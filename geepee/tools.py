@@ -29,58 +29,7 @@ def adam(func, init_params, callback=None, maxiter=1000,
     return x
 
 
-def objective_wrapper(params, params_args, obj, idxs, yb, N_train, alpha):
-    params_dict = unflatten_dict(params, params_args)
-    f, grad_dict = obj.objective_function(
-        params_dict, idxs, yb, N_train, alpha=alpha)
-    g, _ = flatten_dict(grad_dict)
-    g_is_fin = np.isfinite(g)
-    if np.all(g_is_fin):
-        return f, g
-    else:
-        print("Warning: inf or nan in gradient: replacing with zeros")
-        return f, np.where(g_is_fin, g, 0.)
 
-
-def flatten_dict(params):
-    keys = params.keys()
-    shapes = {}
-    ind = np.zeros(len(keys), dtype=int)
-    vec = np.array([])
-    for i, key in enumerate(sorted(keys)):
-        val = params[key]
-        shapes[key] = val.shape
-        val_vec = val.ravel()
-        vec = np.concatenate((vec, val_vec))
-        ind[i] = val_vec.shape[0]
-
-    indices = np.cumsum(ind)[:-1]
-    return vec, (keys, indices, shapes)
-
-
-def unflatten_dict(params, params_args):
-    keys, indices, shapes = params_args[0], params_args[1], params_args[2]
-    vals = np.split(params, indices)
-    params_dict = {}
-    for i, key in enumerate(sorted(keys)):
-        params_dict[key] = np.reshape(vals[i], shapes[key])
-    return params_dict
-
-
-def PCA_reduce(X, Q):
-    """
-    A helpful function for linearly reducing the dimensionality of the data X
-    to Q.
-    :param X: data array of size N (number of points) x D (dimensions)
-    :param Q: Number of latent dimensions, Q < D
-    :return: PCA projection array of size N x Q.
-    """
-    assert Q <= X.shape[1], 'Cannot have more latent dimensions than observed'
-    evecs, evals = np.linalg.eigh(np.cov(X.T))
-    i = np.argsort(evecs)[::-1]
-    W = evals[:, i]
-    W = W[:, :Q]
-    return (X - X.mean(0)).dot(W)
 
 
 def make_batches(N_data, batch_size):
@@ -254,88 +203,13 @@ def is_positive_definite(x):
         print "Unexpected error:", sys.exc_info()[0]
         raise
 
-
 def is_any_nan(x):
     return np.any(np.isnan(x))
-
 
 def compute_distance_matrix(x):
     diff = (x[:, None, :] - x[None, :, :])
     dist = abs(diff)
     return dist
-
-
-def softmax(w):
-    w = np.array(w)
-    maxes = np.amax(w, axis=1)
-    maxes = maxes.reshape(maxes.shape[0], 1)
-    e = np.exp(w - maxes)
-    esum = np.sum(e, axis=1)
-    dist = e / esum.reshape(esum.shape[0], 1)
-    return dist
-
-
-def softmax_onecol(w, col):
-    w = np.array(w)
-    maxes = np.amax(w, axis=1)
-    maxes = maxes.reshape(maxes.shape[0], 1)
-    e = np.exp(w - maxes)
-    esum = np.sum(e, axis=1)
-    p_y_given_w = e / esum.reshape(esum.shape[0], 1)
-    dist = p_y_given_w[:, col]
-    ddist_dw = - dist * p_y_given_w
-    ddist_dw[:, col] = ddist_dw[:, col] + dist
-    return dist, ddist_dw
-
-
-def softmax_given_y(w, ylabel):
-
-    w = np.array(w)
-    no_samples = w.shape[0]
-    no_classes = w.shape[1]
-    maxes = np.amax(w, axis=1)
-    maxes = maxes.reshape(maxes.shape[0], 1)
-    exp_w = np.exp(w - maxes)
-    exp_w_sum = np.sum(exp_w, axis=1).reshape((no_samples, 1))
-    exp_w_sum_mat = np.tile(exp_w_sum, (1, no_classes))
-    exp_w_div = exp_w / exp_w_sum_mat
-    py_k = exp_w_div[:, ylabel]
-    py = np.sum(py_k)
-
-    py_k_mat = np.tile(py_k, (1, no_classes))
-    dpy = - py_k_mat * exp_w_div
-    dpy[:, ylabel] += py_k
-    return py, dpy
-
-    # w = np.array(w)
-    # no_samples = w.shape[0]
-    # no_classes = w.shape[1]
-    # w_max_vec = np.amax(w, axis=1).reshape((no_samples, 1))
-    # w_max = np.tile(w_max_vec, (1, no_classes))
-    # exp_w_bottom = np.exp(w - w_max)
-    # exp_w_top = np.exp(w[:, ylabel] - no_classes*w_max_vec)
-    # sum_exp_w_bottom = np.sum(exp_w_bottom, axis=1).reshape((no_samples, 1))
-    # py_k = exp_w_top / sum_exp_w_bottom**no_classes
-    # py = np.sum(py_k)
-
-    # tmp1 = np.exp(w - w_max)
-    # tmp1_sum = np.sum(tmp1, axis=1).reshape((no_samples, 1))
-    # tmp2 = -no_classes * py_k / tmp1_sum
-    # tmp2_rep = np.tile(tmp2, (1, no_classes))
-    # dpy = tmp2_rep * tmp1
-    # dpy[:, ylabel] += py_k
-
-    # exp_w_label_col = exp_w[:, ylabel]
-    # sum_exp_w = np.sum(exp_w, axis=1).reshape((no_samples, 1))
-    # p_y_k = exp_w_label_col / sum_exp_w**no_classes
-    # p_y = np.sum(p_y_k)
-
-    # dp_y_temp1 = -no_classes * p_y_k / sum_exp_w
-    # dp_y = np.tile(dp_y_temp1, (1, no_classes)) * exp_w
-    # dp_y[:, ylabel] += p_y_k
-
-    return py, dpy
-
 
 def perf_measure(y_actual, y_hat):
     TP = 0

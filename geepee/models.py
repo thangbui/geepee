@@ -1,31 +1,26 @@
-import pprint
-pp = pprint.PrettyPrinter(indent=4)
 import sys
 import math
 import numpy as np
 import scipy.linalg as npalg
-import scipy.stats as stats
-from fitc_layer import FITC_Layer
-from eq_kernel import *
-import copy
+from kernels import *
 import matplotlib.pyplot as plt
 import time
-import multiprocessing as mp
-import os
-from tools import *
 import pdb
 from scipy.optimize import minimize
+from utils import *
+
+
+# ideally this should be moved to some config file
+jitter = 1e-4
 
 
 class GP_AEP_Layer:
-
     def __init__(self, Ntrain, hidden_size, output_size, no_pseudo, lik):
         self.lik = lik
         self.hidden_size = hidden_size
         self.output_size = output_size
         self.no_pseudos = no_pseudo
         self.Ntrain = Ntrain
-        self.jitter = 1e-4
         self.no_output_noise = self.lik.lower() != 'gaussian'
 
         self.ones_M = np.ones(no_pseudo)
@@ -310,7 +305,7 @@ class GP_AEP_Layer:
         M = self.no_pseudos
         zu = self.zu
         self.Kuu = compute_kernel(2 * ls, 2 * sf, zu, zu)
-        self.Kuu += np.diag(self.jitter * np.ones((M, )))
+        self.Kuu += np.diag(jitter * np.ones((M, )))
         # self.Kuuinv = matrixInverse(self.Kuu)
         self.Kuuinv = np.linalg.inv(self.Kuu)
 
@@ -398,7 +393,7 @@ class GP_AEP_Layer:
         zu += 0.1 * np.random.randn(zu.shape[0], zu.shape[1])
         # zu = np.random.randn(M, Din)
         Kuu = compute_kernel(2 * ls, 2 * sf, zu, zu)
-        Kuu += np.diag(self.jitter * np.ones((M, )))
+        Kuu += np.diag(jitter * np.ones((M, )))
         Kuuinv = matrixInverse(Kuu)
 
         for d in range(Dout):
@@ -482,7 +477,6 @@ class GPLVM_AEP:
 
     def __init__(self, y_train, hidden_size, no_pseudo,
                  lik='Gaussian'):
-
         self.lik = lik
         self.y_train = y_train
         self.N_train, self.output_size = y_train.shape
@@ -512,7 +506,7 @@ class GPLVM_AEP:
         toprint = False
         # update layer with new hypers
         t1 = time.time()
-        self.fitc_layer.update_hypers(params)
+        self.sgp_layer.update_hypers(params)
         self.factor_x1 = params['x1']
         self.factor_x2 = np.exp(2 * params['x2'])
         # self.factor_x2 = sigmoid(params['x2'])
@@ -522,21 +516,21 @@ class GPLVM_AEP:
 
         # update Kuu given new hypers
         t1 = time.time()
-        self.fitc_layer.compute_kuu()
+        self.sgp_layer.compute_kuu()
         t2 = time.time()
         if toprint:
             print "compute Kuu %.4fs" % (t2 - t1)
 
         # compute mu and Su for each layer
         t1 = time.time()
-        self.fitc_layer.update_posterior()
+        self.sgp_layer.update_posterior()
         t2 = time.time()
         if toprint:
             print "compute posterior %.4fs" % (t2 - t1)
 
         # compute muhat and Suhat for each layer
         t1 = time.time()
-        self.fitc_layer.compute_cavity(alpha=alpha)
+        self.sgp_layer.compute_cavity(alpha=alpha)
         t2 = time.time()
         if toprint:
             print "compute cavity %.4fs" % (t2 - t1)
@@ -545,7 +539,7 @@ class GPLVM_AEP:
     def objective_function(self, params, idxs, yb, N_train, alpha=1.0):
         toprint = False
         N_batch = yb.shape[0]
-        layer = self.fitc_layer
+        layer = self.sgp_layer
         scale_logZ = - N_train * 1.0 / N_batch / alpha
 
         beta = (N_train - alpha) * 1.0 / N_train
@@ -739,7 +733,7 @@ class GPLVM_AEP:
         return np.sum(0.5 * (m**2 / v + np.log(v)))
 
     def predict_given_inputs(self, inputs, add_noise=False):
-        my, vy = self.fitc_layer.output_probabilistic(inputs, add_noise=False)
+        my, vy = self.sgp_layer.output_probabilistic(inputs, add_noise=False)
         return my, vy
 
     def get_posterior_x(self):
@@ -765,7 +759,7 @@ class GPLVM_AEP:
 
             # propagate x through posterior and get gradients wrt mx and vx
             logZ, m, v, dlogZ_dmx, dlogZ_dvx = \
-                self.fitc_layer.compute_logZ_and_gradients_imputation(
+                self.sgp_layer.compute_logZ_and_gradients_imputation(
                     cav_m, cav_v,
                     y, missing_mask, alpha=alpha)
             
@@ -790,14 +784,14 @@ class GPLVM_AEP:
         # pdb.set_trace()
 
         # propagate x forward to predict missing points
-        my, vy = self.fitc_layer.forward_propagation_thru_post(
+        my, vy = self.sgp_layer.forward_propagation_thru_post(
             post_m, post_v, add_noise=add_noise)
 
         return my, vy
 
     def initialise_hypers(self, y_train):
         Din = self.hidden_size
-        init_params = self.fitc_layer.init_hypers()
+        init_params = self.sgp_layer.init_hypers()
         # if self.lik.lower() == 'gaussian':
         #     post_m = PCA_reduce(y_train, Din)
         # else:
@@ -815,7 +809,7 @@ class GPLVM_AEP:
         return init_params
 
     def get_hypers(self):
-        params = self.fitc_layer.get_hypers()
+        params = self.sgp_layer.get_hypers()
         params['x1'] = self.factor_x1
         params['x2'] = np.log(self.factor_x2) / 2.0
         return params
