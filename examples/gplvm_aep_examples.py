@@ -2,7 +2,7 @@ print "importing stuff..."
 import numpy as np
 import pdb
 import matplotlib.pylab as plt
-from .context import GPLVM_AEP
+from .context import SGPLVM
 from scipy import special
 
 
@@ -30,7 +30,7 @@ def run_cluster():
 	print "inference ..."
 	M = 20
 	D = 5
-	lvm = GPLVM_AEP(Y, D, M, lik='Gaussian')
+	lvm = SGPLVM(Y, D, M, lik='Gaussian')
 
 	lvm.optimise(method='L-BFGS-B', alpha=0.1)
 	# lvm.optimise(method='CG', alpha=0.2)
@@ -88,8 +88,8 @@ def run_mnist():
 	print "inference ..."
 	M = 30
 	D = 2
-	# lvm = GPLVM_AEP(Y, D, M, lik='Gaussian')
-	lvm = GPLVM_AEP(Y, D, M, lik='Probit')
+	# lvm = SGPLVM(Y, D, M, lik='Gaussian')
+	lvm = SGPLVM(Y, D, M, lik='Probit')
 	# lvm.train(alpha=0.5, no_epochs=10, n_per_mb=100, lrate=0.1, fixed_params=['sn'])
 	lvm.optimise(method='L-BFGS-B', alpha=0.1)
 	plt.figure()
@@ -183,7 +183,7 @@ def run_oil():
 	print "inference ..."
 	M = 20
 	D = 5
-	lvm = GPLVM_AEP(Y, D, M, lik='Gaussian')
+	lvm = SGPLVM(Y, D, M, lik='Gaussian')
 	# lvm.set_fixed_params('sn')
 	lvm.optimise(method='L-BFGS-B', alpha=0.3, maxiter=3000)
 
@@ -230,7 +230,7 @@ def run_pinwheel():
 	print "inference ..."
 	M = 20
 	D = 2
-	lvm = GPLVM_AEP(Y, D, M, lik='Gaussian')
+	lvm = SGPLVM(Y, D, M, lik='Gaussian')
 	lvm.optimise(method='L-BFGS-B', alpha=0.2)
 
 	mx, vx = lvm.get_posterior_x()
@@ -263,7 +263,7 @@ def run_semicircle():
 	print "inference ..."
 	M = 10
 	D = 2
-	lvm = GPLVM_AEP(Y, D, M, lik='Gaussian')
+	lvm = SGPLVM(Y, D, M, lik='Gaussian')
 	lvm.optimise(method='L-BFGS-B', alpha=0.5, maxiter=2000)
 
 	plt.figure()
@@ -310,7 +310,7 @@ def run_xor():
 	print "inference ..."
 	M = 10
 	D = 2
-	lvm = GPLVM_AEP(Y, D, M, lik='Probit')
+	lvm = SGPLVM(Y, D, M, lik='Probit')
 	lvm.optimise(method='L-BFGS-B', alpha=0.1, maxiter=200)
 
 	lvm.sgp_layer.update_posterior_for_prediction()
@@ -365,7 +365,7 @@ def run_frey():
 	print "inference ..."
 	M = 30
 	D = 20
-	lvm = GPLVM_AEP(Y, D, M, lik='Gaussian')
+	lvm = SGPLVM(Y, D, M, lik='Gaussian')
 	# lvm.train(alpha=0.5, no_epochs=10, n_per_mb=100, lrate=0.1, fixed_params=['sn'])
 	lvm.optimise(method='L-BFGS-B', alpha=0.1, maxiter=10)
 	plt.figure()

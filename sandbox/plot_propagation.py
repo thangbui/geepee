@@ -6,7 +6,7 @@ mpl.use('pgf')
 from sklearn.neighbors import KernelDensity
 from scipy.stats.kde import gaussian_kde
 
-from geepee.kernels import RBF
+from geepee.kernels import *
 
 import pdb
 
@@ -95,7 +95,7 @@ lsn = np.log(0.05)
 N_train = 100
 x_train = np.linspace(-5, 5, N_train)
 x_train = np.reshape(x_train, (N_train, 1))
-Kff = RBF.compute_kernel(lls, lsf, x_train, x_train) + 1e-6 * np.eye(N_train)
+Kff = compute_kernel(lls, lsf, x_train, x_train) + 1e-6 * np.eye(N_train)
 f_train = np.dot(spla.cholesky(Kff).T, np.random.randn(N_train, 1))
 y_train = f_train + np.exp(lsn) * np.random.randn(N_train, 1)
 
@@ -103,8 +103,8 @@ y_train = f_train + np.exp(lsn) * np.random.randn(N_train, 1)
 M = 30
 z = np.linspace(-4.5, 4.5, M)
 z = np.reshape(z, (M, 1))
-Kuu = RBF.compute_kernel(lls, lsf, z, z) + 1e-6 * np.eye(M)
-Kfu = RBF.compute_kernel(lls, lsf, x_train, z)
+Kuu = compute_kernel(lls, lsf, z, z) + 1e-6 * np.eye(M)
+Kfu = compute_kernel(lls, lsf, x_train, z)
 Kuuinv = matrixInverse(Kuu)
 
 Qff = np.dot(Kfu, np.dot(Kuuinv, Kfu.T))
@@ -119,8 +119,8 @@ Vu = Kuu - np.dot(Kfu.T, np.dot(Qffplus_inv, Kfu))
 N_test = 200
 x_test = np.linspace(-6, 7, N_test)
 x_test = np.reshape(x_test, (N_test, 1))
-Ktu = RBF.compute_kernel(lls, lsf, x_test, z)
-Ktt = RBF.compute_kernel(lls, lsf, x_test, x_test)
+Ktu = compute_kernel(lls, lsf, x_test, z)
+Ktt = compute_kernel(lls, lsf, x_test, x_test)
 KtuKuuinv = np.dot(Ktu, Kuuinv)
 mt = np.dot(KtuKuuinv, mu)
 Vt = Ktt - np.dot(KtuKuuinv, Ktu.T) + np.dot(KtuKuuinv, np.dot(Vu, KtuKuuinv.T)) + np.exp(lsn) * np.eye(N_test)
@@ -128,8 +128,8 @@ mt = np.reshape(mt, (N_test, ))
 vt = np.sqrt(np.diag(Vt).reshape((N_test, )))
 
 def compute_m_v_mm(mx, vx):
-    E0 = RBF.compute_kernel(lls, lsf, mx, mx)
-    E1, E2 = RBF.compute_psi_weave(lls, lsf, mx, vx, z)
+    E0 = compute_kernel(lls, lsf, mx, mx)
+    E1, E2 = compute_psi_weave(lls, lsf, mx, vx, z)
     mx = np.dot(E1, np.dot(Kuuinv, mu))
 
     B = np.dot(Kuuinv, np.dot(Vu + np.outer(mu, mu), Kuuinv)) - Kuuinv
@@ -139,8 +139,8 @@ def compute_m_v_mm(mx, vx):
 
 
 def compute_m_v_mm_approx(mx, vx):
-    E0 = RBF.compute_kernel(lls, lsf, mx, mx)
-    E1, E2 = RBF.compute_psi_weave(lls, lsf, mx, vx, z)
+    E0 = compute_kernel(lls, lsf, mx, mx)
+    E1, E2 = compute_psi_weave(lls, lsf, mx, vx, z)
     E2 = np.diag(np.diag(E2[0, :, :]) - E1**2) + np.outer(E1, E1)
     mx = np.dot(E1, np.dot(Kuuinv, mu))
 
@@ -151,7 +151,7 @@ def compute_m_v_mm_approx(mx, vx):
 
 
 def compute_m_v_lin(mx, vx):
-    ksu = RBF.compute_kernel(lls, lsf, mx, z)
+    ksu = compute_kernel(lls, lsf, mx, z)
     kss = np.exp(lls) * np.ones((mx.shape[0], 1))
 
     ms = np.dot(ksu, np.dot(Kuuinv, mu))
@@ -160,7 +160,7 @@ def compute_m_v_lin(mx, vx):
     vs = kss - np.sum(ksu * Kuuinv_kus.T, axis=1, keepdims=True)
     vs = vs + np.sum(Kuuinv_kus.T * np.dot(Vu, Kuuinv_kus), axis=1, keepdims=True)
 
-    dK = RBF.grad_x(lls, lsf, mx, z)
+    dK = grad_x(lls, lsf, mx, z)
     g = np.einsum('nmd,ma->nd', dK, np.dot(Kuuinv, mu))
     
     m = ms
@@ -203,8 +203,8 @@ for i, val in enumerate(m_ins):
     for n in range(N_samples):
 
         x_in = m_in + np.sqrt(v_in) * np.random.randn()
-        Ktu = RBF.compute_kernel(lls, lsf, x_in, z)
-        Ktt = RBF.compute_kernel(lls, lsf, x_in, x_in)
+        Ktu = compute_kernel(lls, lsf, x_in, z)
+        Ktt = compute_kernel(lls, lsf, x_in, x_in)
         KtuKuuinv = np.dot(Ktu, Kuuinv)
         mtn = np.dot(KtuKuuinv, mu)
         Vtn = Ktt - np.dot(KtuKuuinv, Ktu.T) + np.dot(KtuKuuinv, np.dot(Vu, KtuKuuinv.T)) + np.exp(lsn)

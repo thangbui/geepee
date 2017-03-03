@@ -14,7 +14,7 @@ from utils import *
 jitter = 1e-4
 
 
-class GP_AEP_Layer:
+class SGP_Layer:
     def __init__(self, Ntrain, hidden_size, output_size, no_pseudo, lik):
         self.lik = lik
         self.hidden_size = hidden_size
@@ -473,7 +473,7 @@ class GP_AEP_Layer:
             self.theta_2[d, :] = theta_m_d
 
 
-class GPLVM_AEP:
+class SGPLVM:
 
     def __init__(self, y_train, hidden_size, no_pseudo,
                  lik='Gaussian'):
@@ -485,7 +485,7 @@ class GPLVM_AEP:
         self.no_pseudo = no_pseudo
 
         # create a layer
-        self.sgp_layer = GP_AEP_Layer(self.N_train, self.hidden_size,
+        self.sgp_layer = SGP_Layer(self.N_train, self.hidden_size,
                                      self.output_size, self.no_pseudo,
                                      lik=lik)
 
