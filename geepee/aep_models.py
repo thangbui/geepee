@@ -92,9 +92,6 @@ class SGP_Layer(object):
         return phi
 
     def output_probabilistic(self, x, add_noise=False):
-        Din = self.input_size
-        Dout = self.output_size
-        M = self.no_pseudos
         psi0 = np.exp(2*self.sf)
         psi1 = compute_kernel(2*self.ls, 2*self.sf, x, self.zu)
         mout = np.einsum('nm,dm->nd', psi1, self.A)
@@ -238,10 +235,8 @@ class SGP_Layer(object):
 
     def update_posterior(self):
         # compute the posterior approximation
-        Dout = self.Dout
-        Kuuinv = self.Kuuinv
-        for d in range(Dout):
-            Sinv = Kuuinv + self.theta_1[d, :, :]
+        for d in range(self.Dout):
+            Sinv = self.Kuuinv + self.theta_1[d, :, :]
             SinvM = self.theta_2[d, :]
             # S = matrixInverse(Sinv)
             S = np.linalg.inv(Sinv)
@@ -254,21 +249,20 @@ class SGP_Layer(object):
 
     def update_posterior_for_prediction(self):
         # compute the posterior approximation
-        Dout = self.output_size
-        for d in range(Dout):
-            Kuuinvd = self.Kuuinv
-            Sinv = Kuuinvd + self.theta_1[d, :, :]
+        Kuuinv = self.Kuuinv
+        for d in range(self.Dout):
+            Sinv = Kuuinv + self.theta_1[d, :, :]
             SinvM = self.theta_2[d, :]
             S = matrixInverse(Sinv)
             self.Su[d, :, :] = S
             m = np.dot(S, SinvM)
             self.mu[d, :] = m
 
-            self.A[d, :] = np.dot(Kuuinvd, m)
+            self.A[d, :] = np.dot(Kuuinv, m)
             Smm = S + np.outer(m, m)
             self.Splusmm[d, :, :] = Smm
-            self.B_det[d, :, :] = np.dot(Kuuinvd, np.dot(S, Kuuinvd)) - Kuuinvd
-            self.B_sto[d, :, :] = np.dot(Kuuinvd, np.dot(Smm, Kuuinvd)) - Kuuinvd
+            self.B_det[d, :, :] = np.dot(Kuuinv, np.dot(S, Kuuinv)) - Kuuinv
+            self.B_sto[d, :, :] = np.dot(Kuuinv, np.dot(Smm, Kuuinv)) - Kuuinv
 
     def init_hypers(self):
         # dict to hold hypers, inducing points and parameters of q(U)
@@ -383,7 +377,7 @@ class Lik_Layer(object):
     def compute_log_Z(self, mout, vout, y, alpha=1.0):
         pass
 
-    def backprop_grads(self, mout, vout, dmout, dvout, alpha=1.0):
+    def backprop_grads(self, mout, vout, dmout, dvout, alpha=1.0, scale=1.0):
         return {}
 
     def init_hypers(self):
@@ -431,6 +425,7 @@ class Gauss_Layer(Lik_Layer):
 
     def update_hypers(self, params):
         self.sn = params['sn']
+
 
 class Probit_Layer(Lik_Layer):
 
@@ -482,6 +477,7 @@ class AEP_Model(object):
         self.y_train = y_train
         self.N = y_train.shape[0]
         self.fixed_params = []
+        self.updated = False
 
     def init_hypers(self, y_train, x_train=None):
         pass
@@ -492,6 +488,7 @@ class AEP_Model(object):
     def optimise(
         self, method='L-BFGS-B', tol=None, reinit_hypers=True, 
         callback=None, maxiter=1000, alpha=0.5, adam_lr=0.05, **kargs):
+        self.updated = False
 
         if reinit_hypers:
             init_params_dict = self.init_hypers(self.y_train)
@@ -682,8 +679,19 @@ class SGPLVM(AEP_Model):
         v = 1.0 / t2
         return np.sum(0.5 * (m**2 / v + np.log(v)))
 
-    def predict_given_inputs(self, inputs, add_noise=False):
-        my, vy = self.sgp_layer.output_probabilistic(inputs, add_noise=False)
+    def predict_f(self, inputs):
+        if not self.updated:
+            self.sgp_layer.update_posterior_for_prediction()
+            self.updated = True
+        mf, vf = self.sgp_layer.output_probabilistic(inputs)
+        return mf, vf
+
+    def predict_y(self, inputs):
+        if not self.updated:
+            self.sgp_layer.update_posterior_for_prediction()
+            self.updated = True
+        mf, vf = self.sgp_layer.output_probabilistic(inputs)
+        my, vy = self.lik_layer.output_probabilistic(mf, vf)
         return my, vy
 
     def get_posterior_x(self):
@@ -694,9 +702,14 @@ class SGPLVM(AEP_Model):
         return mx, vx
 
     def impute_missing(self, y, missing_mask, alpha=0.5, no_iters=10, add_noise=False):
+        # TODO
         # find latent conditioned on observed variables
+        if not self.updated:
+            self.sgp_layer.update_posterior_for_prediction()
+            self.updated = True
+
         N_test = y.shape[0]
-        Q = self.hidden_size
+        Q = self.Din
         # np.zeros((N_test, Q))
         factor_x1 = np.zeros((N_test, Q))
         factor_x2 = np.zeros((N_test, Q))

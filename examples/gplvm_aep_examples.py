@@ -51,7 +51,6 @@ def run_cluster():
 	plt.plot(zu[:, inds[0]], zu[:, inds[1]], 'ko')
 	plt.show()
 
-	# lvm.sgp_layer.update_posterior_for_prediction()
 	# X = np.random.normal(0, 1, (N, 5))
 	# A = np.random.multivariate_normal(np.zeros(N), k1.K(X), 10).T
 	# B = np.random.multivariate_normal(np.zeros(N), k2.K(X), 10).T
@@ -99,7 +98,6 @@ def run_mnist():
 	plt.plot(zu[:, 0], zu[:, 1], 'ko')
 
 
-	lvm.sgp_layer.update_posterior_for_prediction()
 	nx = ny = 30
 	x_values = np.linspace(-5, 5, nx)
 	y_values = np.linspace(-5, 5, ny)
@@ -109,7 +107,7 @@ def run_mnist():
 	for i, yi in enumerate(x_values):
 	    for j, xi in enumerate(y_values):
 	        z_mu = np.array([[xi, yi]])
-	        x_mean, x_var = lvm.predict_given_inputs(z_mu)
+	        x_mean, x_var = lvm.predict_f(z_mu)
 	        t = x_mean / np.sqrt(1 + x_var)
 	        Z = 0.5 * (1 + special.erf(t / np.sqrt(2)))
 	        canvas[(nx-i-1)*sx:(nx-i)*sx, j*sy:(j+1)*sy] = Z.reshape(sx, sy)
@@ -270,7 +268,6 @@ def run_semicircle():
 	plt.plot(Y[:, 0], Y[:, 1], 'sb')
 
 	mx, vx = lvm.get_posterior_x()
-	lvm.sgp_layer.update_posterior_for_prediction()
 	for i in range(mx.shape[0]):
 	    mxi = mx[i, :]
 	    vxi = vx[i, :]
@@ -279,7 +276,7 @@ def run_semicircle():
 	    mxis = np.vstack([mxi.reshape((1, D)),
 	                      mxi1.reshape((1, D)),
 	                      mxi2.reshape((1, D))])
-	    myis, vyis = lvm.predict_given_inputs(mxis, add_noise=False)
+	    myis, vyis = lvm.predict_f(mxis)
 
 	    plt.errorbar(myis[:, 0], myis[:, 1],
 	                 xerr=np.sqrt(vyis[:, 0]), yerr=np.sqrt(vyis[:, 1]), fmt='.k')
@@ -313,8 +310,6 @@ def run_xor():
 	lvm = SGPLVM(Y, D, M, lik='Probit')
 	lvm.optimise(method='L-BFGS-B', alpha=0.1, maxiter=200)
 
-	lvm.sgp_layer.update_posterior_for_prediction()
-
 	# predict given inputs
 	mx, vx = lvm.get_posterior_x()
 	lims = [-1.5, 1.5]
@@ -324,7 +319,7 @@ def run_xor():
 	X_ravel = X.ravel()
 	Y_ravel = Y.ravel()
 	inputs = np.vstack((X_ravel, Y_ravel)).T
-	my, vy = lvm.predict_given_inputs(inputs, add_noise=False)
+	my, vy = lvm.predict_f(inputs)
 	t = my / np.sqrt(1 + vy)
 	Z = 0.5 * (1 + special.erf(t / np.sqrt(2)))
 	for d in range(3):
@@ -336,17 +331,17 @@ def run_xor():
 		plt.xlim(*lims)
 		plt.ylim(*lims)
 
-	Y_test = np.array([[1, -1, 1], [-1, 1, 1], [-1, -1, -1], [1, 1, -1]])
-	# impute missing data
-	for k in range(3):
-		Y_test_k = Y_test
-		missing_mask = np.ones_like(Y_test_k)
-		missing_mask[:, k] = 0
-		my_pred, vy_pred = lvm.impute_missing(
-			Y_test_k, missing_mask, 
-			alpha=0.1, no_iters=100, add_noise=False)
+	# Y_test = np.array([[1, -1, 1], [-1, 1, 1], [-1, -1, -1], [1, 1, -1]])
+	# # impute missing data
+	# for k in range(3):
+	# 	Y_test_k = Y_test
+	# 	missing_mask = np.ones_like(Y_test_k)
+	# 	missing_mask[:, k] = 0
+	# 	my_pred, vy_pred = lvm.impute_missing(
+	# 		Y_test_k, missing_mask, 
+	# 		alpha=0.1, no_iters=100, add_noise=False)
 
-		print k, my_pred, vy_pred, Y_test_k
+	# 	print k, my_pred, vy_pred, Y_test_k
 
 	plt.show()
 
@@ -359,7 +354,6 @@ def run_frey():
 	Yn = Y - np.mean(Y, axis=0)
 	Yn /= np.std(Y, axis=0)
 	Y = Yn
-
 
 	# inference
 	print "inference ..."
@@ -374,8 +368,6 @@ def run_frey():
 	plt.scatter(mx[:, 0], mx[:, 1])
 	plt.plot(zu[:, 0], zu[:, 1], 'ko')
 
-
-	lvm.sgp_layer.update_posterior_for_prediction()
 	nx = ny = 30
 	x_values = np.linspace(-5, 5, nx)
 	y_values = np.linspace(-5, 5, ny)
@@ -385,7 +377,7 @@ def run_frey():
 	for i, yi in enumerate(x_values):
 	    for j, xi in enumerate(y_values):
 	        z_mu = np.array([[xi, yi]])
-	        x_mean, x_var = lvm.predict_given_inputs(z_mu)
+	        x_mean, x_var = lvm.predict_f(z_mu)
 	        canvas[(nx-i-1)*sx:(nx-i)*sx, j*sy:(j+1)*sy] = x_mean.reshape(sx, sy)
 
 	plt.figure(figsize=(8, 10))        
@@ -396,7 +388,7 @@ def run_frey():
 	plt.show()
 
 if __name__ == '__main__':
-	run_cluster()
-	run_semicircle()
-	run_pinwheel()
+	# run_cluster()
+	# run_semicircle()
+	# run_pinwheel()
 	run_xor()
