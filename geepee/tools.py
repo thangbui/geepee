@@ -29,9 +29,6 @@ def adam(func, init_params, callback=None, maxiter=1000,
     return x
 
 
-
-
-
 def make_batches(N_data, batch_size):
     return [slice(i, min(i + batch_size, N_data)) for i in range(0, N_data, batch_size)]
 

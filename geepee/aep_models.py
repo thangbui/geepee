@@ -2,34 +2,33 @@ import sys
 import math
 import numpy as np
 import scipy.linalg as npalg
-from kernels import *
+from scipy import special
+from scipy.optimize import minimize
 import matplotlib.pyplot as plt
 import time
 import pdb
-from scipy.optimize import minimize
+from collections import OrderedDict
+
 from utils import *
+from kernels import *
 
 
-# ideally this should be moved to some config file
+# ideally these should be moved to some config file
 jitter = 1e-4
+gh_degree = 10
 
 
-class SGP_Layer:
-    def __init__(self, Ntrain, hidden_size, output_size, no_pseudo, lik):
-        self.lik = lik
-        self.hidden_size = hidden_size
-        self.output_size = output_size
-        self.no_pseudos = no_pseudo
-        self.Ntrain = Ntrain
-        self.no_output_noise = self.lik.lower() != 'gaussian'
+class SGP_Layer(object):
 
-        self.ones_M = np.ones(no_pseudo)
-        self.ones_D = np.ones(hidden_size)
+    def __init__(self, no_train, input_size, output_size, no_pseudo):
+        self.Din = Din = input_size
+        self.Dout = Dout = output_size
+        self.M = M = no_pseudo
+        self.N = N = no_train
+
+        self.ones_M = np.ones(M)
+        self.ones_Din = np.ones(Din)
         self.ones_M_ls = 0
-
-        Din = self.hidden_size
-        Dout = self.output_size
-        M = self.no_pseudos
 
         # variables for the mean and covariance of q(u)
         self.mu = np.zeros([Dout, M, ])
@@ -50,8 +49,6 @@ class SGP_Layer:
         # variables for the hyperparameters
         self.ls = np.zeros([Din, ])
         self.sf = 0
-        if not self.no_output_noise:
-            self.sn = 0
 
         # and natural parameters
         self.theta_1_R = np.zeros([Dout, M, M])
@@ -66,243 +63,154 @@ class SGP_Layer:
         self.B_sto = np.zeros([Dout, M, M])
 
     def compute_phi_prior(self):
-        logZ_prior = 0
-        Dout = self.output_size
         (sign, logdet) = np.linalg.slogdet(self.Kuu)
-        logZ_prior += Dout * 0.5 * logdet
-
+        logZ_prior = self.Dout * 0.5 * logdet
         return logZ_prior
 
     def compute_phi_posterior(self):
-        logZ_posterior = 0
-        mu = self.mu
-        Su = self.Su
-        (sign, logdet) = np.linalg.slogdet(Su)
+        (sign, logdet) = np.linalg.slogdet(self.Su)
         phi_posterior = 0.5 * np.sum(logdet)
-        phi_posterior += 0.5 * \
-            np.sum(mu * np.linalg.solve(Su, mu))
+        phi_posterior += 0.5 * np.sum(self.mu*np.linalg.solve(self.Su, self.mu))
         return phi_posterior
-
 
     def compute_phi_cavity(self):
         logZ_posterior = 0
-        mu = self.muhat
-        Su = self.Suhat
-        (sign, logdet) = np.linalg.slogdet(Su)
+        (sign, logdet) = np.linalg.slogdet(self.Suhat)
         phi_cavity = 0.5 * np.sum(logdet)
-        phi_cavity += 0.5 * \
-            np.sum(mu * np.linalg.solve(Su, mu))
+        phi_cavity += 0.5 * np.sum(self.muhat*np.linalg.solve(self.Suhat, self.muhat))
         return phi_cavity
 
+    def compute_phi(self, alpha=1.0):
+        N = self.N
+        scale_post = N * 1.0 / alpha - 1.0
+        scale_cav = - N * 1.0 / alpha
+        scale_prior = 1
+        phi_prior = self.compute_phi_prior()
+        phi_post = self.compute_phi_posterior()
+        phi_cav = self.compute_phi_cavity()
+        phi = scale_prior*phi_prior + scale_post*phi_post + scale_cav*phi_cav
+        return phi
 
     def output_probabilistic(self, x, add_noise=False):
-        Din = self.hidden_size
+        Din = self.input_size
         Dout = self.output_size
         M = self.no_pseudos
-        ls = self.ls
-        sf = self.sf
-        sf2 = np.exp(2.0 * sf)
-        psi1 = compute_kernel(2 * ls, 2 * sf, x, self.zu)
+        psi0 = np.exp(2*self.sf)
+        psi1 = compute_kernel(2*self.ls, 2*self.sf, x, self.zu)
         mout = np.einsum('nm,dm->nd', psi1, self.A)
         Bhatpsi2 = np.einsum('dab,na,nb->nd', self.B_det, psi1, psi1)
-        vout = sf2 + Bhatpsi2
-        if add_noise and self.lik.lower() == 'gaussian':
-            sn2 = np.exp(2.0 * self.sn)
-            vout += sn2
-
+        vout = psi0 + Bhatpsi2
         return mout, vout
 
-    def forward_propagation_thru_post(self, mx, vx, add_noise=True):
-        ls = self.ls
-        sf = self.sf
-        sf2 = np.exp(2.0 * sf)
-        N = mx.shape[0]
-        psi0 = sf2
-        zu = self.zu
-
-        psi1, psi2 = compute_psi_weave(2 * ls, 2 * sf, mx, vx, zu)
-        mout = np.einsum('nm,dm->nd', psi1, self.A)
-        Bhatpsi2 = np.einsum('dab,nab->nd', self.B_sto, psi2)
-        vout = psi0 + Bhatpsi2 - mout**2
-
-        if add_noise and self.lik.lower() == 'gaussian':
-            sn2 = np.exp(2.0 * self.sn)
-            vout += sn2
-
-        return mout, vout
-
-
-    def compute_logZ_and_gradients_imputation(
-            self, mx, vx, y, missing_mask, 
-            alpha=1.0, add_noise=False, gh_deg=10):
-        Din = self.hidden_size
-        Dout = self.output_size
-        M = self.no_pseudos
-        ls = self.ls
-        sf = self.sf
-        sf2 = np.exp(2.0 * sf)
-        N = mx.shape[0]
-        psi0 = sf2
-        zu = self.zu
-
-        psi1, psi2 = compute_psi_weave(2 * ls, 2 * sf, mx, vx, zu)
-        mout = np.einsum('nm,dm->nd', psi1, self.A)
-        Bhatpsi2 = np.einsum('dab,nab->nd', self.B_sto, psi2)
-        vout = psi0 + Bhatpsi2 - mout**2
-
-        # compute logZ
-        if self.lik == 'Gaussian':
-            # real valued data, gaussian lik
-            sn2 = np.exp(2.0 * self.sn)
-            vout += sn2 / alpha
-            logZ = np.sum(-0.5 * (np.log(2 * np.pi * vout) +
-                                  (y - mout)**2 / vout))
-            logZ += N * Dout * (0.5 * np.log(2 * np.pi * sn2 / alpha)
-                                - 0.5 * alpha * np.log(2 * np.pi * sn2))
-            dlogZ_dm = (y - mout) / vout
-            dlogZ_dv = -0.5 / vout + 0.5 * (y - mout)**2 / vout**2
-        elif self.lik == 'Probit':
-            # binary data probit likelihood
-            if alpha == 1.0:
-                t = y * mout / np.sqrt(1 + vout)
-                Z = 0.5 * (1 + special.erf(t / np.sqrt(2)))
-                eps = 1e-16
-                logZ = np.sum(np.log(Z + eps) * missing_mask)
-
-                dlogZ_dt = 1 / (Z + eps) * 1 / np.sqrt(2 *
-                                                       np.pi) * np.exp(-t**2.0 / 2)
-                dlogZ_dt *= missing_mask
-                dt_dm = y / np.sqrt(1 + vout)
-                dt_dv = -0.5 * y * mout / (1 + vout)**1.5
-                dlogZ_dm = dlogZ_dt * dt_dm
-                dlogZ_dv = dlogZ_dt * dt_dv
-            else:
-                gh_x, gh_w = self._gh_points(gh_deg)
-                gh_x = gh_x[:, np.newaxis, np.newaxis]
-                gh_w = gh_w[:, np.newaxis, np.newaxis]
-                ts = gh_x * np.sqrt(2*vout[np.newaxis, :, :]) + mout[np.newaxis, :, :]
-                eps = 1e-8
-                pdfs = 0.5 * (1 + special.erf(y*ts / np.sqrt(2))) + eps
-                Ztilted = np.sum(pdfs**alpha * gh_w, axis=0) / np.sqrt(np.pi)
-                logZ = np.sum(np.log(Ztilted) * missing_mask)
-                
-                a = pdfs**(alpha-1.0)*np.exp(-ts**2/2)
-                dZdm = np.sum(gh_w * a, axis=0) * y * alpha / np.pi / np.sqrt(2)
-                dlogZ_dm = (dZdm / Ztilted + eps) * missing_mask
-
-                dZdv = np.sum(gh_w * (a*gh_x), axis=0) * y * alpha / np.pi / np.sqrt(2) / np.sqrt(2*vout)
-                dlogZ_dv = (dZdv / Ztilted + eps) * missing_mask
-
-
-        # compute grads wrt Ahat and Bhat
-        dlogZ_dm_all = dlogZ_dm - 2 * dlogZ_dv * mout
-        # compute grads wrt psi1 and psi2
-        dpsi1 = np.einsum('nd,dm->nm', dlogZ_dm_all, self.A)
-        dpsi2 = np.einsum('nd,dab->nab', dlogZ_dv, self.B_sto)
-        dsf2, dls, dzu, dmx, dvx = compute_psi_derivatives(
-            dpsi1, psi1, dpsi2, psi2, np.exp(ls), sf2, mx, vx, zu)
-
-        return logZ, mout, vout, dmx, dvx
-
-    __gh_points = None
-    def _gh_points(self, T=20):
-        if self.__gh_points is None:
-            self.__gh_points = np.polynomial.hermite.hermgauss(T)
-        return self.__gh_points
-
-    # @profile
-    def compute_logZ_and_gradients(self, mx, vx, y, alpha=1.0, gh_deg=10):
-        Din = self.hidden_size
-        Dout = self.output_size
-        M = self.no_pseudos
-        ls = self.ls
-        sf = self.sf
-        sf2 = np.exp(2.0 * sf)
-        N = mx.shape[0]
-        psi0 = sf2
-        zu = self.zu
-
-        psi1, psi2 = compute_psi_weave(2 * ls, 2 * sf, mx, vx, zu)
+    def forward_prop_thru_cav(self, mx, vx):
+        psi0 = np.exp(2*self.sf)
+        psi1, psi2 = compute_psi_weave(2*self.ls, 2*self.sf, mx, vx, self.zu)
         mout = np.einsum('nm,dm->nd', psi1, self.Ahat)
         Bhatpsi2 = np.einsum('dab,nab->nd', self.Bhat, psi2)
         vout = psi0 + Bhatpsi2 - mout**2
+        return mout, vout, psi1, psi2
 
-        # compute logZ
-        if self.lik == 'Gaussian':
-            # real valued data, gaussian lik
-            sn2 = np.exp(2.0 * self.sn)
-            vout += sn2 / alpha
-            logZ = np.sum(-0.5 * (np.log(2 * np.pi * vout) +
-                                  (y - mout)**2 / vout))
-            logZ += N * Dout * (0.5 * np.log(2 * np.pi * sn2 / alpha)
-                                - 0.5 * alpha * np.log(2 * np.pi * sn2))
-            dlogZ_dm = (y - mout) / vout
-            dlogZ_dv = -0.5 / vout + 0.5 * (y - mout)**2 / vout**2
-        elif self.lik == 'Probit':
-            # binary data probit likelihood
-            if alpha == 1:
-                t = y * mout / np.sqrt(1 + vout)
-                Z = 0.5 * (1 + special.erf(t / np.sqrt(2)))
-                eps = 1e-16
-                logZ = np.sum(np.log(Z + eps))
+    def backprop_grads_lvm(self, m, v, dm, dv, psi1, psi2, mx, vx, alpha=1.0):
+        N = self.N
+        M = self.M
+        ls = np.exp(self.ls)
+        sf2 = np.exp(2*self.sf)
+        triu_ind = np.triu_indices(M)
+        diag_ind = np.diag_indices(M)
+        mu = self.mu
+        Su = self.Su
+        Spmm = self.Splusmm
+        muhat = self.muhat
+        Suhat = self.Suhat
+        Spmmhat = self.Splusmmhat
+        Kuuinv = self.Kuuinv
 
-                dlogZ_dt = 1 / (Z + eps) * 1 / np.sqrt(2 *
-                                                       np.pi) * np.exp(-t**2.0 / 2)
-                dt_dm = y / np.sqrt(1 + vout)
-                dt_dv = -0.5 * y * mout / (1 + vout)**1.5
-                dlogZ_dm = dlogZ_dt * dt_dm
-                dlogZ_dv = dlogZ_dt * dt_dv
 
-            else:
-                gh_x, gh_w = self._gh_points(gh_deg)
-                gh_x = gh_x[:, np.newaxis, np.newaxis]
-                gh_w = gh_w[:, np.newaxis, np.newaxis]
-
-                ts = gh_x * np.sqrt(2*vout[np.newaxis, :, :]) + mout[np.newaxis, :, :]
-                eps = 1e-8
-                pdfs = 0.5 * (1 + special.erf(y*ts / np.sqrt(2))) + eps
-                Ztilted = np.sum(pdfs**alpha * gh_w, axis=0) / np.sqrt(np.pi)
-                logZ = np.sum(np.log(Ztilted))
-                
-                a = pdfs**(alpha-1.0)*np.exp(-ts**2/2)
-                dZdm = np.sum(gh_w * a, axis=0) * y * alpha / np.pi / np.sqrt(2)
-                dlogZ_dm = dZdm / Ztilted + eps
-
-                dZdv = np.sum(gh_w * (a*gh_x), axis=0) * y * alpha / np.pi / np.sqrt(2) / np.sqrt(2*vout)
-                dlogZ_dv = dZdv / Ztilted + eps
-
+        beta = (N - alpha) * 1.0 / N
+        scale_poste = N * 1.0 / alpha - 1.0
+        scale_cav = - N * 1.0 / alpha
+        scale_prior = 1
         # compute grads wrt Ahat and Bhat
-        dlogZ_dm_all = dlogZ_dm - 2 * dlogZ_dv * mout
-        dAhat = np.einsum('nd,nm->dm', dlogZ_dm_all, psi1)
-        dBhat = np.einsum('nd,nab->dab', dlogZ_dv, psi2)
+        dm_all = dm - 2 * dv * m
+        dAhat = np.einsum('nd,nm->dm', dm_all, psi1)
+        dBhat = np.einsum('nd,nab->dab', dv, psi2)
         # compute grads wrt psi1 and psi2
-        dpsi1 = np.einsum('nd,dm->nm', dlogZ_dm_all, self.Ahat)
-        dpsi2 = np.einsum('nd,dab->nab', dlogZ_dv, self.Bhat)
+        dpsi1 = np.einsum('nd,dm->nm', dm_all, self.Ahat)
+        dpsi2 = np.einsum('nd,dab->nab', dv, self.Bhat)
         dsf2, dls, dzu, dmx, dvx = compute_psi_derivatives(
-            dpsi1, psi1, dpsi2, psi2, np.exp(ls), sf2, mx, vx, zu)
+            dpsi1, psi1, dpsi2, psi2, ls, sf2, mx, vx, self.zu)
 
-        sum_dlogZ_dv = np.sum(dlogZ_dv)
-        dls *= np.exp(ls)
-        dsf2 += sum_dlogZ_dv
+        dv_sum = np.sum(dv)
+        dls *= ls
+        dsf2 += dv_sum
         dsf = 2 * sf2 * dsf2
 
-        if self.lik == 'Gaussian':
-            dsn = sum_dlogZ_dv * 2 * sn2 / alpha + N * Dout * (1 - alpha)
+        dvcav = np.einsum('ab,dbc,ce->dae', Kuuinv, dBhat, Kuuinv)
+        dmcav = 2 * np.einsum('dab,db->da', dvcav, muhat) \
+            + np.einsum('ab,db->da', Kuuinv, dAhat)
 
-        grads = {'ls': dls, 'sf': dsf, 'zu': dzu,
-                 'Ahat': dAhat, 'Bhat': dBhat, 'mx': dmx, 'vx': dvx}
+        dvcav_via_mcav = beta * np.einsum('da,db->dab', dmcav, self.theta_2)
+        dvcav += dvcav_via_mcav
+        dvcavinv = - np.einsum('dab,dbc,dce->dae', Suhat, dvcav, Suhat)
+        dtheta1 = beta * dvcavinv
+        dtheta2 = beta * np.einsum('dab,db->da', Suhat, dmcav)
+        dKuuinv_via_vcav = np.sum(dvcavinv, axis=0)
 
-        if self.lik.lower() == 'gaussian':
-            grads['sn'] = dsn
+        # get contribution of Ahat and Bhat to Kuu and add to Minner
+        dKuuinv_via_Ahat = np.einsum('da,db->ab', dAhat, muhat)
+        KuuinvSmmd = np.einsum('ab,dbc->dac', Kuuinv, Spmmhat)
+        dKuuinv_via_Bhat = 2 * np.einsum('dab,dac->bc', KuuinvSmmd, dBhat) \
+            - np.sum(dBhat, axis=0)
+        dKuuinv = dKuuinv_via_Ahat + dKuuinv_via_Bhat + dKuuinv_via_vcav
+        Minner = scale_poste * np.sum(Spmm, axis=0) + scale_cav * \
+            np.sum(Spmmhat, axis=0) - 2.0 * dKuuinv
 
-        return logZ, grads
+        dtheta1 = -0.5*scale_poste*Spmm - 0.5*scale_cav*beta*Spmmhat + dtheta1
+        dtheta2 = scale_poste*mu + scale_cav*beta*muhat + dtheta2
+        dtheta1T = np.transpose(dtheta1, [0, 2, 1])
+        dtheta1_R = np.einsum('dab,dbc->dac', self.theta_1_R, dtheta1+dtheta1T)
+
+        deta1_R = np.zeros([self.Dout, M * (M + 1) / 2])
+        deta2 = dtheta2
+        for d in range(self.Dout):
+            dtheta1_R_d = dtheta1_R[d, :, :]
+            theta1_R_d = self.theta_1_R[d, :, :]
+            dtheta1_R_d[diag_ind] = dtheta1_R_d[
+                diag_ind] * theta1_R_d[diag_ind]
+            dtheta1_R_d = dtheta1_R_d[triu_ind]
+            deta1_R[d, :] = dtheta1_R_d.reshape(
+                (dtheta1_R_d.shape[0], ))
+
+        M_all = 0.5 * (scale_prior*self.Dout*Kuuinv +
+                       np.dot(Kuuinv, np.dot(Minner, Kuuinv)))
+        dhyp = d_trace_MKzz_dhypers(
+            2*self.ls, 2*self.sf, self.zu, M_all, self.Kuu)
+
+        dzu += dhyp[2]
+        dls += 2*dhyp[1]
+        dsf += 2*dhyp[0]
+
+        grad_hyper = {
+            'sf': dsf, 'ls': dls, 'zu': dzu, 
+            'eta1_R': deta1_R, 'eta2': deta2} 
+        grad_input = {'mx': dmx, 'vx': dvx}
+
+        return grad_hyper, grad_input
+
+    def forward_propagation_thru_post(self, mx, vx):
+        psi0 = np.exp(2.0*self.sf)
+        psi1, psi2 = compute_psi_weave(2*self.ls, 2*self.sf, mx, vx, self.zu)
+        mout = np.einsum('nm,dm->nd', psi1, self.A)
+        Bhatpsi2 = np.einsum('dab,nab->nd', self.B_sto, psi2)
+        vout = psi0 + Bhatpsi2 - mout**2
+        return mout, vout
 
     def compute_kuu(self):
         # update kuu and kuuinv
         ls = self.ls
         sf = self.sf
-        Dout = self.output_size
-        M = self.no_pseudos
+        Dout = self.Dout
+        M = self.M
         zu = self.zu
         self.Kuu = compute_kernel(2 * ls, 2 * sf, zu, zu)
         self.Kuu += np.diag(jitter * np.ones((M, )))
@@ -311,9 +219,9 @@ class SGP_Layer:
 
     def compute_cavity(self, alpha=1.0):
         # compute the leave one out moments
-        beta = (self.Ntrain - alpha) * 1.0 / self.Ntrain
+        beta = (self.N - alpha) * 1.0 / self.N
 
-        Dout = self.output_size
+        Dout = self.Dout
         Kuuinv = self.Kuuinv
         for d in range(Dout):
             self.Suhatinv[d, :, :] = Kuuinv + beta * self.theta_1[d, :, :]
@@ -330,7 +238,7 @@ class SGP_Layer:
 
     def update_posterior(self):
         # compute the posterior approximation
-        Dout = self.output_size
+        Dout = self.Dout
         Kuuinv = self.Kuuinv
         for d in range(Dout):
             Sinv = Kuuinv + self.theta_1[d, :, :]
@@ -368,24 +276,18 @@ class SGP_Layer:
                   'sf': [],
                   'zu': [],
                   'eta1_R': [],
-                  'eta2': [],
-                  'x1': [],
-                  'x2': []}
+                  'eta2': []}
 
-        Ntrain = self.Ntrain
-        M = self.no_pseudos
-        Din = self.hidden_size
-        Dout = self.output_size
+        N = self.N
+        M = self.M
+        Din = self.Din
+        Dout = self.Dout
 
         # ls = np.log(np.random.rand(Din, ))
         ls = np.log(np.ones((Din, )) + 0.1 * np.random.rand(Din, ))
         sf = np.log(np.array([0.5]))
-
         params['sf'] = sf
         params['ls'] = ls
-        if not self.no_output_noise:
-            sn = np.log(np.array([0.0001]))
-            params['sn'] = sn
 
         eta1_R = np.zeros((Dout, M * (M + 1) / 2))
         eta2 = np.zeros((Dout, M))
@@ -424,13 +326,11 @@ class SGP_Layer:
 
     def get_hypers(self):
         params = {}
-        M = self.no_pseudos
-        Din = self.hidden_size
-        Dout = self.output_size
+        M = self.M
+        Din = self.Din
+        Dout = self.Dout
         params['ls'] = self.ls
         params['sf'] = self.sf
-        if not self.no_output_noise:
-            params['sn'] = self.sn
         triu_ind = np.triu_indices(M)
         diag_ind = np.diag_indices(M)
         params_eta2 = self.theta_2
@@ -447,22 +347,17 @@ class SGP_Layer:
         params['eta2'] = params_eta2
         return params
 
-    def update_hypers(self, params):
-        M = self.no_pseudos
-        Din = self.hidden_size
-        Dout = self.output_size
+    def update_hypers(self, params, alpha=1.0):
+        M = self.M
         self.ls = params['ls']
         self.ones_M_ls = np.outer(self.ones_M, 1.0 / np.exp(2 * self.ls))
         self.sf = params['sf']
-        if not (self.no_output_noise):
-            self.sn = params['sn']
-
         triu_ind = np.triu_indices(M)
         diag_ind = np.diag_indices(M)
         zu = params['zu']
         self.zu = zu
 
-        for d in range(Dout):
+        for d in range(self.Dout):
             theta_m_d = params['eta2'][d, :]
             theta_R_d = params['eta1_R'][d, :]
             R = np.zeros((M, M))
@@ -472,230 +367,288 @@ class SGP_Layer:
             self.theta_1[d, :, :] = np.dot(R.T, R)
             self.theta_2[d, :] = theta_m_d
 
+        # update Kuu given new hypers
+        self.compute_kuu()
+        # compute mu and Su for each layer
+        self.update_posterior()
+        # compute muhat and Suhat for each layer
+        self.compute_cavity(alpha=alpha)
 
-class SGPLVM:
 
-    def __init__(self, y_train, hidden_size, no_pseudo,
-                 lik='Gaussian'):
-        self.lik = lik
+class Lik_Layer(object):
+    def __init__(self, N, D):
+        self.N = N
+        self.D = D
+
+    def compute_log_Z(self, mout, vout, y, alpha=1.0):
+        pass
+
+    def backprop_grads(self, mout, vout, dmout, dvout, alpha=1.0):
+        return {}
+
+    def init_hypers(self):
+        return {}
+
+    def get_hypers(self):
+        return {}
+
+    def update_hypers(self, params):
+        pass
+
+
+class Gauss_Layer(Lik_Layer):
+    
+    def __init__(self, N, D):
+        super(Gauss_Layer, self).__init__(N, D)
+        self.sn = 0
+    
+    def compute_log_Z(self, mout, vout, y, alpha=1.0):
+        # real valued data, gaussian lik
+        sn2 = np.exp(2.0 * self.sn)
+        vout += sn2 / alpha
+        logZ = np.sum(-0.5 * (np.log(2 * np.pi * vout) +
+                              (y - mout)**2 / vout))
+        logZ += y.shape[0] * self.D * (0.5 * np.log(2 * np.pi * sn2 / alpha)
+                            - 0.5 * alpha * np.log(2 * np.pi * sn2))
+        dlogZ_dm = (y - mout) / vout
+        dlogZ_dv = -0.5 / vout + 0.5 * (y - mout)**2 / vout**2
+
+        return logZ, dlogZ_dm, dlogZ_dv
+
+    def backprop_grads(self, mout, vout, dmout, dvout, alpha=1.0, scale=1.0):
+        sn2 = np.exp(2.0 * self.sn)
+        dv_sum = np.sum(dvout)
+        dsn = dv_sum*2*sn2/alpha + mout.shape[0]*self.D*(1-alpha)
+        dsn *= scale
+        return {'sn': dsn}
+
+    def init_hypers(self):
+        self.sn = np.log(0.01)
+        return {'sn': self.sn}
+
+    def get_hypers(self):
+        return {'sn': self.sn}    
+
+    def update_hypers(self, params):
+        self.sn = params['sn']
+
+class Probit_Layer(Lik_Layer):
+
+    __gh_points = None
+    def _gh_points(self, T=20):
+        if self.__gh_points is None:
+            self.__gh_points = np.polynomial.hermite.hermgauss(T)
+        return self.__gh_points
+    
+    def compute_log_Z(self, mout, vout, y, alpha=1.0):
+        # binary data probit likelihood
+        if alpha == 1.0:
+            t = y * mout / np.sqrt(1 + vout)
+            Z = 0.5 * (1 + special.erf(t / np.sqrt(2)))
+            eps = 1e-16
+            logZ = np.sum(np.log(Z + eps))
+
+            dlogZ_dt = 1 / (Z + eps) * 1 / np.sqrt(2 *
+                                                   np.pi) * np.exp(-t**2.0 / 2)
+            dt_dm = y / np.sqrt(1 + vout)
+            dt_dv = -0.5 * y * mout / (1 + vout)**1.5
+            dlogZ_dm = dlogZ_dt * dt_dm
+            dlogZ_dv = dlogZ_dt * dt_dv
+
+        else:
+            gh_x, gh_w = self._gh_points(gh_degree)
+            gh_x = gh_x[:, np.newaxis, np.newaxis]
+            gh_w = gh_w[:, np.newaxis, np.newaxis]
+
+            ts = gh_x * np.sqrt(2*vout[np.newaxis, :, :]) + mout[np.newaxis, :, :]
+            eps = 1e-8
+            pdfs = 0.5 * (1 + special.erf(y*ts / np.sqrt(2))) + eps
+            Ztilted = np.sum(pdfs**alpha * gh_w, axis=0) / np.sqrt(np.pi)
+            logZ = np.sum(np.log(Ztilted))
+            
+            a = pdfs**(alpha-1.0)*np.exp(-ts**2/2)
+            dZdm = np.sum(gh_w * a, axis=0) * y * alpha / np.pi / np.sqrt(2)
+            dlogZ_dm = dZdm / Ztilted + eps
+
+            dZdv = np.sum(gh_w * (a*gh_x), axis=0) * y * alpha / np.pi / np.sqrt(2) / np.sqrt(2*vout)
+            dlogZ_dv = dZdv / Ztilted + eps
+
+        return logZ, dlogZ_dm, dlogZ_dv
+
+
+class AEP_Model(object):
+
+    def __init__(self, y_train):
         self.y_train = y_train
-        self.N_train, self.output_size = y_train.shape
-        N_train = self.N_train
-        self.hidden_size = hidden_size
-        self.no_pseudo = no_pseudo
-
-        # create a layer
-        self.sgp_layer = SGP_Layer(self.N_train, self.hidden_size,
-                                     self.output_size, self.no_pseudo,
-                                     lik=lik)
-
-        # natural params for latent variables
-        self.factor_x1 = np.zeros((N_train, hidden_size))
-        self.factor_x2 = np.zeros((N_train, hidden_size))
-
-        self.prior_x1 = 0
-        self.prior_x2 = 1
-
-        self.x_post_1 = np.zeros((N_train, hidden_size))
-        self.x_post_2 = np.zeros((N_train, hidden_size))
-
+        self.N = y_train.shape[0]
         self.fixed_params = []
 
-    # @profile
-    def train_overhead(self, params, alpha=1.0):
-        toprint = False
-        # update layer with new hypers
-        t1 = time.time()
-        self.sgp_layer.update_hypers(params)
+    def init_hypers(self, y_train, x_train=None):
+        pass
+
+    def get_hypers(self):
+        pass
+
+    def optimise(
+        self, method='L-BFGS-B', tol=None, reinit_hypers=True, 
+        callback=None, maxiter=1000, alpha=0.5, adam_lr=0.05, **kargs):
+
+        if reinit_hypers:
+            init_params_dict = self.init_hypers(self.y_train)
+        else:
+            init_params_dict = self.get_hypers()
+
+        init_params_vec, params_args = flatten_dict(init_params_dict)
+
+        N = self.N
+        idxs = np.arange(N)
+        yb = self.y_train
+
+        try:
+            if method.lower() == 'adam':
+                results = adam(objective_wrapper, init_params_vec,
+                               step_size=adam_lr,
+                               maxiter=maxiter,
+                               args=(params_args, self, idxs, yb, alpha))
+            else:
+                options = {'maxiter': maxiter, 'disp': True, 'gtol': 1e-8}
+                results = minimize(
+                    fun=objective_wrapper,
+                    x0=init_params_vec,
+                    args=(params_args, self, idxs, yb, alpha),
+                    method=method,
+                    jac=True,
+                    tol=tol,
+                    callback=callback,
+                    options=options)
+
+        except KeyboardInterrupt:
+            print 'Caught KeyboardInterrupt ...'
+            results = []
+            # todo: deal with rresults here
+
+        results = self.get_hypers()
+        return results
+
+    def set_fixed_params(self, params):
+        if isinstance(params, (list)):
+            for p in params:
+                if p not in self.fixed_params:
+                    self.fixed_params.append(p)
+        else:
+            self.fixed_params.append(params)
+
+
+class SGPLVM(AEP_Model):
+
+    def __init__(
+        self, y_train, hidden_size, no_pseudo, 
+        lik='Gaussian', prior_mean=0, prior_var=1):
+
+        super(SGPLVM, self).__init__(y_train)
+        self.N = N = y_train.shape[0]
+        self.Dout = Dout = y_train.shape[1]
+        self.Din = Din = hidden_size
+        self.M = M = no_pseudo
+
+        # create a layer
+        self.sgp_layer = SGP_Layer(N, Din, Dout, M)
+        if lik.lower() == 'gaussian':
+            self.lik_layer = Gauss_Layer(N, Dout)
+        elif lik.lower() == 'probit':
+            self.lik_layer = Probit_Layer(N, Dout)
+        else:
+            raise NotImplementedError('likelihood not implemented')
+
+        # natural params for latent variables
+        self.factor_x1 = np.zeros((N, Din))
+        self.factor_x2 = np.zeros((N, Din))
+
+        self.prior_x1 = prior_mean
+        self.prior_x2 = prior_var
+
+        self.x_post_1 = np.zeros((N, Din))
+        self.x_post_2 = np.zeros((N, Din))
+
+    def objective_function(self, params, idxs, yb, alpha=1.0):
+        N = self.N
+        batch_size = yb.shape[0]
+        scale_logZ = - N * 1.0 / batch_size / alpha
+        scale_poste = N * 1.0 / alpha - 1.0
+        scale_cav = - N * 1.0 / alpha
+        scale_prior = 1
+        
+        # update model with new hypers
+        self.sgp_layer.update_hypers(params, alpha=alpha)
+        self.lik_layer.update_hypers(params)
         self.factor_x1 = params['x1']
         self.factor_x2 = np.exp(2 * params['x2'])
-        # self.factor_x2 = sigmoid(params['x2'])
-        t2 = time.time()
-        if toprint:
-            print "update hypers %.4fs" % (t2 - t1)
 
-        # update Kuu given new hypers
-        t1 = time.time()
-        self.sgp_layer.compute_kuu()
-        t2 = time.time()
-        if toprint:
-            print "compute Kuu %.4fs" % (t2 - t1)
-
-        # compute mu and Su for each layer
-        t1 = time.time()
-        self.sgp_layer.update_posterior()
-        t2 = time.time()
-        if toprint:
-            print "compute posterior %.4fs" % (t2 - t1)
-
-        # compute muhat and Suhat for each layer
-        t1 = time.time()
-        self.sgp_layer.compute_cavity(alpha=alpha)
-        t2 = time.time()
-        if toprint:
-            print "compute cavity %.4fs" % (t2 - t1)
-
-    # @profile
-    def objective_function(self, params, idxs, yb, N_train, alpha=1.0):
-        toprint = False
-        N_batch = yb.shape[0]
-        layer = self.sgp_layer
-        scale_logZ = - N_train * 1.0 / N_batch / alpha
-
-        beta = (N_train - alpha) * 1.0 / N_train
-        scale_poste = N_train * 1.0 / alpha - 1.0
-        scale_cav = - N_train * 1.0 / alpha
-        scale_prior = 1
-
-        self.train_overhead(params, alpha=alpha)
-
-        # reset gradient placeholders
-        grad_all = {}
-
-        M = layer.no_pseudos
-        Din = layer.hidden_size
-        Dout = layer.output_size
-
-        t1 = time.time()
         # compute cavity
-        cav_1 = self.prior_x1 + (1.0 - alpha) * self.factor_x1[idxs, :]
-        cav_2 = self.prior_x2 + (1.0 - alpha) * self.factor_x2[idxs, :]
-        vx = 1.0 / cav_2
-        mx = cav_1 / cav_2
-        logZi, grad_logZ = layer.compute_logZ_and_gradients(mx, vx, yb, alpha)
-        # print grad_logZ['sf']
-        t2 = time.time()
-        if toprint:
-            print "compute logZ and grads %.4fs" % (t2 - t1)
-
-        time1 = time.time()
-
-        grad_all['sf'] = scale_logZ * grad_logZ['sf']
-        grad_all['ls'] = scale_logZ * grad_logZ['ls']
-        if self.lik.lower() == 'gaussian':
-            grad_all['sn'] = scale_logZ * grad_logZ['sn']
-        grad_all['zu'] = scale_logZ * grad_logZ['zu']
-
-        triu_ind = np.triu_indices(M)
-        diag_ind = np.diag_indices(M)
-        Minner = 0
-
-        mu = layer.mu
-        Su = layer.Su
-        Spmm = layer.Splusmm
-        muhat = layer.muhat
-        Suhat = layer.Suhat
-        Spmmhat = layer.Splusmmhat
-        Kuuinv = layer.Kuuinv
-        Kuu = layer.Kuu
-        theta2 = layer.theta_2
-        theta1_R = layer.theta_1_R
-
-        dlogZ_dAhat = grad_logZ['Ahat']
-        dlogZ_dBhat = grad_logZ['Bhat']
-        dlogZ_dvcav = np.einsum('ab,dbc,ce->dae', Kuuinv, dlogZ_dBhat, Kuuinv)
-        dlogZ_dmcav = 2 * np.einsum('dab,db->da', dlogZ_dvcav, muhat) \
-            + np.einsum('ab,db->da', Kuuinv, dlogZ_dAhat)
-
-        dlogZ_dvcav_via_mcav = beta * \
-            np.einsum('da,db->dab', dlogZ_dmcav, theta2)
-        dlogZ_dvcav += dlogZ_dvcav_via_mcav
-        dlogZ_dvcavinv = - \
-            np.einsum('dab,dbc,dce->dae', Suhat, dlogZ_dvcav, Suhat)
-        dlogZ_dtheta1 = beta * dlogZ_dvcavinv
-        dlogZ_dtheta2 = beta * np.einsum('dab,db->da', Suhat, dlogZ_dmcav)
-        dlogZ_dKuuinv_via_vcav = np.sum(dlogZ_dvcavinv, axis=0)
-
-        # get contribution of Ahat and Bhat to Kuu and add to Minner
-        dlogZ_dKuuinv_via_Ahat = np.einsum('da,db->ab', dlogZ_dAhat, muhat)
-        KuuinvSmmd = np.einsum('ab,dbc->dac', Kuuinv, Spmmhat)
-        dlogZ_dKuuinv_via_Bhat = 2 * np.einsum('dab,dac->bc', KuuinvSmmd, dlogZ_dBhat) \
-            - np.sum(dlogZ_dBhat, axis=0)
-        dlogZ_dKuuinv = dlogZ_dKuuinv_via_Ahat + \
-            dlogZ_dKuuinv_via_Bhat + dlogZ_dKuuinv_via_vcav
-        Minner = scale_poste * np.sum(Spmm, axis=0) + scale_cav * \
-            np.sum(Spmmhat, axis=0) - 2.0 * scale_logZ * dlogZ_dKuuinv
-
-        dtheta1 = scale_poste * -0.5 * Spmm + scale_cav * \
-            beta * -0.5 * Spmmhat + scale_logZ * dlogZ_dtheta1
-        dtheta2 = scale_poste * mu + scale_cav * \
-            beta * muhat + scale_logZ * dlogZ_dtheta2
-        dtheta1_T = np.transpose(dtheta1, [0, 2, 1])
-        dtheta1_R = np.einsum('dab,dbc->dac', theta1_R, dtheta1 + dtheta1_T)
-
-        grad_all['eta1_R'] = np.zeros([Dout, M * (M + 1) / 2])
-        grad_all['eta2'] = dtheta2
-        for d in range(Dout):
-            dtheta1_R_d = dtheta1_R[d, :, :]
-            theta1_R_d = theta1_R[d, :, :]
-            dtheta1_R_d[diag_ind] = dtheta1_R_d[
-                diag_ind] * theta1_R_d[diag_ind]
-            dtheta1_R_d = dtheta1_R_d[triu_ind]
-            grad_all['eta1_R'][d, :] = dtheta1_R_d.reshape(
-                (dtheta1_R_d.shape[0], ))
-
-        M_all = 0.5 * (scale_prior * Dout * Kuuinv +
-                       np.dot(Kuuinv, np.dot(Minner, Kuuinv)))
-        dhyp = d_trace_MKzz_dhypers(
-            2 * layer.ls, 2 * layer.sf, layer.zu, M_all, Kuu)
-
-        grad_all['sf'] += 2 * dhyp[0]
-        grad_all['ls'] += 2 * dhyp[1]
-        grad_all['zu'] += dhyp[2]
-
-        # compute grad wrt x params
-        scale_x = N_train * 1.0 / N_batch
         t01 = self.prior_x1
         t02 = self.prior_x2
         t11 = self.factor_x1[idxs, :]
         t12 = self.factor_x2[idxs, :]
+        cav_t1 = t01 + (1.0 - alpha) * t11
+        cav_t2 = t02 + (1.0 - alpha) * t12
+        vx = 1.0 / cav_t2
+        mx = cav_t1 / cav_t2
 
-        t1 = t01 + (1.0 - alpha) * t11
-        t2 = t02 + (1.0 - alpha) * t12
+        # propagate x cavity forward
+        mout, vout, psi1, psi2 = self.sgp_layer.forward_prop_thru_cav(mx, vx)
+        # compute logZ and gradients
+        logZ, dm, dv = self.lik_layer.compute_log_Z(mout, vout, yb, alpha)
+        logZ_scale = scale_logZ * logZ
+        dm_scale = scale_logZ * dm
+        dv_scale = scale_logZ * dv
+        sgp_grad_hyper, sgp_grad_input = self.sgp_layer.backprop_grads_lvm(
+            mout, vout, dm_scale, dv_scale, psi1, psi2, mx, vx, alpha)
+        lik_grad_hyper = self.lik_layer.backprop_grads(
+            mout, vout, dm, dv, alpha, scale_logZ)
+        
+        grad_all = {}
+        for key in sgp_grad_hyper.keys():
+            grad_all[key] = sgp_grad_hyper[key]
 
-        dcav_dt11 = (1.0 - alpha) * t1 / t2
-        dcav_dt12 = (1.0 - alpha) * (- 0.5 * t1**2 / t2**2 - 0.5 / t2)
+        for key in lik_grad_hyper.keys():
+            grad_all[key] = lik_grad_hyper[key]
 
-        dlogZ_dt11 = (1.0 - alpha) * grad_logZ['mx'] / t2
-        dlogZ_dt12 = (1.0 - alpha) * \
-            (- grad_logZ['mx'] * t1 / t2**2 - grad_logZ['vx'] / t2**2)
+        # compute grad wrt x params
+        dcav_dt11 = (1.0-alpha) * cav_t1 / cav_t2
+        dcav_dt12 = (1.0-alpha) * (-0.5*cav_t1**2/cav_t2**2 - 0.5/cav_t2)
+        dmx = sgp_grad_input['mx']
+        dvx = sgp_grad_input['vx']
+        dlogZ_dt11 = (1.0-alpha) * dmx/cav_t2
+        dlogZ_dt12 = (1.0-alpha) * (-dmx*cav_t1/cav_t2**2 - dvx/cav_t2**2)
 
-        t1 = t01 + t11
-        t2 = t02 + t12
+        post_t1 = t01 + t11
+        post_t2 = t02 + t12
+        dpost_dt11 = post_t1 / post_t2
+        dpost_dt12 = - 0.5 * post_t1**2 / post_t2**2 - 0.5 / post_t2
 
-        dpost_dt11 = t1 / t2
-        dpost_dt12 = - 0.5 * t1**2 / t2**2 - 0.5 / t2
-
-        grad_all['x1'] = (scale_logZ * dlogZ_dt11
-                          + scale_x * (- 1.0 / alpha * dcav_dt11 - (1.0 - 1.0 / alpha) * dpost_dt11))
-        grad_all['x2'] = (scale_logZ * dlogZ_dt12
-                          + scale_x * (- 1.0 / alpha * dcav_dt12 - (1.0 - 1.0 / alpha) * dpost_dt12))
+        scale_x = N * 1.0 / batch_size
+        grad_all['x1'] = dlogZ_dt11 + scale_x * (
+            - 1.0 / alpha * dcav_dt11 - (1.0 - 1.0 / alpha) * dpost_dt11)
+        grad_all['x2'] = dlogZ_dt12 + scale_x * (
+            - 1.0 / alpha * dcav_dt12 - (1.0 - 1.0 / alpha) * dpost_dt12)
         grad_all['x2'] *= 2 * t12
 
-        if toprint:
-            print "merge gradients %.4fs" % (time.time() - time1)
-
-        time1 = time.time()
-
-        phi_prior = layer.compute_phi_prior()
-        phi_poste = layer.compute_phi_posterior()
-        phi_cavity = layer.compute_phi_cavity()
+        # compute objective
+        sgp_contrib = self.sgp_layer.compute_phi(alpha)
 
         phi_prior_x = self.compute_phi_prior_x(idxs)
         phi_poste_x = self.compute_phi_posterior_x(idxs)
         phi_cavity_x = self.compute_phi_cavity_x(idxs, alpha)
+        x_contrib = scale_x * (
+            phi_prior_x - 1.0/alpha*phi_cavity_x 
+            - (1.0 - 1.0/alpha)*phi_poste_x)
 
-        energy = 0
-        energy = scale_prior * phi_prior + scale_poste * \
-            phi_poste + scale_cav * phi_cavity + scale_logZ * logZi
-        energy += scale_x * (phi_prior_x - 1.0 / alpha *
-                             phi_cavity_x - (1.0 - 1.0 / alpha) * phi_poste_x)
-
-        if toprint:
-            print "compute energy %.4fs" % (time.time() - time1)
+        energy = logZ_scale + x_contrib + sgp_contrib
 
         for p in self.fixed_params:
             grad_all[p] = np.zeros_like(grad_all[p])
+
+        # grad_all = OrderedDict(sorted(grad_all.items(), key=lambda t: t[0]))
 
         return energy, grad_all
 
@@ -705,8 +658,7 @@ class SGPLVM:
         m = t1 / t2
         v = 1.0 / t2
         Nb = idxs.shape[0]
-        hidden_size = self.hidden_size
-        return 0.5 * Nb * hidden_size * (m**2 / v + np.log(v))
+        return 0.5 * Nb * self.Din * (m**2 / v + np.log(v))
 
     def compute_phi_posterior_x(self, idxs):
         t01 = self.prior_x1
@@ -717,7 +669,6 @@ class SGPLVM:
         t2 = t02 + t12
         m = t1 / t2
         v = 1.0 / t2
-
         return np.sum(0.5 * (m**2 / v + np.log(v)))
 
     def compute_phi_cavity_x(self, idxs, alpha=1.0):
@@ -729,7 +680,6 @@ class SGPLVM:
         t2 = t02 + (1.0 - alpha) * t12
         m = t1 / t2
         v = 1.0 / t2
-
         return np.sum(0.5 * (m**2 / v + np.log(v)))
 
     def predict_given_inputs(self, inputs, add_noise=False):
@@ -781,7 +731,6 @@ class SGPLVM:
         post_x2 = self.prior_x2 + factor_x2
         post_m = post_x1 / post_x2
         post_v = 1.0 / post_x2
-        # pdb.set_trace()
 
         # propagate x forward to predict missing points
         my, vy = self.sgp_layer.forward_propagation_thru_post(
@@ -789,75 +738,38 @@ class SGPLVM:
 
         return my, vy
 
-    def initialise_hypers(self, y_train):
-        Din = self.hidden_size
-        init_params = self.sgp_layer.init_hypers()
-        # if self.lik.lower() == 'gaussian':
-        #     post_m = PCA_reduce(y_train, Din)
-        # else:
-        #     post_m = np.random.randn(y_train.shape[0], Din)
-        post_m = PCA_reduce(y_train, Din)
+    def init_hypers(self, y_train):
+        sgp_params = self.sgp_layer.init_hypers()
+        lik_params = self.lik_layer.init_hypers()
+        # TODO: alternatitve method for non real-valued data
+        post_m = PCA_reduce(y_train, self.Din)
         post_m_mean = np.mean(post_m, axis=0)
         post_m_std = np.std(post_m, axis=0)
         post_m = (post_m - post_m_mean) / post_m_std
         post_v = 0.1 * np.ones_like(post_m)
         post_2 = 1.0 / post_v
         post_1 = post_2 * post_m
-        init_params['x1'] = post_1
-        init_params['x2'] = np.log(post_2 - 1) / 2
-        # init_params['x2'] = inverse_sigmoid(post_2 - 1)
+        x_params = {}
+        x_params['x1'] = post_1
+        x_params['x2'] = np.log(post_2 - 1) / 2
+
+        init_params = dict(sgp_params)
+        init_params.update(lik_params)
+        init_params.update(x_params)
+
+        # init_params = OrderedDict(sorted(init_params.items(), key=lambda t: t[0]))
         return init_params
 
     def get_hypers(self):
-        params = self.sgp_layer.get_hypers()
-        params['x1'] = self.factor_x1
-        params['x2'] = np.log(self.factor_x2) / 2.0
+        sgp_params = self.sgp_layer.get_hypers()
+        lik_params = self.lik_layer.get_hypers()
+        x_params = {}
+        x_params['x1'] = self.factor_x1
+        x_params['x2'] = np.log(self.factor_x2) / 2.0
+
+        params = dict(sgp_params)
+        params.update(lik_params)
+        params.update(x_params)
+
+        # params = OrderedDict(sorted(params.items(), key=lambda t: t[0]))
         return params
-
-    def set_fixed_params(self, params):
-        if isinstance(params, (list)):
-            for p in params:
-                if p not in self.fixed_params:
-                    self.fixed_params.append(p)
-        else:
-            self.fixed_params.append(params)
-
-    def optimise(self, method='L-BFGS-B', tol=None,
-                 reinit_hypers=True, callback=None, maxiter=1000, alpha=0.5,
-                 adam_lr=0.05, **kargs):
-        if reinit_hypers:
-            init_params_dict = self.initialise_hypers(self.y_train)
-        else:
-            init_params_dict = self.get_hypers()
-
-        init_params_vec, params_args = flatten_dict(init_params_dict)
-
-        N_train = self.N_train
-        idxs = np.arange(N_train)
-        yb = self.y_train
-
-        try:
-            if method.lower() == 'adam':
-                results = adam(objective_wrapper, init_params_vec,
-                               step_size=adam_lr,
-                               maxiter=maxiter,
-                               args=(params_args, self, idxs, yb, N_train, alpha))
-            else:
-                options = {'maxiter': maxiter, 'disp': True, 'gtol': 1e-8}
-                results = minimize(
-                    fun=objective_wrapper,
-                    x0=init_params_vec,
-                    args=(params_args, self, idxs, yb, N_train, alpha),
-                    method=method,
-                    jac=True,
-                    tol=tol,
-                    callback=callback,
-                    options=options)
-
-        except KeyboardInterrupt:
-            print 'Caught KeyboardInterrupt ...'
-            results = []
-            # todo: deal with rresults here
-
-        results = self.get_hypers()
-        return results
