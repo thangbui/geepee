@@ -26,10 +26,10 @@ def PCA_reduce(X, Q):
     return (X - X.mean(0)).dot(W)
 
 
-def objective_wrapper(params, params_args, obj, idxs, yb, alpha):
+def objective_wrapper(params, params_args, obj, idxs, alpha):
     params_dict = unflatten_dict(params, params_args)
     f, grad_dict = obj.objective_function(
-        params_dict, idxs, yb, alpha=alpha)
+        params_dict, idxs, alpha=alpha)
     g, _ = flatten_dict(grad_dict)
     g_is_fin = np.isfinite(g)
     if np.all(g_is_fin):

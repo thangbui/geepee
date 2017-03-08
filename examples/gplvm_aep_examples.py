@@ -389,6 +389,6 @@ def run_frey():
 
 if __name__ == '__main__':
 	# run_cluster()
-	# run_semicircle()
+	run_semicircle()
 	# run_pinwheel()
 	run_xor()

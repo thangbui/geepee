@@ -292,6 +292,11 @@ def compute_psi_derivatives(dL_dpsi1, psi1, dL_dpsi2, psi2, ls, sf2, xmean, xvar
     return (_dL_dvar_1 + _dL_dvar_2, _dL_dl_1 + _dL_dl_2,
             _dL_dZ_1 + _dL_dZ_2, _dL_dmu_1 + _dL_dmu_2, _dL_dS_1 + _dL_dS_2)
 
+
+def compute_kfu_derivatives(dL_dkfu, kfu, ls, sf2, x, z):
+    return kfucompDer(dL_dkfu, kfu, sf2, ls, z, x)
+
+
 # from GPy codebase
 def psi1computations(variance, lengthscale, Z, mu, S):
     # here are the "statistics" for psi1
@@ -356,6 +361,25 @@ def psi1compDer(dL_dpsi1, _psi1, variance, lengthscale, Z, mu, S):
 
     return _dL_dvar, _dL_dl, _dL_dZ, _dL_dmu, _dL_dS
 
+def kfucompDer(dL_dkfu, kfu, variance, lengthscale, Z, mu):
+    # here are the "statistics" for psi1
+    # Produced intermediate results: dL_dparams w.r.t. psi1
+    # _dL_dvariance     1
+    # _dL_dlengthscale  Q
+    # _dL_dZ            MxQ
+
+    lengthscale2 = np.square(lengthscale)
+
+    Lpsi1 = dL_dkfu * kfu
+    Zmu = Z[None, :, :] - mu[:, None, :]  # NxMxQ
+    denom = 1. / lengthscale2
+    Zmu2_denom = np.square(Zmu) / lengthscale  # NxMxQ
+    _dL_dvar = Lpsi1.sum() / variance
+    _dL_dZ = -np.einsum('nm,nmq->mq', Lpsi1, Zmu / lengthscale)
+    _dL_dl = np.einsum('nm,nmq->q', Lpsi1, np.square(Zmu) / lengthscale**3)
+
+    return _dL_dvar, _dL_dl, _dL_dZ
+
 
 def psi2compDer(dL_dpsi2, _psi2, variance, lengthscale, Z, mu, S):
     # here are the "statistics" for psi2
@@ -363,7 +387,6 @@ def psi2compDer(dL_dpsi2, _psi2, variance, lengthscale, Z, mu, S):
     # _dL_dvariance      1
     # _dL_dlengthscale   Q
     # _dL_dZ             MxQ
-    # _dL_dgamma         NxQ
     # _dL_dmu            NxQ
     # _dL_dS             NxQ
     N, M, Q = mu.shape[0], Z.shape[0], mu.shape[1]
