@@ -220,6 +220,7 @@ class SGP_Layer(object):
         Spmm = self.Splusmm
         muhat = self.muhat
         Suhat = self.Suhat
+        Spmmhat = self.Splusmmhat
         Kuuinv = self.Kuuinv
 
         beta = (N - alpha) * 1.0 / N
@@ -242,8 +243,7 @@ class SGP_Layer(object):
         dsf = 2 * sf2 * dsf2
 
         dvcav = np.einsum('ab,dbc,ce->dae', Kuuinv, dBhat, Kuuinv)
-        dmcav = 2 * np.einsum('dab,db->da', dvcav, muhat) \
-            + np.einsum('ab,db->da', Kuuinv, dAhat)
+        dmcav = np.einsum('ab,db->da', Kuuinv, dAhat)
 
         dvcav_via_mcav = beta * np.einsum('da,db->dab', dmcav, self.theta_2)
         dvcav += dvcav_via_mcav
@@ -259,9 +259,9 @@ class SGP_Layer(object):
             - np.sum(dBhat, axis=0)
         dKuuinv = dKuuinv_via_Ahat + dKuuinv_via_Bhat + dKuuinv_via_vcav
         Minner = scale_poste * np.sum(Spmm, axis=0) + scale_cav * \
-            np.sum(Suhat, axis=0) - 2.0 * dKuuinv
+            np.sum(Spmmhat, axis=0) - 2.0 * dKuuinv
 
-        dtheta1 = -0.5*scale_poste*Spmm - 0.5*scale_cav*beta*Suhat + dtheta1
+        dtheta1 = -0.5*scale_poste*Spmm - 0.5*scale_cav*beta*Spmmhat + dtheta1
         dtheta2 = scale_poste*mu + scale_cav*beta*muhat + dtheta2
         dtheta1T = np.transpose(dtheta1, [0, 2, 1])
         dtheta1_R = np.einsum('dab,dbc->dac', self.theta_1_R, dtheta1+dtheta1T)
@@ -922,18 +922,6 @@ class SGPR(AEP_Model):
             mout, vout, dm_scale, dv_scale, kfu, xb, alpha)
         lik_grad_hyper = self.lik_layer.backprop_grads(
             mout, vout, dm, dv, alpha, scale_logZ)
-
-        # test code
-        mtest, vtest, psi1, psi2 = self.sgp_layer.forward_prop_thru_cav(xb, np.zeros_like(xb))
-        # compute logZ and gradients
-        logZtest, dmtest, dvtest = self.lik_layer.compute_log_Z(mtest, vtest, yb, alpha)
-        logZ_scale = scale_logZ * logZtest
-        dm_scaletest = scale_logZ * dmtest
-        dv_scaletest = scale_logZ * dvtest
-        sgp_grad_hyper_test, sgp_grad_input_test = self.sgp_layer.backprop_grads_lvm(
-            mtest, vtest, dm_scaletest, dv_scaletest, psi1, psi2, xb, np.zeros_like(xb), alpha)
-        
-        pdb.set_trace()
         
         grad_all = {}
         for key in sgp_grad_hyper.keys():
@@ -979,4 +967,3 @@ class SGPR(AEP_Model):
         params = dict(sgp_params)
         params.update(lik_params)
         return params
-

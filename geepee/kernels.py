@@ -372,10 +372,8 @@ def kfucompDer(dL_dkfu, kfu, variance, lengthscale, Z, mu):
 
     Lpsi1 = dL_dkfu * kfu
     Zmu = Z[None, :, :] - mu[:, None, :]  # NxMxQ
-    denom = 1. / lengthscale2
-    Zmu2_denom = np.square(Zmu) / lengthscale  # NxMxQ
     _dL_dvar = Lpsi1.sum() / variance
-    _dL_dZ = -np.einsum('nm,nmq->mq', Lpsi1, Zmu / lengthscale)
+    _dL_dZ = -np.einsum('nm,nmq->mq', Lpsi1, Zmu / lengthscale2)
     _dL_dl = np.einsum('nm,nmq->q', Lpsi1, np.square(Zmu) / lengthscale**3)
 
     return _dL_dvar, _dL_dl, _dL_dZ
