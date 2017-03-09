@@ -1,8 +1,8 @@
-** General
+## General
 
 - [ ] save/load models: is saving parameters enough?
 
-** AEP modules
+## AEP modules
 
 - [x] sparse GPLVM
 - [x] sparse GP regression and classification: make sure that the gradients of logZ 
@@ -13,13 +13,13 @@ are the same with sparse GPLVM when variance = 0
 for other alphas, what do we do?
 - [ ] moment matching vs linearisation vs quadrature
 
-** EP modules
+## EP modules
 
 - [ ] separate inference and learning
 - [ ] sparse GPR/C, GPLVM, Deep-GP, GP SSM
 - [ ] should work with all alphas
 
-** VI modules
+## VI modules
 
 - [ ] Titsias's VI for GPR/C
 - [ ] Titsias's VI for GPLVM (collapsed bound)
