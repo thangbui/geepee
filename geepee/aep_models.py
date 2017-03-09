@@ -7,7 +7,7 @@ from scipy.optimize import minimize
 import matplotlib.pyplot as plt
 import time
 import pdb
-from collections import OrderedDict
+from scipy.cluster.vq import kmeans2
 
 from utils import *
 from kernels import *
@@ -363,7 +363,7 @@ class SGP_Layer(object):
             self.B_det[d, :, :] = np.dot(Kuuinv, np.dot(S, Kuuinv)) - Kuuinv
             self.B_sto[d, :, :] = np.dot(Kuuinv, np.dot(Smm, Kuuinv)) - Kuuinv
 
-    def init_hypers(self):
+    def init_hypers(self, x_train=None):
         # dict to hold hypers, inducing points and parameters of q(U)
         params = {'ls': [],
                   'sf': [],
@@ -376,21 +376,39 @@ class SGP_Layer(object):
         Din = self.Din
         Dout = self.Dout
 
-        # ls = np.log(np.random.rand(Din, ))
-        ls = np.log(np.ones((Din, )) + 0.1 * np.random.rand(Din, ))
-        sf = np.log(np.array([0.5]))
-        params['sf'] = sf
-        params['ls'] = ls
+        if x_train is None:
+            ls = np.log(np.ones((Din, )) + 0.1 * np.random.rand(Din, ))
+            sf = np.log(np.array([0.5]))
+            zu = np.tile(np.linspace(-1.2, 1.2, M).reshape((M, 1)), (1, Din))
+            zu += 0.1 * np.random.randn(zu.shape[0], zu.shape[1])
+        else:
+            if N < 10000:
+                centroids, label = kmeans2(x_train, M, minit='points')
+            else:
+                randind = np.random.permutation(N)
+                centroids = x_train[randind[0:M], :]
+            zu = centroids
 
-        eta1_R = np.zeros((Dout, M * (M + 1) / 2))
-        eta2 = np.zeros((Dout, M))
-        zu = np.tile(np.linspace(-1.2, 1.2, M).reshape((M, 1)), (1, Din))
-        zu += 0.1 * np.random.randn(zu.shape[0], zu.shape[1])
-        # zu = np.random.randn(M, Din)
+            if N < 10000:
+                X1 = np.copy(x_train)
+            else:
+                randind = np.random.permutation(N)
+                X1 = X[randind[:5000], :]
+
+            x_dist = cdist(X1, X1, 'euclidean')
+            triu_ind = np.triu_indices(N)
+            ls = np.zeros((Din, ))
+            d2imed = np.median(x_dist[triu_ind])
+            for i in range(Din):
+                ls[i] = np.log(d2imed/2  + 1e-16)
+            sf = np.log(np.array([1]))
+
         Kuu = compute_kernel(2 * ls, 2 * sf, zu, zu)
         Kuu += np.diag(jitter * np.ones((M, )))
         Kuuinv = matrixInverse(Kuu)
 
+        eta1_R = np.zeros((Dout, M * (M + 1) / 2))
+        eta2 = np.zeros((Dout, M))
         for d in range(Dout):
             mu = np.linspace(-1.2, 1.2, M).reshape((M, 1))
             mu += 0.1 * np.random.randn(M, 1)
@@ -407,10 +425,11 @@ class SGP_Layer(object):
             R[diag_ind] = np.log(R[diag_ind])
             eta1_d = R[triu_ind].reshape((M * (M + 1) / 2,))
             eta2_d = theta2.reshape((M,))
-
             eta1_R[d, :] = eta1_d
             eta2[d, :] = eta2_d
 
+        params['sf'] = sf
+        params['ls'] = ls
         params['zu'] = zu
         params['eta1_R'] = eta1_R
         params['eta2'] = eta2
@@ -955,7 +974,7 @@ class SGPR(AEP_Model):
         return my, vy
 
     def init_hypers(self, y_train):
-        sgp_params = self.sgp_layer.init_hypers()
+        sgp_params = self.sgp_layer.init_hypers(self.x_train)
         lik_params = self.lik_layer.init_hypers()
         init_params = dict(sgp_params)
         init_params.update(lik_params)
