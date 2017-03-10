@@ -2,7 +2,7 @@ print "importing stuff..."
 import numpy as np
 import pdb
 import matplotlib.pylab as plt
-from .context import SGPR
+from .context import SDGPR
 from scipy import special
 
 
@@ -34,8 +34,9 @@ def run_regression_1D():
 	# inference
 	print "create model and optimize ..."
 	M = 20
-	model = SGPR(X, Y, M, lik='Gaussian')
-	model.optimise(method='L-BFGS-B', alpha=0.01, maxiter=2000)
+	hidden_size = [2]
+	model = SDGPR(X, Y, M, hidden_size, lik='Gaussian')
+	model.optimise(method='L-BFGS-B', alpha=1, maxiter=2000)
 	plot(model)
 	plt.show()
 
@@ -73,14 +74,9 @@ def run_banana():
 	Ytrain = np.loadtxt('./examples/data/banana_Y_train.txt', delimiter=',').reshape(-1,1)
 	Ytrain[np.where(Ytrain==0)[0]] = -1
 	M = 50
-	model = SGPR(Xtrain, Ytrain, M, lik='Probit')
-	model.optimise(method='L-BFGS-B', alpha=0.01, maxiter=2000)
-	plot(model)
-	model = SGPR(Xtrain, Ytrain, M, lik='Probit')
-	model.optimise(method='L-BFGS-B', alpha=0.2, maxiter=2000)
-	plot(model)
-	model = SGPR(Xtrain, Ytrain, M, lik='Probit')
-	model.optimise(method='L-BFGS-B', alpha=0.7, maxiter=2000)
+	hidden_size = [2]
+	model = SDGPR(Xtrain, Ytrain, M, hidden_size, lik='Probit')
+	model.optimise(method='L-BFGS-B', alpha=1, maxiter=2000)
 	plot(model)
 	plt.show()
 
@@ -119,8 +115,9 @@ def run_step_1D():
 	# inference
 	print "create model and optimize ..."
 	M = 20
-	model = SGPR(X, Y, M, lik='Gaussian')
-	model.optimise(method='L-BFGS-B', alpha=0.01, maxiter=2000)
+	hidden_size = [2]
+	model = SDGPR(X, Y, M, hidden_size, lik='Gaussian')
+	model.optimise(method='L-BFGS-B', alpha=1, maxiter=2000)
 	plot(model)
 	plt.show()
 

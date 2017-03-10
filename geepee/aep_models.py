@@ -292,7 +292,7 @@ class SGP_Layer(object):
 
         return grad_hyper
 
-    def forward_propagation_thru_post(self, mx, vx):
+    def forward_prop_thru_post(self, mx, vx):
         psi0 = np.exp(2.0*self.sf)
         psi1, psi2 = compute_psi_weave(2*self.ls, 2*self.sf, mx, vx, self.zu)
         mout = np.einsum('nm,dm->nd', psi1, self.A)
@@ -363,14 +363,8 @@ class SGP_Layer(object):
             self.B_det[d, :, :] = np.dot(Kuuinv, np.dot(S, Kuuinv)) - Kuuinv
             self.B_sto[d, :, :] = np.dot(Kuuinv, np.dot(Smm, Kuuinv)) - Kuuinv
 
-    def init_hypers(self, x_train=None):
+    def init_hypers(self, x_train=None, key_suffix=''):
         # dict to hold hypers, inducing points and parameters of q(U)
-        params = {'ls': [],
-                  'sf': [],
-                  'zu': [],
-                  'eta1_R': [],
-                  'eta2': []}
-
         N = self.N
         M = self.M
         Din = self.Din
@@ -428,21 +422,22 @@ class SGP_Layer(object):
             eta1_R[d, :] = eta1_d
             eta2[d, :] = eta2_d
 
-        params['sf'] = sf
-        params['ls'] = ls
-        params['zu'] = zu
-        params['eta1_R'] = eta1_R
-        params['eta2'] = eta2
+        params = dict()
+        params['sf' + key_suffix] = sf
+        params['ls' + key_suffix] = ls
+        params['zu' + key_suffix] = zu
+        params['eta1_R' + key_suffix] = eta1_R
+        params['eta2' + key_suffix] = eta2
 
         return params
 
-    def get_hypers(self):
+    def get_hypers(self, key_suffix=''):
         params = {}
         M = self.M
         Din = self.Din
         Dout = self.Dout
-        params['ls'] = self.ls
-        params['sf'] = self.sf
+        params['ls' + key_suffix] = self.ls
+        params['sf' + key_suffix] = self.sf
         triu_ind = np.triu_indices(M)
         diag_ind = np.diag_indices(M)
         params_eta2 = self.theta_2
@@ -454,24 +449,24 @@ class SGP_Layer(object):
             Rd[diag_ind] = np.log(Rd[diag_ind])
             params_eta1_R[d, :] = Rd[triu_ind]
 
-        params['zu'] = self.zu
-        params['eta1_R'] = params_eta1_R
-        params['eta2'] = params_eta2
+        params['zu' + key_suffix] = self.zu
+        params['eta1_R' + key_suffix] = params_eta1_R
+        params['eta2' + key_suffix] = params_eta2
         return params
 
-    def update_hypers(self, params, alpha=1.0):
+    def update_hypers(self, params, alpha=1.0, key_suffix=''):
         M = self.M
-        self.ls = params['ls']
+        self.ls = params['ls' + key_suffix]
         self.ones_M_ls = np.outer(self.ones_M, 1.0 / np.exp(2 * self.ls))
-        self.sf = params['sf']
+        self.sf = params['sf' + key_suffix]
         triu_ind = np.triu_indices(M)
         diag_ind = np.diag_indices(M)
-        zu = params['zu']
+        zu = params['zu' + key_suffix]
         self.zu = zu
 
         for d in range(self.Dout):
-            theta_m_d = params['eta2'][d, :]
-            theta_R_d = params['eta1_R'][d, :]
+            theta_m_d = params['eta2' + key_suffix][d, :]
+            theta_R_d = params['eta1_R' + key_suffix][d, :]
             R = np.zeros((M, M))
             R[triu_ind] = theta_R_d.reshape(theta_R_d.shape[0], )
             R[diag_ind] = np.exp(R[diag_ind])
@@ -860,7 +855,7 @@ class SGPLVM(AEP_Model):
         post_v = 1.0 / post_x2
 
         # propagate x forward to predict missing points
-        my, vy = self.sgp_layer.forward_propagation_thru_post(
+        my, vy = self.sgp_layer.forward_prop_thru_post(
             post_m, post_v, add_noise=add_noise)
 
         return my, vy
@@ -986,3 +981,151 @@ class SGPR(AEP_Model):
         params = dict(sgp_params)
         params.update(lik_params)
         return params
+
+
+class SDGPR(AEP_Model):
+
+    def __init__(self, x_train, y_train, no_pseudos, hidden_sizes, lik='Gaussian'):
+        super(SDGPR, self).__init__(y_train)
+        self.N = N = y_train.shape[0]
+        self.Dout = Dout = y_train.shape[1]
+        self.Din = Din = x_train.shape[1]
+        self.size = [Din] + hidden_sizes + [Dout]
+        self.L = L = len(self.size) - 1
+        if not isinstance(no_pseudos, (list, tuple)):
+            self.Ms = Ms = [no_pseudos for i in range(L)]
+        else:
+            self.Ms = Ms = no_pseudos
+        self.x_train = x_train
+
+        self.sgp_layers = []
+        for i in range(L):
+            Din_i = self.size[i]
+            Dout_i = self.size[i+1]
+            M_i = self.Ms[i]
+            self.sgp_layers.append(SGP_Layer(N, Din_i, Dout_i, M_i))
+
+        if lik.lower() == 'gaussian':
+            self.lik_layer = Gauss_Layer(N, Dout)
+        elif lik.lower() == 'probit':
+            self.lik_layer = Probit_Layer(N, Dout)
+        else:
+            raise NotImplementedError('likelihood not implemented')
+
+    def objective_function(self, params, idxs, alpha=1.0):
+        N = self.N
+        xb = self.x_train[idxs, :]
+        yb = self.y_train[idxs, :]
+        batch_size = yb.shape[0]
+        scale_logZ = - N * 1.0 / batch_size / alpha
+        scale_poste = N * 1.0 / alpha - 1.0
+        scale_cav = - N * 1.0 / alpha
+        scale_prior = 1
+        
+        # update model with new hypers
+        for i, layer in enumerate(self.sgp_layers):
+            layer.update_hypers(params, alpha=alpha, key_suffix='_%d'%i)
+        self.lik_layer.update_hypers(params)
+
+        #### propagate x cavity forward
+        mout, vout, psi1, psi2 = [], [], [], []
+        for i in range(0, self.L):
+            layer = self.sgp_layers[i]
+            if i == 0:
+                # first layer
+                m0, v0, kfu0 = layer.forward_prop_thru_cav(xb)
+                mout.append(m0)
+                vout.append(v0)
+                psi1.append(kfu0)
+                psi2.append(None)
+            else:
+                mi, vi, psi1i, psi2i = layer.forward_prop_thru_cav(
+                    mout[i-1], vout[i-1])
+                mout.append(mi)
+                vout.append(vi)
+                psi1.append(psi1i)
+                psi2.append(psi2i)
+
+        # compute logZ and gradients
+        logZ, dm, dv = self.lik_layer.compute_log_Z(
+            mout[-1], vout[-1], yb, alpha)
+        logZ_scale = scale_logZ * logZ
+        dmi = scale_logZ * dm
+        dvi = scale_logZ * dv
+        grad_list = []
+        for i in range(self.L-1, -1, -1):
+            layer = self.sgp_layers[i]
+            if i == 0:
+                grad_hyper = layer.backprop_grads_reg(
+                    mout[i], vout[i], dmi, dvi, psi1[i], xb, alpha)
+            else:
+                grad_hyper, grad_input = layer.backprop_grads_lvm(
+                    mout[i], vout[i], dmi, dvi, psi1[i], psi2[i], 
+                    mout[i-1], vout[i-1], alpha)
+                dmi, dvi = grad_input['mx'], grad_input['vx']
+            grad_list.insert(0, grad_hyper)
+
+        lik_grad_hyper = self.lik_layer.backprop_grads(
+            mout[-1], vout[-1], dm, dv, alpha, scale_logZ)
+        
+        grad_all = {}
+        for i, grad in enumerate(grad_list):
+            for key in grad.keys():
+                grad_all[key + '_%d'%i] = grad[key]
+
+        for key in lik_grad_hyper.keys():
+            grad_all[key] = lik_grad_hyper[key]
+
+        # compute objective
+        sgp_contrib = 0
+        for layer in self.sgp_layers:
+            sgp_contrib += layer.compute_phi(alpha)
+        energy = logZ_scale + sgp_contrib
+
+        for p in self.fixed_params:
+            grad_all[p] = np.zeros_like(grad_all[p])
+
+        return energy, grad_all
+
+    def predict_f(self, inputs):
+        if not self.updated:
+            for layer in self.sgp_layers:
+                layer.update_posterior_for_prediction()
+            self.updated = True
+        for i, layer in range(self.sgp_layers):
+            if i == 0:
+                mf, vf = layer.output_probabilistic(inputs)
+            else:
+                mf, vf = layer.forward_prop_thru_post(mf, vf)
+        return mf, vf
+
+    def predict_y(self, inputs):
+        mf, vf = self.predict_f(inputs)
+        my, vy = self.lik_layer.output_probabilistic(mf, vf)
+        return my, vy
+
+    def init_hypers(self, y_train):
+        init_params = dict()
+        for i in range(self.L):
+            if i == 0:
+                sgp_params = self.sgp_layers[i].init_hypers(
+                    self.x_train, 
+                    key_suffix='_%d'%i)
+            else:
+                sgp_params = self.sgp_layers[i].init_hypers(
+                    key_suffix='_%d'%i)
+            init_params.update(sgp_params)
+
+        lik_params = self.lik_layer.init_hypers()
+        init_params.update(lik_params)
+        return init_params
+
+    def get_hypers(self):
+        params = dict()
+        for i in range(self.L):
+            sgp_params = self.sgp_layers[i].get_hypers(key_suffix='_%d'%i)
+            params.update(sgp_params)
+        lik_params = self.lik_layer.get_hypers()
+        params.update(lik_params)
+        return params
+
