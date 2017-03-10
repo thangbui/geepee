@@ -101,7 +101,7 @@ def run_step_1D():
 	# plt.plot(X, Y, 'kx', mew=2)
 
 	def plot(m):
-		xx = np.linspace(-0.5, 1.5, 100)[:,None]
+		xx = np.linspace(-3, 3, 100)[:,None]
 		mean, var = m.predict_f(xx)
 		zu = m.sgp_layer.zu
 		mean_u, var_u = m.predict_f(zu)
@@ -114,7 +114,7 @@ def run_step_1D():
 			mean[:, 0] + 2*np.sqrt(var[:, 0]), 
 			color='blue', alpha=0.2)
 		plt.errorbar(zu, mean_u, yerr=2*np.sqrt(var_u), fmt='ro')
-		plt.xlim(-0.1, 1.1)
+		plt.xlim(-3, 3)
 
 	# inference
 	print "create model and optimize ..."

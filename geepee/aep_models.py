@@ -373,8 +373,8 @@ class SGP_Layer(object):
         if x_train is None:
             ls = np.log(np.ones((Din, )) + 0.1 * np.random.rand(Din, ))
             sf = np.log(np.array([0.5]))
-            zu = np.tile(np.linspace(-1.2, 1.2, M).reshape((M, 1)), (1, Din))
-            zu += 0.1 * np.random.randn(zu.shape[0], zu.shape[1])
+            zu = np.tile(np.linspace(-1, 1, M).reshape((M, 1)), (1, Din))
+            # zu += 0.01 * np.random.randn(zu.shape[0], zu.shape[1])
         else:
             if N < 10000:
                 centroids, label = kmeans2(x_train, M, minit='points')
@@ -404,9 +404,9 @@ class SGP_Layer(object):
         eta1_R = np.zeros((Dout, M * (M + 1) / 2))
         eta2 = np.zeros((Dout, M))
         for d in range(Dout):
-            mu = np.linspace(-1.2, 1.2, M).reshape((M, 1))
-            mu += 0.1 * np.random.randn(M, 1)
-            alpha = 0.1 * np.random.rand(M)
+            mu = np.linspace(-1, 1, M).reshape((M, 1))
+            # mu += 0.01 * np.random.randn(M, 1)
+            alpha = 0.5 * np.random.rand(M)
             Su = np.diag(alpha)
             Suinv = np.diag(1 / alpha)
 
@@ -1092,7 +1092,7 @@ class SDGPR(AEP_Model):
             for layer in self.sgp_layers:
                 layer.update_posterior_for_prediction()
             self.updated = True
-        for i, layer in range(self.sgp_layers):
+        for i, layer in enumerate(self.sgp_layers):
             if i == 0:
                 mf, vf = layer.output_probabilistic(inputs)
             else:

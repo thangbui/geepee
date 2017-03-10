@@ -18,7 +18,7 @@ def run_regression_1D():
 	def plot(m):
 		xx = np.linspace(-0.5, 1.5, 100)[:,None]
 		mean, var = m.predict_f(xx)
-		zu = m.sgp_layer.zu
+		zu = m.sgp_layers[0].zu
 		mean_u, var_u = m.predict_f(zu)
 		plt.figure()
 		plt.plot(X, Y, 'kx', mew=2)
@@ -66,7 +66,7 @@ def run_banana():
 			Xtrain[:,0][Ytrain[:,0]==-1], 
 			Xtrain[:,1][Ytrain[:,0]==-1], 
 			'o', color=col2, mew=0, alpha=0.5)
-		zu = m.sgp_layer.zu
+		zu = m.sgp_layers[0].zu
 		plt.plot(zu[:,0], zu[:,1], 'ro', mew=0, ms=4)
 		plt.contour(xx, yy, mf.reshape(*xx.shape), [0], colors='k', linewidths=1.8, zorder=100)
 
@@ -91,15 +91,15 @@ def run_step_1D():
 		return y + 0.05*np.random.randn(x.shape[0], 1)
 
 	print "create dataset ..."
-	N = 200
+	N = 100
 	X = np.random.rand(N,1) * 3 - 1.5 
 	Y = step(X)
 	# plt.plot(X, Y, 'kx', mew=2)
 
 	def plot(m):
-		xx = np.linspace(-0.5, 1.5, 100)[:,None]
+		xx = np.linspace(-3, 3, 100)[:,None]
 		mean, var = m.predict_f(xx)
-		zu = m.sgp_layer.zu
+		zu = m.sgp_layers[0].zu
 		mean_u, var_u = m.predict_f(zu)
 		plt.figure()
 		plt.plot(X, Y, 'kx', mew=2)
@@ -110,14 +110,14 @@ def run_step_1D():
 			mean[:, 0] + 2*np.sqrt(var[:, 0]), 
 			color='blue', alpha=0.2)
 		plt.errorbar(zu, mean_u, yerr=2*np.sqrt(var_u), fmt='ro')
-		plt.xlim(-0.1, 1.1)
+		plt.xlim(-3, 3)
 
 	# inference
 	print "create model and optimize ..."
 	M = 20
-	hidden_size = [2]
+	hidden_size = [3, 2]
 	model = SDGPR(X, Y, M, hidden_size, lik='Gaussian')
-	model.optimise(method='L-BFGS-B', alpha=1, maxiter=2000)
+	model.optimise(method='L-BFGS-B', alpha=1, maxiter=1000)
 	plot(model)
 	plt.show()
 
