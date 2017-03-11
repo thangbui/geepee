@@ -300,6 +300,24 @@ class SGP_Layer(object):
         vout = psi0 + Bpsi2 - mout**2
         return mout, vout
 
+    def sample(self, x):
+        Su = self.Su
+        mu = self.mu
+        Lu = np.linalg.cholesky(Su)
+        epsilon = np.random.randn(self.Dout, self.M)
+        u_sample = mu + np.einsum('dab,db->da', Lu, epsilon)
+
+        kff = compute_kernel(2*self.ls, 2*self.sf, x, x) 
+        kff += np.diag(jitter * np.ones(x.shape[0]))
+        kfu = compute_kernel(2*self.ls, 2*self.sf, x, self.zu)
+        qfu = np.dot(kfu, self.Kuuinv)
+        mf = np.einsum('nm,dm->nd', qfu, u_sample)
+        vf = kff - np.dot(qfu, kfu.T)
+        Lf = np.linalg.cholesky(vf)
+        epsilon = np.random.randn(x.shape[0], self.Dout)
+        f_sample = mf + np.einsum('ab,bd->ad', Lf, epsilon)
+        return f_sample
+
     def compute_kuu(self):
         # update kuu and kuuinv
         ls = self.ls
@@ -372,7 +390,7 @@ class SGP_Layer(object):
 
         if x_train is None:
             ls = np.log(np.ones((Din, )) + 0.1 * np.random.rand(Din, ))
-            sf = np.log(np.array([0.5]))
+            sf = np.log(np.array([1]))
             zu = np.tile(np.linspace(-1, 1, M).reshape((M, 1)), (1, Din))
             # zu += 0.01 * np.random.randn(zu.shape[0], zu.shape[1])
         else:
@@ -394,8 +412,8 @@ class SGP_Layer(object):
             ls = np.zeros((Din, ))
             d2imed = np.median(x_dist[triu_ind])
             for i in range(Din):
-                ls[i] = np.log(d2imed/2  + 1e-16)
-            sf = np.log(np.array([1]))
+                ls[i] = np.log(d2imed  + 1e-16)
+            sf = np.log(np.array([0.5]))
 
         Kuu = compute_kernel(2 * ls, 2 * sf, zu, zu)
         Kuu += np.diag(jitter * np.ones((M, )))
@@ -406,7 +424,8 @@ class SGP_Layer(object):
         for d in range(Dout):
             mu = np.linspace(-1, 1, M).reshape((M, 1))
             # mu += 0.01 * np.random.randn(M, 1)
-            alpha = 0.5 * np.random.rand(M)
+            alpha = 0.1 * np.random.rand(M)
+            # alpha = 0.01 * np.ones(M)
             Su = np.diag(alpha)
             Suinv = np.diag(1 / alpha)
 
@@ -960,6 +979,17 @@ class SGPR(AEP_Model):
         mf, vf = self.sgp_layer.output_probabilistic(inputs)
         return mf, vf
 
+    def sample_f(self, inputs, no_samples=1):
+        if not self.updated:
+            self.sgp_layer.update_posterior_for_prediction()
+            self.updated = True
+        K = no_samples
+        fs = np.zeros((inputs.shape[0], self.Dout, K))
+        # TODO: remove for loop here
+        for k in range(K):
+            fs[:, :, k] = self.sgp_layer.sample(inputs)
+        return fs
+        
     def predict_y(self, inputs):
         if not self.updated:
             self.sgp_layer.update_posterior_for_prediction()
@@ -1098,6 +1128,22 @@ class SDGPR(AEP_Model):
             else:
                 mf, vf = layer.forward_prop_thru_post(mf, vf)
         return mf, vf
+
+    def sample_f(self, inputs, no_samples=1):
+        if not self.updated:
+            for layer in self.sgp_layers:
+                layer.update_posterior_for_prediction()
+            self.updated = True
+        K = no_samples
+        fs = np.zeros((inputs.shape[0], self.Dout, K))
+        # TODO: remove for loop here
+        for k in range(K):
+            inputs_k = inputs
+            for layer in self.sgp_layers:
+                outputs = layer.sample(inputs_k)
+                inputs_k = outputs
+            fs[:, :, k] = outputs
+        return fs
 
     def predict_y(self, inputs):
         mf, vf = self.predict_f(inputs)

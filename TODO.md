@@ -2,16 +2,16 @@
 
 - [ ] save/load models: is saving parameters enough?
 
-## AEP modules
+## AEP (BB-alpha) modules
 
 - [x] sparse GPLVM
 - [x] sparse GP regression and classification: make sure that the gradients of logZ 
 are the same with sparse GPLVM when variance = 0
-- [ ] sparse Deep GP regression and classification
+- [x] sparse Deep GP regression and classification
 - [ ] sparse Deep GP latent variable models
 - [ ] for sparse Deep GP: alpha = 1.0 do moment matching, 
 for other alphas, what do we do?
-- [ ] moment matching vs linearisation vs quadrature
+- [ ] moment matching vs linearisation vs quadrature/MC
 
 ## EP modules
 

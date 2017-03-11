@@ -2,8 +2,10 @@ print "importing stuff..."
 import numpy as np
 import pdb
 import matplotlib.pylab as plt
-from .context import SDGPR
 from scipy import special
+
+from .context import SDGPR
+from .datautils import step, spiral
 
 
 def run_regression_1D():
@@ -110,6 +112,12 @@ def run_step_1D():
 			mean[:, 0] + 2*np.sqrt(var[:, 0]), 
 			color='blue', alpha=0.2)
 		plt.errorbar(zu, mean_u, yerr=2*np.sqrt(var_u), fmt='ro')
+
+		no_samples = 20
+		f_samples = m.sample_f(xx, no_samples)
+		for i in range(no_samples):
+			plt.plot(xx, f_samples[:, :, i], linewidth=0.5, alpha=0.5)
+
 		plt.xlim(-3, 3)
 
 	# inference
@@ -121,7 +129,52 @@ def run_step_1D():
 	plot(model)
 	plt.show()
 
+
+def run_spiral():
+	np.random.seed(42)
+
+	def gridParams():
+		mins = [-1.2, -1.2]
+		maxs = [1.2, 1.2]
+		nGrid = 80
+		xspaced = np.linspace( mins[0], maxs[0], nGrid )
+		yspaced = np.linspace( mins[1], maxs[1], nGrid )
+		xx, yy = np.meshgrid( xspaced, yspaced )
+		Xplot = np.vstack((xx.flatten(),yy.flatten())).T
+		return mins, maxs, xx, yy, Xplot
+
+	def plot(m):
+		col1 = '#0172B2'
+		col2 = '#CC6600'
+		mins, maxs, xx, yy, Xplot = gridParams()
+		mf, vf = m.predict_f(Xplot)
+		plt.figure()
+		plt.plot(
+			Xtrain[:,0][Ytrain[:,0]==1], 
+			Xtrain[:,1][Ytrain[:,0]==1], 
+			'o', color=col1, mew=0, alpha=0.5)
+		plt.plot(
+			Xtrain[:,0][Ytrain[:,0]==-1], 
+			Xtrain[:,1][Ytrain[:,0]==-1], 
+			'o', color=col2, mew=0, alpha=0.5)
+		zu = m.sgp_layers[0].zu
+		plt.plot(zu[:,0], zu[:,1], 'ro', mew=0, ms=4)
+		plt.contour(xx, yy, mf.reshape(*xx.shape), [0], colors='k', linewidths=1.8, zorder=100)
+
+	N = 100
+	M = 20
+	Xtrain, Ytrain = spiral(N)
+	Xtrain /= 6
+	hidden_size = [2, 2]
+	model = SDGPR(Xtrain, Ytrain, M, hidden_size, lik='Probit')
+	model.set_fixed_params(['sf_0', 'sf_1', 'sf_2'])
+	model.optimise(method='L-BFGS-B', alpha=1, maxiter=5000)
+	plot(model)
+	plt.show()
+
+
 if __name__ == '__main__':
 	# run_regression_1D()
 	# run_banana()
 	run_step_1D()
+	# run_spiral()
