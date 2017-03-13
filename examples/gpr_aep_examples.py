@@ -5,7 +5,7 @@ import matplotlib.pylab as plt
 from scipy import special
 
 from .datautils import step, spiral
-from .context import SGPR
+from .context import aep
 
 
 
@@ -37,7 +37,7 @@ def run_regression_1D():
 	# inference
 	print "create model and optimize ..."
 	M = 20
-	model = SGPR(X, Y, M, lik='Gaussian')
+	model = aep.SGPR(X, Y, M, lik='Gaussian')
 	model.optimise(method='L-BFGS-B', alpha=0.01, maxiter=2000)
 	plot(model)
 	plt.show()
@@ -76,13 +76,13 @@ def run_banana():
 	Ytrain = np.loadtxt('./examples/data/banana_Y_train.txt', delimiter=',').reshape(-1,1)
 	Ytrain[np.where(Ytrain==0)[0]] = -1
 	M = 50
-	model = SGPR(Xtrain, Ytrain, M, lik='Probit')
+	model = aep.SGPR(Xtrain, Ytrain, M, lik='Probit')
 	model.optimise(method='L-BFGS-B', alpha=0.01, maxiter=2000)
 	plot(model)
-	model = SGPR(Xtrain, Ytrain, M, lik='Probit')
+	model = aep.SGPR(Xtrain, Ytrain, M, lik='Probit')
 	model.optimise(method='L-BFGS-B', alpha=0.2, maxiter=2000)
 	plot(model)
-	model = SGPR(Xtrain, Ytrain, M, lik='Probit')
+	model = aep.SGPR(Xtrain, Ytrain, M, lik='Probit')
 	model.optimise(method='L-BFGS-B', alpha=0.7, maxiter=2000)
 	plot(model)
 	plt.show()
@@ -122,7 +122,7 @@ def run_step_1D():
 	# inference
 	print "create model and optimize ..."
 	M = 20
-	model = SGPR(X, Y, M, lik='Gaussian')
+	model = aep.SGPR(X, Y, M, lik='Gaussian')
 	model.optimise(method='L-BFGS-B', alpha=0.01, maxiter=2000)
 	plot(model)
 	plt.show()
@@ -164,7 +164,7 @@ def run_spiral():
 	M = 50
 	Xtrain, Ytrain = spiral(N)
 	Xtrain /= 6
-	model = SGPR(Xtrain, Ytrain, M, lik='Probit')
+	model = aep.SGPR(Xtrain, Ytrain, M, lik='Probit')
 	model.set_fixed_params(['sf'])
 	model.optimise(method='L-BFGS-B', alpha=1, maxiter=2000)
 	plot(model)

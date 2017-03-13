@@ -4,7 +4,7 @@ import pdb
 import matplotlib.pylab as plt
 from scipy import special
 
-from .context import SDGPR
+from .context import aep
 from .datautils import step, spiral
 
 
@@ -77,7 +77,7 @@ def run_banana():
 	Ytrain[np.where(Ytrain==0)[0]] = -1
 	M = 50
 	hidden_size = [2]
-	model = SDGPR(Xtrain, Ytrain, M, hidden_size, lik='Probit')
+	model = aep.SDGPR(Xtrain, Ytrain, M, hidden_size, lik='Probit')
 	model.optimise(method='L-BFGS-B', alpha=1, maxiter=2000)
 	plot(model)
 	plt.show()
@@ -124,7 +124,7 @@ def run_step_1D():
 	print "create model and optimize ..."
 	M = 20
 	hidden_size = [3, 2]
-	model = SDGPR(X, Y, M, hidden_size, lik='Gaussian')
+	model = aep.SDGPR(X, Y, M, hidden_size, lik='Gaussian')
 	model.optimise(method='L-BFGS-B', alpha=1, maxiter=1000)
 	plot(model)
 	plt.show()
@@ -166,7 +166,7 @@ def run_spiral():
 	Xtrain, Ytrain = spiral(N)
 	Xtrain /= 6
 	hidden_size = [2, 2]
-	model = SDGPR(Xtrain, Ytrain, M, hidden_size, lik='Probit')
+	model = aep.SDGPR(Xtrain, Ytrain, M, hidden_size, lik='Probit')
 	model.set_fixed_params(['sf_0', 'sf_1', 'sf_2'])
 	model.optimise(method='L-BFGS-B', alpha=1, maxiter=5000)
 	plot(model)
