@@ -103,11 +103,10 @@ class SGPR(VI_Model):
         N = self.N
         Dout = self.Dout
         M = self.M
-        sf2 = np.exp(2*self.sf)
-        sn2 = np.exp(2*self.sn)
-
         # update model with new hypers
         self.update_hypers(params)
+        sf2 = np.exp(2*self.sf)
+        sn2 = np.exp(2*self.sn)
 
         # compute the approximate log marginal likelihood
         Lu = self.Lu
@@ -122,7 +121,7 @@ class SGPR(VI_Model):
         iGy = iG[:, None] * y
         z1 = np.dot(B, iGy)
         z2 = np.dot(B, iG)
-        z = iGy + np.dot(z2.T, z1)
+        z = iGy - np.dot(z2.T, z1)
         term1 = 0.5 * np.sum(z*y)
         term2 = Dout * np.sum(np.log(np.diag(La)))
         term3 = 0.5 * Dout * np.sum(np.log(G))
@@ -134,14 +133,14 @@ class SGPR(VI_Model):
         R = np.linalg.solve(Lu.T, V)
         RiG = R*iG
         RdQ = -np.dot(np.dot(R, z), z.T) + RiG - np.dot(np.dot(RiG, B.T), B)*iG;
-        dG = z**2 - (iG + iG**2 * np.sum(B*B, axis=0)) [:, None]
+        dG = z**2 + (-iG + iG**2 * np.sum(B*B, axis=0)) [:, None]
         tmp = alpha*dG - (1-alpha)/(1+alpha*r[:, None]/sn2)/sn2
         RdQ2 = RdQ + R*tmp.T
         KW = Kuf*RdQ2
         KWR = self.Kuu*(np.dot(RdQ2, R.T))
         P = (np.dot(KW, x) - np.dot(KWR, self.zu) 
             + (np.sum(KWR, axis=1) - np.sum(KW, axis=1))[:, None]*self.zu)
-        dzu = P / np.exp(self.ls);
+        dzu = P / np.exp(self.ls)
         dls = (-np.sum(P*self.zu, axis=0) 
             - np.sum((np.dot(KW.T, self.zu) - np.sum(KW, axis=0)[:, None]*x)*x, axis=0))
         dsn = -np.sum(dG)*sn2 - (1-alpha)*np.sum(r/(1+alpha*r/sn2))/sn2;
