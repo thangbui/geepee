@@ -5,7 +5,7 @@ import pdb
 import pprint
 import os
 
-from .context import SGPLVM, SGPR, SDGPR
+from .context import aep
 from .context import flatten_dict, unflatten_dict
 
 
@@ -38,7 +38,7 @@ def test_gplvm_aep_gaussian():
     Q = 3
     y_train = np.random.randn(N_train, Q)
     # params  tied
-    lvm = SGPLVM(y_train, D, M, lik='Gaussian')
+    lvm = aep.SGPLVM(y_train, D, M, lik='Gaussian')
 
     # init hypers, inducing points and q(u) params
     init_params = lvm.init_hypers(y_train)
@@ -196,7 +196,7 @@ def test_gplvm_aep_probit():
     Q = 3
     y_train = 2*np.random.randint(0, 2, size=(N_train, Q)) - 1
     # params  tied
-    lvm = SGPLVM(y_train, D, M, lik='Probit')
+    lvm = aep.SGPLVM(y_train, D, M, lik='Probit')
 
     # init hypers, inducing points and q(u) params
     init_params = lvm.init_hypers(y_train)
@@ -337,7 +337,7 @@ def test_gplvm_aep_gaussian_scipy():
     Q = 3
     y_train = np.random.randn(N_train, Q)
     # params  tied
-    lvm = SGPLVM(y_train, D, M, lik='Gaussian')
+    lvm = aep.SGPLVM(y_train, D, M, lik='Gaussian')
 
     # init hypers, inducing points and q(u) params
     init_params_dict = lvm.init_hypers(y_train)
@@ -364,7 +364,7 @@ def test_gplvm_aep_probit_scipy():
     Q = 3
     y_train = 2*np.random.randint(0, 2, size=(N_train, Q)) - 1
     # params  tied
-    lvm = SGPLVM(y_train, D, M, lik='Gaussian')
+    lvm = aep.SGPLVM(y_train, D, M, lik='Gaussian')
 
     # init hypers, inducing points and q(u) params
     init_params_dict = lvm.init_hypers(y_train)
@@ -393,7 +393,7 @@ def test_gpr_aep_gaussian():
     y_train = np.random.randn(N_train, Q)
     x_train = np.random.randn(N_train, D)
     # params  tied
-    model = SGPR(x_train, y_train, M, lik='Gaussian')
+    model = aep.SGPR(x_train, y_train, M, lik='Gaussian')
 
     # init hypers, inducing points and q(u) params
     init_params = model.init_hypers(y_train)
@@ -516,7 +516,7 @@ def test_gpr_aep_probit():
     x_train = np.random.randn(N_train, D)
     y_train = 2*np.random.randint(0, 2, size=(N_train, Q)) - 1
     # params  tied
-    model = SGPR(x_train, y_train, M, lik='Probit')
+    model = aep.SGPR(x_train, y_train, M, lik='Probit')
 
     # init hypers, inducing points and q(u) params
     init_params = model.init_hypers(y_train)
@@ -624,7 +624,7 @@ def test_gpr_aep_gaussian_scipy():
     x_train = np.random.randn(N_train, D)
     y_train = np.random.randn(N_train, Q)
     # params  tied
-    model = SGPR(x_train, y_train, M, lik='Gaussian')
+    model = aep.SGPR(x_train, y_train, M, lik='Gaussian')
 
     # init hypers, inducing points and q(u) params
     init_params_dict = model.init_hypers(y_train)
@@ -652,7 +652,7 @@ def test_gpr_aep_probit_scipy():
     x_train = np.random.randn(N_train, D)
     y_train = 2*np.random.randint(0, 2, size=(N_train, Q)) - 1
     # params  tied
-    model = SGPR(x_train, y_train, M, lik='Probit')
+    model = aep.SGPR(x_train, y_train, M, lik='Probit')
 
     # init hypers, inducing points and q(u) params
     init_params_dict = model.init_hypers(y_train)
@@ -683,7 +683,7 @@ def test_dgpr_aep_gaussian():
     x_train = np.random.randn(N_train, D)
     hidden_size = [3, 2]
     # params  tied
-    model = SDGPR(x_train, y_train, M, hidden_size, lik='Gaussian')
+    model = aep.SDGPR(x_train, y_train, M, hidden_size, lik='Gaussian')
 
     # init hypers, inducing points and q(u) params
     init_params = model.init_hypers(y_train)
@@ -815,7 +815,7 @@ def test_dgpr_aep_probit():
     hidden_size = [3, 2]
     x_train = np.random.randn(N_train, D)
     y_train = 2*np.random.randint(0, 2, size=(N_train, Q)) - 1
-    model = SDGPR(x_train, y_train, M, hidden_size, lik='Probit')
+    model = aep.SDGPR(x_train, y_train, M, hidden_size, lik='Probit')
 
     # init hypers, inducing points and q(u) params
     init_params = model.init_hypers(y_train)
@@ -932,7 +932,7 @@ def test_dgpr_aep_gaussian_scipy():
     x_train = np.random.randn(N_train, D)
     y_train = np.random.randn(N_train, Q)
     
-    model = SDGPR(x_train, y_train, M, hidden_size, lik='Gaussian')
+    model = aep.SDGPR(x_train, y_train, M, hidden_size, lik='Gaussian')
 
     # init hypers, inducing points and q(u) params
     init_params_dict = model.init_hypers(y_train)
@@ -962,7 +962,7 @@ def test_dgpr_aep_probit_scipy():
     x_train = np.random.randn(N_train, D)
     y_train = 2*np.random.randint(0, 2, size=(N_train, Q)) - 1
     # params  tied
-    model = SDGPR(x_train, y_train, M, hidden_size, lik='Probit')
+    model = aep.SDGPR(x_train, y_train, M, hidden_size, lik='Probit')
 
     # init hypers, inducing points and q(u) params
     init_params_dict = model.init_hypers(y_train)

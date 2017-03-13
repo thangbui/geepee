@@ -382,7 +382,6 @@ class SGP_Layer(object):
             self.B_sto[d, :, :] = np.dot(Kuuinv, np.dot(Smm, Kuuinv)) - Kuuinv
 
     def init_hypers(self, x_train=None, key_suffix=''):
-        # dict to hold hypers, inducing points and parameters of q(U)
         N = self.N
         M = self.M
         Din = self.Din
