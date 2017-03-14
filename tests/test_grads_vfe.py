@@ -146,6 +146,7 @@ def test_gpr_vfe_gaussian_scipy():
     pp.pprint(check_grad(objective, gradient, init_params_vec, params_args, model, idxs, alpha))
 
 if __name__ == '__main__':
-    test_gpr_vfe_gaussian()
-    test_gpr_vfe_gaussian_scipy()
+    for i in range(10):
+        test_gpr_vfe_gaussian()
+        test_gpr_vfe_gaussian_scipy()
     

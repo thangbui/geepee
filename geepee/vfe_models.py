@@ -7,7 +7,7 @@ from utils import *
 from kernels import *
 
 # ideally these should be moved to some config file
-jitter = 1e-4
+jitter = 1e-6
 
 
 class VI_Model(object):
@@ -88,11 +88,8 @@ class SGPR(VI_Model):
         self.M = M = no_pseudo
         self.x_train = x_train
 
-        # numpy variable for inducing points, Kuuinv, Kuu
-        self.zu = np.zeros([M, Din])
-        self.Kuu = np.zeros([M, M])
-        self.Lu = np.zeros([M, M])
         # variables for the hyperparameters
+        self.zu = np.zeros([M, Din])
         self.ls = np.zeros([Din, ])
         self.sf = 0
         self.sn = 0
@@ -105,11 +102,13 @@ class SGPR(VI_Model):
         M = self.M
         # update model with new hypers
         self.update_hypers(params)
+        Kuu_noiseless = compute_kernel(2*self.ls, 2*self.sf, self.zu, self.zu)
+        Kuu = Kuu_noiseless + np.diag(jitter * np.ones((M, )))
+        Lu = np.linalg.cholesky(Kuu)
         sf2 = np.exp(2*self.sf)
         sn2 = np.exp(2*self.sn)
         Kuf = compute_kernel(2*self.ls, 2*self.sf, self.zu, x)
         Kfu = Kuf.T
-        Kuu = self.Kuu
         KuinvKuf = np.linalg.solve(Kuu, Kuf)
         Qff = np.dot(Kfu, KuinvKuf)
         Kff_diag = sf2
@@ -138,7 +137,9 @@ class SGPR(VI_Model):
         sn2 = np.exp(2*self.sn)
 
         # compute the approximate log marginal likelihood
-        Lu = self.Lu
+        Kuu_noiseless = compute_kernel(2*self.ls, 2*self.sf, self.zu, self.zu)
+        Kuu = Kuu_noiseless + np.diag(jitter * np.ones((M, )))
+        Lu = np.linalg.cholesky(Kuu)
         Kuf = compute_kernel(2*self.ls, 2*self.sf, self.zu, x)
         V = np.linalg.solve(Lu, Kuf)
         r = sf2 - np.sum(V*V, axis=0)
@@ -168,7 +169,7 @@ class SGPR(VI_Model):
         tmp = alpha*dG - (1-alpha)/(1+alpha*r[:, None]/sn2)/sn2
         RdQ2 = RdQ + R*tmp.T
         KW = Kuf*RdQ2
-        KWR = self.Kuu*(np.dot(RdQ2, R.T))
+        KWR = Kuu_noiseless*(np.dot(RdQ2, R.T))
         P = (np.dot(KW, xs) - np.dot(KWR, zus) 
             + (np.sum(KWR, axis=1) - np.sum(KW, axis=1))[:, None]*zus)
         dzu = P / np.exp(self.ls)
@@ -194,7 +195,9 @@ class SGPR(VI_Model):
         sn2 = np.exp(2*self.sn)
 
         # compute the approximate log marginal likelihood
-        Lu = self.Lu
+        Kuu_noiseless = compute_kernel(2*self.ls, 2*self.sf, self.zu, self.zu)
+        Kuu = Kuu_noiseless + np.diag(jitter * np.ones((M, )))
+        Lu = np.linalg.cholesky(Kuu)
         Kuf = compute_kernel(2*self.ls, 2*self.sf, self.zu, x)
         Kut = compute_kernel(2*self.ls, 2*self.sf, self.zu, inputs)
         V = np.linalg.solve(Lu, Kuf)
@@ -281,8 +284,3 @@ class SGPR(VI_Model):
         self.sf = params['sf']
         self.zu = params['zu']
         self.sn = params['sn']
-
-        # update Kuu given new hypers
-        self.Kuu = compute_kernel(2*self.ls, 2*self.sf, self.zu, self.zu)
-        self.Kuu += np.diag(jitter * np.ones((self.M, )))
-        self.Lu = np.linalg.cholesky(self.Kuu)
