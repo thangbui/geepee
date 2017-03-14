@@ -7,7 +7,7 @@ from scipy import special
 from .datautils import step, spiral
 from .context import vfe
 
-
+import GPflow as gf
 
 def run_regression_1D():
 	np.random.seed(42)
@@ -40,9 +40,21 @@ def run_regression_1D():
 	M = 20
 	alpha = 0.01
 	model = vfe.SGPR(X, Y, M)
-	model.update_hypers(model.init_hypers())
-	# model.optimise(method='L-BFGS-B', alpha=alpha, maxiter=0)
+	params = model.init_hypers()
+	# model.update_hypers(params)
+	model.optimise(method='L-BFGS-B', alpha=alpha, maxiter=1000)
 	plot(model)
+
+	# print model.objective_function(params, alpha=1.0)[0]
+	# print model.objective_function_manual(params, alpha=1.0)
+
+	# gfm = gf.sgpr.SGPR(X, Y, gf.kernels.RBF(1), Z=params['zu'])
+	# gfm.likelihood.variance = np.exp(2*params['sn'])
+	# gfm.kern.variance = np.exp(2*params['sf'])
+	# gfm.kern.lengthscales = np.exp(params['ls'])
+
+	# print gfm.compute_log_likelihood()
+
 	plt.show()
 
 
@@ -82,8 +94,20 @@ def run_step_1D():
 	M = 20
 	alpha = 0.01
 	model = vfe.SGPR(X, Y, M)
-	model.optimise(method='L-BFGS-B', alpha=alpha, maxiter=2000)
+	# params = model.init_hypers()
+	# model.update_hypers(params)
+	model.optimise(method='L-BFGS-B', alpha=alpha, maxiter=1000)
 	plot(model)
+
+	# print model.objective_function(params, alpha=1.0)
+
+	# gfm = gf.sgpr.GPRFITC(X, Y, gf.kernels.RBF(1), Z=params['zu'])
+	# gfm.likelihood.variance = np.exp(2*params['sn'])
+	# gfm.kern.variance = np.exp(2*params['sf'])
+	# gfm.kern.lengthscales = np.exp(params['ls'])
+
+	# print gfm.compute_log_likelihood()
+
 	plt.show()
 
 

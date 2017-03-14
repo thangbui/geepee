@@ -46,6 +46,7 @@ def test_gpr_vfe_gaussian():
     logZ, grad_all = model.objective_function(params, idxs, alpha=alpha)
     pp.pprint(logZ)
     pp.pprint(params)
+
     # pdb.set_trace()
 
     eps = 1e-5

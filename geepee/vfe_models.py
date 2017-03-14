@@ -97,6 +97,35 @@ class SGPR(VI_Model):
         self.sf = 0
         self.sn = 0
 
+    def objective_function_manual(self, params, alpha=1.0):
+        x = self.x_train
+        y = self.y_train
+        N = self.N
+        Dout = self.Dout
+        M = self.M
+        # update model with new hypers
+        self.update_hypers(params)
+        sf2 = np.exp(2*self.sf)
+        sn2 = np.exp(2*self.sn)
+        Kuf = compute_kernel(2*self.ls, 2*self.sf, self.zu, x)
+        Kfu = Kuf.T
+        Kuu = self.Kuu
+        KuinvKuf = np.linalg.solve(Kuu, Kuf)
+        Qff = np.dot(Kfu, KuinvKuf)
+        Kff_diag = sf2
+        Dff_diag = sf2 - np.diag(Qff)
+        Kyy_bar = Qff + alpha * np.diag(Dff_diag) + sn2*np.eye(N)
+        Ly = np.linalg.cholesky(Kyy_bar)
+        Lyy = np.linalg.solve(Ly, y)
+        term1 = 0.5 * N * np.log(2*np.pi)
+        term2 = np.sum(np.log(np.diag(Ly)))
+        term3 = 0.5 * np.sum(Lyy*Lyy)
+        term4 = 0.5*(1-alpha)/alpha * np.sum(np.log(1 + alpha*Dff_diag/sn2))
+
+        print term3, term2, term1, term4
+
+        return term1 + term2 + term3 + term4
+
     def objective_function(self, params, idxs=None, alpha=1.0):
         x = self.x_train
         y = self.y_train
@@ -119,17 +148,19 @@ class SGPR(VI_Model):
         La = np.linalg.cholesky(A)
         B = np.linalg.solve(La, V)
         iGy = iG[:, None] * y
-        z1 = np.dot(B, iGy)
-        z2 = np.dot(B, iG)
-        z = iGy - np.dot(z2.T, z1)
+        z_tmp = np.dot(B.T, np.dot(B, iGy)) * iG[:, None]
+        z = iGy - z_tmp
         term1 = 0.5 * np.sum(z*y)
         term2 = Dout * np.sum(np.log(np.diag(La)))
         term3 = 0.5 * Dout * np.sum(np.log(G))
-        term3 = 0.5 * N * Dout * np.log(2*np.pi)
+        term4 = 0.5 * N * Dout * np.log(2*np.pi)
         c4 = 0.5 * Dout * (1-alpha) / alpha
-        term4 = c4 * np.sum(np.log(1 + alpha*r/sn2))
-        energy = term1 + term2 + term3 + term4
+        term5 = c4 * np.sum(np.log(1 + alpha*r/sn2))
+        energy = term1 + term2 + term3 + term4 + term5
+        # print term1, term2 + term3, term4, term5
 
+        zus = self.zu / np.exp(self.ls)
+        xs = x / np.exp(self.ls)
         R = np.linalg.solve(Lu.T, V)
         RiG = R*iG
         RdQ = -np.dot(np.dot(R, z), z.T) + RiG - np.dot(np.dot(RiG, B.T), B)*iG;
@@ -138,11 +169,11 @@ class SGPR(VI_Model):
         RdQ2 = RdQ + R*tmp.T
         KW = Kuf*RdQ2
         KWR = self.Kuu*(np.dot(RdQ2, R.T))
-        P = (np.dot(KW, x) - np.dot(KWR, self.zu) 
-            + (np.sum(KWR, axis=1) - np.sum(KW, axis=1))[:, None]*self.zu)
+        P = (np.dot(KW, xs) - np.dot(KWR, zus) 
+            + (np.sum(KWR, axis=1) - np.sum(KW, axis=1))[:, None]*zus)
         dzu = P / np.exp(self.ls)
-        dls = (-np.sum(P*self.zu, axis=0) 
-            - np.sum((np.dot(KW.T, self.zu) - np.sum(KW, axis=0)[:, None]*x)*x, axis=0))
+        dls = (-np.sum(P*zus, axis=0) 
+            - np.sum((np.dot(KW.T, zus) - np.sum(KW, axis=0)[:, None]*xs)*xs, axis=0))
         dsn = -np.sum(dG)*sn2 - (1-alpha)*np.sum(r/(1+alpha*r/sn2))/sn2;
         dsf = (np.sum(Kuf*RdQ) - alpha*np.sum(r[:, None]*dG) 
             + (1-alpha)*np.sum(r/(1+alpha*r/sn2))/sn2)
@@ -224,7 +255,7 @@ class SGPR(VI_Model):
         ls = np.zeros((Din, ))
         d2imed = np.median(x_dist[triu_ind])
         for i in range(Din):
-            ls[i] = np.log(d2imed  + 1e-16)
+            ls[i] = 2*np.log(d2imed  + 1e-16)
         sf = np.log(np.array([0.5]))
 
         params = dict()
