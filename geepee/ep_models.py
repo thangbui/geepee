@@ -14,7 +14,7 @@ from kernels import *
 
 
 # ideally these should be moved to some config file
-jitter = 1e-4
+jitter = 1e-5
 gh_degree = 10
 
 
@@ -75,12 +75,17 @@ class SGP_Layer(object):
         phi = scale_prior*phi_prior + scale_post*phi_post + scale_cav*phi_cav
         return phi
 
-    def output_probabilistic(self, x, add_noise=False):
-        psi0 = np.exp(2*self.sf)
-        psi1 = compute_kernel(2*self.ls, 2*self.sf, x, self.zu)
-        mout = np.einsum('nm,dm->nd', psi1, self.A)
-        Bpsi2 = np.einsum('dab,na,nb->nd', self.B_det, psi1, psi1)
-        vout = psi0 + Bpsi2
+    def output_probabilistic(self, x):
+        Kuuinv = self.Kuuinv
+        A = np.einsum('ab,db->da', Kuuinv, self.mu)
+        B = np.einsum(
+            'ab,dbc->dac', 
+            Kuuinv, np.einsum('dab,bc->dac', self.Su, Kuuinv)) - Kuuinv
+        kff = np.exp(2*self.sf)
+        kfu = compute_kernel(2*self.ls, 2*self.sf, x, self.zu)
+        mout = np.einsum('nm,dm->nd', kfu, A)
+        Bpsi2 = np.einsum('dab,na,nb->nd', B, kfu, kfu)
+        vout = kff + Bpsi2
         return mout, vout
 
     def forward_prop_thru_cav(self, n, mx, vx=None, alpha=1.0):
@@ -199,7 +204,7 @@ class SGP_Layer(object):
         return grad_hyper, grad_input
 
     def backprop_grads_reg(self, m, v, dm, dv, extra_args, x, alpha=1.0):
-        kfu, Ahat, Bhat, muhat, Suhat, SuinvMuhat, Suinvhat = extra_args[0]
+        kfu = extra_args[0]
         Kuuinv = self.Kuuinv
         # compute grads wrt Ahat and Bhat
         dAhat = np.einsum('nd,nm->dm', dm, kfu)
@@ -213,8 +218,9 @@ class SGP_Layer(object):
 
         return grad_hyper, grad_cav
 
-    def update_factor(self, n, alpha, grad_cav, extra_res, decay=0):
-        kfu, Ahat, Bhat, muhat, Suhat, SuinvMuhat, Suinvhat = extra_args[0]
+    def update_factor(self, n, alpha, grad_cav, extra_args, decay=0):
+        muhat, Suhat, SuinvMuhat, Suinvhat = \
+            extra_args[3], extra_args[4], extra_args[5], extra_args[6]
         dmcav, dvcav = grad_cav['mcav'], grad_cav['vcav']
 
         # perform Power-EP update
@@ -291,25 +297,8 @@ class SGP_Layer(object):
         # compute the posterior approximation
         self.Suinv = self.Kuuinv + np.sum(self.t2, axis=0)
         self.SuinvMu = np.sum(self.t1, axis=0)
-        self.Su = np.linalg.inv(Suinv)
+        self.Su = np.linalg.inv(self.Suinv)
         self.mu = np.einsum('dab,db->da', self.Su, self.SuinvMu)
-        
-    def update_posterior_for_prediction(self):
-        # compute the posterior approximation
-        Kuuinv = self.Kuuinv
-        for d in range(self.Dout):
-            Sinv = Kuuinv + self.theta_1[d, :, :]
-            SinvM = self.theta_2[d, :]
-            S = matrixInverse(Sinv)
-            self.Su[d, :, :] = S
-            m = np.dot(S, SinvM)
-            self.mu[d, :] = m
-
-            self.A[d, :] = np.dot(Kuuinv, m)
-            Smm = S + np.outer(m, m)
-            self.Splusmm[d, :, :] = Smm
-            self.B_det[d, :, :] = np.dot(Kuuinv, np.dot(S, Kuuinv)) - Kuuinv
-            self.B_sto[d, :, :] = np.dot(Kuuinv, np.dot(Smm, Kuuinv)) - Kuuinv
 
     def init_hypers(self, x_train=None, key_suffix=''):
         # dict to hold hypers, inducing points and parameters of q(U)
@@ -495,7 +484,7 @@ class EP_Model(object):
         self.fixed_params = []
         self.updated = False
 
-    def init_hypers(self, y_train, x_train=None):
+    def init_hypers(self, y_train=None, x_train=None):
         pass
 
     def get_hypers(self):
@@ -573,20 +562,46 @@ class SGPR(EP_Model):
             raise NotImplementedError('likelihood not implemented')
 
     def inference(self, alpha=1.0, no_epochs=10, sequential=True):
-        for e in range(no_epochs):
-            if sequential:
-                for n in range(self.N):
-                    print 'epoch %d, n %d' % (e, n)
-                    yn = self.y_train[n, :].reshape([1, self.Dout])
-                    xn = self.x_train[n, :].reshape([1, self.Din])
+        def plot():
+            xx = np.linspace(-0.5, 1.5, 100)[:,None]
+            mean, var = self.predict_f(xx)
+            zu = self.sgp_layer.zu
+            mean_u, var_u = self.predict_f(zu)
+            plt.figure()
+            plt.plot(self.x_train, self.y_train, 'kx', mew=2)
+            plt.plot(xx, mean, 'b', lw=2)
+            plt.fill_between(
+                xx[:, 0], 
+                mean[:, 0] - 2*np.sqrt(var[:, 0]), 
+                mean[:, 0] + 2*np.sqrt(var[:, 0]), 
+                color='blue', alpha=0.2)
 
-                    (mn, vn, extra_res) = \
-                        self.sgp_layer.forward_prop_thru_cav(n, xn, alpha=alpha)
-                    logZn, dmn, dvn = self.tilted_func(yn, mn, vn, alpha)
-                    # update gp_layer
-                    grad_hyper, grad_cav = self.sgp_layer.backprop_grads_reg(
-                        mn, vn, dmn, dvn, xn, extra_res, alpha=alpha)
-                    self.sgp_layer.update_factor(n, alpha, grad_cav, extra_res)
+            plt.errorbar(zu, mean_u, yerr=2*np.sqrt(var_u), fmt='ro')
+            plt.xlim(-0.1, 1.1)
+            plt.show()
+
+        # plot()
+        try:
+            for e in range(no_epochs):
+                print 'epoch %d/%d' % (e, no_epochs)
+                if sequential:
+                    for n in range(self.N):
+                        yn = self.y_train[n, :].reshape([1, self.Dout])
+                        xn = self.x_train[n, :].reshape([1, self.Din])
+
+                        (mn, vn, extra_res) = \
+                            self.sgp_layer.forward_prop_thru_cav(n, xn, alpha=alpha)
+                        logZn, dmn, dvn = \
+                            self.lik_layer.compute_log_Z(mn, vn, yn, alpha)
+                        # update gp_layer
+                        grad_hyper, grad_cav = self.sgp_layer.backprop_grads_reg(
+                            mn, vn, dmn, dvn, extra_res, xn, alpha=alpha)
+                        self.sgp_layer.update_factor(n, alpha, grad_cav, extra_res)
+                        # plot()
+        except KeyboardInterrupt:
+            print 'Caught KeyboardInterrupt ...'
+
+
         
     # def objective_function(self, params, idxs, alpha=1.0):
     #     N = self.N
@@ -632,14 +647,14 @@ class SGPR(EP_Model):
 
     def predict_f(self, inputs):
         if not self.updated:
-            self.sgp_layer.update_posterior_for_prediction()
+            self.sgp_layer.update_posterior()
             self.updated = True
         mf, vf = self.sgp_layer.output_probabilistic(inputs)
         return mf, vf
 
     def sample_f(self, inputs, no_samples=1):
         if not self.updated:
-            self.sgp_layer.update_posterior_for_prediction()
+            self.sgp_layer.update_posterior()
             self.updated = True
         K = no_samples
         fs = np.zeros((inputs.shape[0], self.Dout, K))
@@ -650,7 +665,7 @@ class SGPR(EP_Model):
         
     def predict_y(self, inputs):
         if not self.updated:
-            self.sgp_layer.update_posterior_for_prediction()
+            self.sgp_layer.update_posterior()
             self.updated = True
         mf, vf = self.sgp_layer.output_probabilistic(inputs)
         my, vy = self.lik_layer.output_probabilistic(mf, vf)
@@ -660,7 +675,7 @@ class SGPR(EP_Model):
         self.sgp_layer.update_hypers(params)
         self.lik_layer.update_hypers(params)
 
-    def init_hypers(self, y_train):
+    def init_hypers(self):
         sgp_params = self.sgp_layer.init_hypers(self.x_train)
         lik_params = self.lik_layer.init_hypers()
         init_params = dict(sgp_params)

@@ -92,7 +92,7 @@ class SGP_Layer(object):
         phi = scale_prior*phi_prior + scale_post*phi_post + scale_cav*phi_cav
         return phi
 
-    def output_probabilistic(self, x, add_noise=False):
+    def output_probabilistic(self, x):
         psi0 = np.exp(2*self.sf)
         psi1 = compute_kernel(2*self.ls, 2*self.sf, x, self.zu)
         mout = np.einsum('nm,dm->nd', psi1, self.A)

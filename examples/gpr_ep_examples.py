@@ -38,12 +38,13 @@ def run_regression_1D():
 	M = 20
 	alpha = 0.1
 	model_aep = aep.SGPR(X, Y, M, lik='Gaussian')
-	model_aep.optimise(method='L-BFGS-B', alpha=alpha, maxiter=2000)
+	model_aep.optimise(method='L-BFGS-B', alpha=alpha, maxiter=200)
 	plot(model_aep)
 
 	model = ep.SGPR(X, Y, M, lik='Gaussian')
 	model.update_hypers(model_aep.get_hypers())
-	model.inference(alpha=alpha, no_epochs=20)
+	# model.update_hypers(model.init_hypers())
+	model.inference(alpha=alpha, no_epochs=10)
 	plot(model)
 	plt.show()
 
@@ -83,12 +84,13 @@ def run_banana():
 	M = 50
 	alpha = 0.2
 	model_aep = aep.SGPR(Xtrain, Ytrain, M, lik='Probit')
-	model_aep.optimise(method='L-BFGS-B', alpha=alpha, maxiter=2000)
+	model_aep.optimise(method='L-BFGS-B', alpha=alpha, maxiter=200)
 	plot(model_aep)
 
-	model = ep.SGPR(X, Y, M, lik='Gaussian')
+	model = ep.SGPR(Xtrain, Ytrain, M, lik='Probit')
 	model.update_hypers(model_aep.get_hypers())
-	model.inference(alpha=alpha, no_epochs=20)
+	# model.update_hypers(model.init_hypers())
+	model.inference(alpha=alpha, no_epochs=10)
 	plot(model)
 	plt.show()
 
@@ -128,17 +130,18 @@ def run_step_1D():
 	print "create model and optimize ..."
 	M = 20
 	alpha = 0.5
-	model_aep = aep.SGPR(X, Y, M, lik='Gaussian')
-	model_aep.optimise(method='L-BFGS-B', alpha=alpha, maxiter=2000)
-	plot(model_aep)
+	# model_aep = aep.SGPR(X, Y, M, lik='Gaussian')
+	# model_aep.optimise(method='L-BFGS-B', alpha=alpha, maxiter=200)
+	# plot(model_aep)
 
 	model = ep.SGPR(X, Y, M, lik='Gaussian')
-	model.update_hypers(model_aep.get_hypers())
-	model.inference(alpha=alpha, no_epochs=20)
+	# model.update_hypers(model_aep.get_hypers())
+	model.update_hypers(model.init_hypers())
+	model.inference(alpha=alpha, no_epochs=10)
 	plot(model)
 	plt.show()
 
 if __name__ == '__main__':
-	run_regression_1D()
-	run_banana()
+	# run_regression_1D()
+	# run_banana()
 	run_step_1D()
