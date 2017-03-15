@@ -5,4 +5,5 @@ sys.path.insert(0, os.path.abspath(
 
 import geepee.aep_models as aep
 import geepee.vfe_models as vfe
+import geepee.ep_models as ep
 # from geepee.aep_models import SGPLVM, SGPR, SDGPR

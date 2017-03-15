@@ -5,7 +5,7 @@ import matplotlib.pylab as plt
 from scipy import special
 
 from .datautils import step, spiral
-from .context import aep
+from .context import ep, aep
 
 
 def run_regression_1D():
@@ -36,8 +36,14 @@ def run_regression_1D():
 	# inference
 	print "create model and optimize ..."
 	M = 20
-	model = aep.SGPR(X, Y, M, lik='Gaussian')
-	model.optimise(method='L-BFGS-B', alpha=0.01, maxiter=2000)
+	alpha = 0.1
+	model_aep = aep.SGPR(X, Y, M, lik='Gaussian')
+	model_aep.optimise(method='L-BFGS-B', alpha=alpha, maxiter=2000)
+	plot(model_aep)
+
+	model = ep.SGPR(X, Y, M, lik='Gaussian')
+	model.update_hypers(model_aep.get_hypers())
+	model.inference(alpha=alpha, no_epochs=20)
 	plot(model)
 	plt.show()
 
@@ -75,14 +81,14 @@ def run_banana():
 	Ytrain = np.loadtxt('./examples/data/banana_Y_train.txt', delimiter=',').reshape(-1,1)
 	Ytrain[np.where(Ytrain==0)[0]] = -1
 	M = 50
-	model = aep.SGPR(Xtrain, Ytrain, M, lik='Probit')
-	model.optimise(method='L-BFGS-B', alpha=0.01, maxiter=2000)
-	plot(model)
-	model = aep.SGPR(Xtrain, Ytrain, M, lik='Probit')
-	model.optimise(method='L-BFGS-B', alpha=0.2, maxiter=2000)
-	plot(model)
-	model = aep.SGPR(Xtrain, Ytrain, M, lik='Probit')
-	model.optimise(method='L-BFGS-B', alpha=0.7, maxiter=2000)
+	alpha = 0.2
+	model_aep = aep.SGPR(Xtrain, Ytrain, M, lik='Probit')
+	model_aep.optimise(method='L-BFGS-B', alpha=alpha, maxiter=2000)
+	plot(model_aep)
+
+	model = ep.SGPR(X, Y, M, lik='Gaussian')
+	model.update_hypers(model_aep.get_hypers())
+	model.inference(alpha=alpha, no_epochs=20)
 	plot(model)
 	plt.show()
 
@@ -121,57 +127,18 @@ def run_step_1D():
 	# inference
 	print "create model and optimize ..."
 	M = 20
-	model = aep.SGPR(X, Y, M, lik='Gaussian')
-	model.optimise(method='L-BFGS-B', alpha=0.01, maxiter=2000)
+	alpha = 0.5
+	model_aep = aep.SGPR(X, Y, M, lik='Gaussian')
+	model_aep.optimise(method='L-BFGS-B', alpha=alpha, maxiter=2000)
+	plot(model_aep)
+
+	model = ep.SGPR(X, Y, M, lik='Gaussian')
+	model.update_hypers(model_aep.get_hypers())
+	model.inference(alpha=alpha, no_epochs=20)
 	plot(model)
 	plt.show()
-
-
-def run_spiral():
-	np.random.seed(42)
-
-	def gridParams():
-		mins = [-1.2, -1.2]
-		maxs = [1.2, 1.2]
-		nGrid = 80
-		xspaced = np.linspace( mins[0], maxs[0], nGrid )
-		yspaced = np.linspace( mins[1], maxs[1], nGrid )
-		xx, yy = np.meshgrid( xspaced, yspaced )
-		Xplot = np.vstack((xx.flatten(),yy.flatten())).T
-		return mins, maxs, xx, yy, Xplot
-
-	def plot(m):
-		col1 = '#0172B2'
-		col2 = '#CC6600'
-		mins, maxs, xx, yy, Xplot = gridParams()
-		mf, vf = m.predict_f(Xplot)
-		plt.figure()
-		plt.plot(
-			Xtrain[:,0][Ytrain[:,0]==1], 
-			Xtrain[:,1][Ytrain[:,0]==1], 
-			'o', color=col1, mew=0, alpha=0.5)
-		plt.plot(
-			Xtrain[:,0][Ytrain[:,0]==-1], 
-			Xtrain[:,1][Ytrain[:,0]==-1], 
-			'o', color=col2, mew=0, alpha=0.5)
-		zu = m.sgp_layer.zu
-		plt.plot(zu[:,0], zu[:,1], 'ro', mew=0, ms=4)
-		plt.contour(xx, yy, mf.reshape(*xx.shape), [0], 
-			colors='k', linewidths=1.8, zorder=100)
-
-	N = 100
-	M = 50
-	Xtrain, Ytrain = spiral(N)
-	Xtrain /= 6
-	model = aep.SGPR(Xtrain, Ytrain, M, lik='Probit')
-	model.set_fixed_params(['sf'])
-	model.optimise(method='L-BFGS-B', alpha=1, maxiter=2000)
-	plot(model)
-	plt.show()
-
 
 if __name__ == '__main__':
-	# run_regression_1D()
-	# run_banana()
+	run_regression_1D()
+	run_banana()
 	run_step_1D()
-	# run_spiral()

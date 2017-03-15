@@ -1,6 +1,8 @@
 ## General
 
 - [ ] save/load models: is saving parameters enough?
+- [ ] remove for loops in aep_models update_posterior, compute_cavity
+- [ ] separate parameters for different output dimensions
 
 ## AEP (BB-alpha) modules
 
@@ -15,8 +17,14 @@ for other alphas, what do we do?
 
 ## EP modules
 
-- [ ] separate inference and learning
-- [ ] sparse GPR/C, GPLVM, Deep-GP, GP SSM
+- [ ] sparse GPR/C inference
+- [ ] sparse GPR/C learning
+- [ ] GPLVM inference
+- [ ] GPLVM learning
+- [ ] Deep-GP inference
+- [ ] Deep-GP learning
+- [ ] GP SSM inference
+- [ ] GP SSM learning
 - [ ] should work with all alphas
 
 ## VI modules
