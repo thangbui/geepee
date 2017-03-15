@@ -92,14 +92,6 @@ class SGP_Layer(object):
         phi = scale_prior*phi_prior + scale_post*phi_post + scale_cav*phi_cav
         return phi
 
-    def output_probabilistic(self, x):
-        psi0 = np.exp(2*self.sf)
-        psi1 = compute_kernel(2*self.ls, 2*self.sf, x, self.zu)
-        mout = np.einsum('nm,dm->nd', psi1, self.A)
-        Bpsi2 = np.einsum('dab,na,nb->nd', self.B_det, psi1, psi1)
-        vout = psi0 + Bpsi2
-        return mout, vout
-
     def forward_prop_thru_cav(self, mx, vx=None):
         if vx is None:
             return self._forward_prop_deterministic_thru_cav(mx)
@@ -121,6 +113,28 @@ class SGP_Layer(object):
         Bhatpsi2 = np.einsum('dab,nab->nd', self.Bhat_sto, psi2)
         vout = psi0 + Bhatpsi2 - mout**2
         return mout, vout, psi1, psi2
+
+    def forward_prop_thru_post(self, mx, vx=None):
+        if vx is None:
+            return self._forward_prop_deterministic_thru_post(mx)
+        else:
+            return self._forward_prop_random_thru_post_mm(mx, vx)
+
+    def _forward_prop_deterministic_thru_post(self, x):
+        psi0 = np.exp(2*self.sf)
+        psi1 = compute_kernel(2*self.ls, 2*self.sf, x, self.zu)
+        mout = np.einsum('nm,dm->nd', psi1, self.A)
+        Bpsi2 = np.einsum('dab,na,nb->nd', self.B_det, psi1, psi1)
+        vout = psi0 + Bpsi2
+        return mout, vout
+
+    def _forward_prop_random_thru_post_mm(self, mx, vx):
+        psi0 = np.exp(2.0*self.sf)
+        psi1, psi2 = compute_psi_weave(2*self.ls, 2*self.sf, mx, vx, self.zu)
+        mout = np.einsum('nm,dm->nd', psi1, self.A)
+        Bpsi2 = np.einsum('dab,nab->nd', self.B_sto, psi2)
+        vout = psi0 + Bpsi2 - mout**2
+        return mout, vout
 
     def backprop_grads_lvm(self, m, v, dm, dv, psi1, psi2, mx, vx, alpha=1.0):
         N = self.N
@@ -291,14 +305,6 @@ class SGP_Layer(object):
             'eta1_R': deta1_R, 'eta2': deta2}
 
         return grad_hyper
-
-    def forward_prop_thru_post(self, mx, vx):
-        psi0 = np.exp(2.0*self.sf)
-        psi1, psi2 = compute_psi_weave(2*self.ls, 2*self.sf, mx, vx, self.zu)
-        mout = np.einsum('nm,dm->nd', psi1, self.A)
-        Bpsi2 = np.einsum('dab,nab->nd', self.B_sto, psi2)
-        vout = psi0 + Bpsi2 - mout**2
-        return mout, vout
 
     def sample(self, x):
         Su = self.Su
@@ -810,14 +816,14 @@ class SGPLVM(AEP_Model):
         if not self.updated:
             self.sgp_layer.update_posterior_for_prediction()
             self.updated = True
-        mf, vf = self.sgp_layer.output_probabilistic(inputs)
+        mf, vf = self.sgp_layer.forward_prop_thru_post(inputs)
         return mf, vf
 
     def predict_y(self, inputs):
         if not self.updated:
             self.sgp_layer.update_posterior_for_prediction()
             self.updated = True
-        mf, vf = self.sgp_layer.output_probabilistic(inputs)
+        mf, vf = self.sgp_layer.forward_prop_thru_post(inputs)
         my, vy = self.lik_layer.output_probabilistic(mf, vf)
         return my, vy
 
@@ -975,7 +981,7 @@ class SGPR(AEP_Model):
         if not self.updated:
             self.sgp_layer.update_posterior_for_prediction()
             self.updated = True
-        mf, vf = self.sgp_layer.output_probabilistic(inputs)
+        mf, vf = self.sgp_layer.forward_prop_thru_post(inputs)
         return mf, vf
 
     def sample_f(self, inputs, no_samples=1):
@@ -993,7 +999,7 @@ class SGPR(AEP_Model):
         if not self.updated:
             self.sgp_layer.update_posterior_for_prediction()
             self.updated = True
-        mf, vf = self.sgp_layer.output_probabilistic(inputs)
+        mf, vf = self.sgp_layer.forward_prop_thru_post(inputs)
         my, vy = self.lik_layer.output_probabilistic(mf, vf)
         return my, vy
 
@@ -1123,7 +1129,7 @@ class SDGPR(AEP_Model):
             self.updated = True
         for i, layer in enumerate(self.sgp_layers):
             if i == 0:
-                mf, vf = layer.output_probabilistic(inputs)
+                mf, vf = layer.forward_prop_thru_post(inputs)
             else:
                 mf, vf = layer.forward_prop_thru_post(mf, vf)
         return mf, vf
@@ -1146,7 +1152,7 @@ class SDGPR(AEP_Model):
 
     def predict_y(self, inputs):
         mf, vf = self.predict_f(inputs)
-        my, vy = self.lik_layer.output_probabilistic(mf, vf)
+        my, vy = self.lik_layer.forward_prop_thru_post(mf, vf)
         return my, vy
 
     def init_hypers(self, y_train):
