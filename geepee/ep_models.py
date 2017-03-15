@@ -561,30 +561,11 @@ class SGPR(EP_Model):
         else:
             raise NotImplementedError('likelihood not implemented')
 
-    def inference(self, alpha=1.0, no_epochs=10, sequential=True):
-        def plot():
-            xx = np.linspace(-0.5, 1.5, 100)[:,None]
-            mean, var = self.predict_f(xx)
-            zu = self.sgp_layer.zu
-            mean_u, var_u = self.predict_f(zu)
-            plt.figure()
-            plt.plot(self.x_train, self.y_train, 'kx', mew=2)
-            plt.plot(xx, mean, 'b', lw=2)
-            plt.fill_between(
-                xx[:, 0], 
-                mean[:, 0] - 2*np.sqrt(var[:, 0]), 
-                mean[:, 0] + 2*np.sqrt(var[:, 0]), 
-                color='blue', alpha=0.2)
-
-            plt.errorbar(zu, mean_u, yerr=2*np.sqrt(var_u), fmt='ro')
-            plt.xlim(-0.1, 1.1)
-            plt.show()
-
-        # plot()
+    def inference(self, alpha=1.0, no_epochs=10, parallel=True):
         try:
             for e in range(no_epochs):
                 print 'epoch %d/%d' % (e, no_epochs)
-                if sequential:
+                if not parallel:
                     for n in range(self.N):
                         yn = self.y_train[n, :].reshape([1, self.Dout])
                         xn = self.x_train[n, :].reshape([1, self.Din])
@@ -597,53 +578,8 @@ class SGPR(EP_Model):
                         grad_hyper, grad_cav = self.sgp_layer.backprop_grads_reg(
                             mn, vn, dmn, dvn, extra_res, xn, alpha=alpha)
                         self.sgp_layer.update_factor(n, alpha, grad_cav, extra_res)
-                        # plot()
         except KeyboardInterrupt:
             print 'Caught KeyboardInterrupt ...'
-
-
-        
-    # def objective_function(self, params, idxs, alpha=1.0):
-    #     N = self.N
-    #     xb = self.x_train[idxs, :]
-    #     yb = self.y_train[idxs, :]
-    #     batch_size = yb.shape[0]
-    #     scale_logZ = - N * 1.0 / batch_size / alpha
-    #     scale_poste = N * 1.0 / alpha - 1.0
-    #     scale_cav = - N * 1.0 / alpha
-    #     scale_prior = 1
-        
-    #     # update model with new hypers
-    #     self.sgp_layer.update_hypers(params, alpha=alpha)
-    #     self.lik_layer.update_hypers(params)
-        
-    #     # propagate x cavity forward
-    #     mout, vout, kfu = self.sgp_layer.forward_prop_thru_cav(xb)
-    #     # compute logZ and gradients
-    #     logZ, dm, dv = self.lik_layer.compute_log_Z(mout, vout, yb, alpha)
-    #     logZ_scale = scale_logZ * logZ
-    #     dm_scale = scale_logZ * dm
-    #     dv_scale = scale_logZ * dv
-    #     sgp_grad_hyper = self.sgp_layer.backprop_grads_reg(
-    #         mout, vout, dm_scale, dv_scale, kfu, xb, alpha)
-    #     lik_grad_hyper = self.lik_layer.backprop_grads(
-    #         mout, vout, dm, dv, alpha, scale_logZ)
-        
-    #     grad_all = {}
-    #     for key in sgp_grad_hyper.keys():
-    #         grad_all[key] = sgp_grad_hyper[key]
-
-    #     for key in lik_grad_hyper.keys():
-    #         grad_all[key] = lik_grad_hyper[key]
-
-    #     # compute objective
-    #     sgp_contrib = self.sgp_layer.compute_phi(alpha)
-    #     energy = logZ_scale + sgp_contrib
-
-    #     for p in self.fixed_params:
-    #         grad_all[p] = np.zeros_like(grad_all[p])
-
-    #     return energy, grad_all
 
     def predict_f(self, inputs):
         if not self.updated:
