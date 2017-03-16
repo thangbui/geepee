@@ -263,7 +263,10 @@ class SGP_Layer(object):
             self.Suinv = Suinvnew
             self.SuinvMu = SuinvMunew
         else:
-            pass # TODO
+            # parallel update
+            self.t1[n, :, :] = decay * t1_old + (1-decay) * t1_new
+            self.t2[n, :, :] = decay * t2_old + (1-decay) * t2_new
+            self.update_posterior()
 
     def sample(self, x):
         Su = self.Su
@@ -572,7 +575,7 @@ class SGPR(EP_Model):
         else:
             raise NotImplementedError('likelihood not implemented')
 
-    def inference(self, alpha=1.0, no_epochs=10, parallel=False):
+    def inference(self, alpha=1.0, no_epochs=10, parallel=False, decay=0.5):
         try:
             for e in range(no_epochs):
                 print 'epoch %d/%d' % (e, no_epochs)
@@ -588,7 +591,8 @@ class SGPR(EP_Model):
                             mn, vn, dmn, dvn, extra_res, xn, alpha=alpha)
                         self.sgp_layer.update_factor([n], alpha, grad_cav, extra_res)
                 else:
-                    # TOOD: minibatch parallel
+                    # parallel update for entire dataset
+                    # TODO: minibatch parallel
                     idxs = np.arange(self.N)
                     y = self.y_train[idxs, :]
                     x = self.x_train[idxs, :]
@@ -598,7 +602,8 @@ class SGPR(EP_Model):
                         self.lik_layer.compute_log_Z(m, v, y, alpha)
                     grad_hyper, grad_cav = self.sgp_layer.backprop_grads_reg(
                         m, v, dm, dv, extra_res, x, alpha=alpha)
-                    self.sgp_layer.update_factor(idxs, alpha, grad_cav, extra_res)
+                    self.sgp_layer.update_factor(
+                        idxs, alpha, grad_cav, extra_res, decay=decay)
 
         except KeyboardInterrupt:
             print 'Caught KeyboardInterrupt ...'

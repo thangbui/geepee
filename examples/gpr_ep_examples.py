@@ -3,6 +3,7 @@ import numpy as np
 import pdb
 import matplotlib.pylab as plt
 from scipy import special
+import time
 
 from .datautils import step, spiral
 from .context import ep, aep
@@ -41,11 +42,24 @@ def run_regression_1D():
 	model_aep.optimise(method='L-BFGS-B', alpha=alpha, maxiter=200)
 	plot(model_aep)
 
+	start_time = time.time()
 	model = ep.SGPR(X, Y, M, lik='Gaussian')
 	model.update_hypers(model_aep.get_hypers())
 	# model.update_hypers(model.init_hypers())
 	model.inference(alpha=alpha, no_epochs=10)
+	end_time = time.time()
+	print "sequential updates: %.4f" % (end_time - start_time)
 	plot(model)
+
+	start_time = time.time()
+	model = ep.SGPR(X, Y, M, lik='Gaussian')
+	model.update_hypers(model_aep.get_hypers())
+	# model.update_hypers(model.init_hypers())
+	model.inference(alpha=alpha, no_epochs=10, parallel=True)
+	end_time = time.time()
+	print "parallel updates: %.4f" % (end_time - start_time)
+	plot(model)
+
 	plt.show()
 
 def run_banana():
@@ -87,11 +101,27 @@ def run_banana():
 	model_aep.optimise(method='L-BFGS-B', alpha=alpha, maxiter=200)
 	plot(model_aep)
 
+	
+	plot(model)
+
+	start_time = time.time()
 	model = ep.SGPR(Xtrain, Ytrain, M, lik='Probit')
 	model.update_hypers(model_aep.get_hypers())
 	# model.update_hypers(model.init_hypers())
 	model.inference(alpha=alpha, no_epochs=10)
+	end_time = time.time()
+	print "sequential updates: %.4f" % (end_time - start_time)
 	plot(model)
+
+	start_time = time.time()
+	model = ep.SGPR(Xtrain, Ytrain, M, lik='Probit')
+	model.update_hypers(model_aep.get_hypers())
+	# model.update_hypers(model.init_hypers())
+	model.inference(alpha=alpha, no_epochs=10, parallel=True)
+	end_time = time.time()
+	print "parallel updates: %.4f" % (end_time - start_time)
+	plot(model)
+
 	plt.show()
 
 
@@ -134,11 +164,24 @@ def run_step_1D():
 	# model_aep.optimise(method='L-BFGS-B', alpha=alpha, maxiter=200)
 	# plot(model_aep)
 
+	start_time = time.time()
 	model = ep.SGPR(X, Y, M, lik='Gaussian')
 	# model.update_hypers(model_aep.get_hypers())
 	model.update_hypers(model.init_hypers())
 	model.inference(alpha=alpha, no_epochs=10)
+	end_time = time.time()
+	print "sequential updates: %.4f" % (end_time - start_time)
 	plot(model)
+
+	start_time = time.time()
+	model = ep.SGPR(X, Y, M, lik='Gaussian')
+	# model.update_hypers(model_aep.get_hypers())
+	model.update_hypers(model.init_hypers())
+	model.inference(alpha=alpha, no_epochs=10, parallel=True)
+	end_time = time.time()
+	print "parallel updates: %.4f" % (end_time - start_time)
+	plot(model)
+
 	plt.show()
 
 if __name__ == '__main__':
