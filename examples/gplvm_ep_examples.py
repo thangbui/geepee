@@ -31,11 +31,11 @@ def run_cluster():
 	M = 20
 	D = 5
 	lvm_aep = aep.SGPLVM(Y, D, M, lik='Gaussian')
-	lvm_aep.optimise(method='L-BFGS-B', alpha=0.1)
+	lvm_aep.optimise(method='L-BFGS-B', alpha=0.1, maxiter=2000)
 
 	lvm = ep.SGPLVM(Y, D, M, lik='Gaussian')
 	lvm.update_hypers(lvm_aep.get_hypers())
-	lvm.inference(alpha=0.1, no_epochs=5, parallel=True)
+	lvm.inference(alpha=0.1, no_epochs=10, parallel=True, decay=0.5)
 
 	ls = np.exp(lvm.sgp_layer.ls)
 	print ls
@@ -173,8 +173,12 @@ def run_pinwheel():
 	print "inference ..."
 	M = 20
 	D = 2
-	lvm = aep.SGPLVM(Y, D, M, lik='Gaussian')
-	lvm.optimise(method='L-BFGS-B', alpha=0.2)
+	lvm_aep = aep.SGPLVM(Y, D, M, lik='Gaussian')
+	lvm_aep.optimise(method='L-BFGS-B', alpha=0.2)
+
+	lvm = ep.SGPLVM(Y, D, M, lik='Gaussian')
+	lvm.update_hypers(lvm_aep.get_hypers())
+	lvm.inference(alpha=0.1, no_epochs=100, parallel=True, decay=0.5)
 
 	mx, vx = lvm.get_posterior_x()
 
@@ -206,13 +210,31 @@ def run_semicircle():
 	print "inference ..."
 	M = 10
 	D = 2
+	alpha = 0.2
 	lvm_aep = aep.SGPLVM(Y, D, M, lik='Gaussian')
-	lvm_aep.optimise(method='L-BFGS-B', alpha=0.5, maxiter=1000)
+	lvm_aep.optimise(method='L-BFGS-B', alpha=alpha, maxiter=2000)
+
+	plt.figure()
+	plt.plot(Y[:, 0], Y[:, 1], 'sb')
+
+	mx, vx = lvm_aep.get_posterior_x()
+	for i in range(mx.shape[0]):
+	    mxi = mx[i, :]
+	    vxi = vx[i, :]
+	    mxi1 = mxi + np.sqrt(vxi)
+	    mxi2 = mxi - np.sqrt(vxi)
+	    mxis = np.vstack([mxi.reshape((1, D)),
+	                      mxi1.reshape((1, D)),
+	                      mxi2.reshape((1, D))])
+	    myis, vyis = lvm_aep.predict_f(mxis)
+
+	    plt.errorbar(myis[:, 0], myis[:, 1],
+	                 xerr=np.sqrt(vyis[:, 0]), yerr=np.sqrt(vyis[:, 1]), fmt='.k')
+
 
 	lvm = ep.SGPLVM(Y, D, M, lik='Gaussian')
 	lvm.update_hypers(lvm_aep.get_hypers())
-	print lvm_aep.get_hypers()
-	lvm.inference(alpha=0.1, no_epochs=100, parallel=True, decay=0.5)
+	lvm.inference(alpha=alpha, no_epochs=200, parallel=False, decay=0.1)
 
 	plt.figure()
 	plt.plot(Y[:, 0], Y[:, 1], 'sb')
@@ -257,8 +279,13 @@ def run_xor():
 	print "inference ..."
 	M = 10
 	D = 2
-	lvm = aep.SGPLVM(Y, D, M, lik='Probit')
-	lvm.optimise(method='L-BFGS-B', alpha=0.1, maxiter=200)
+	alpha = 0.1
+	lvm_aep = aep.SGPLVM(Y, D, M, lik='Probit')
+	lvm_aep.optimise(method='L-BFGS-B', alpha=alpha, maxiter=2000)
+
+	lvm = ep.SGPLVM(Y, D, M, lik='Probit')
+	lvm.update_hypers(lvm_aep.get_hypers())
+	lvm.inference(alpha=alpha, no_epochs=100, parallel=True, decay=0.5)
 
 	# predict given inputs
 	mx, vx = lvm.get_posterior_x()

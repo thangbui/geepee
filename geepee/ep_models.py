@@ -381,7 +381,6 @@ class Gauss_Layer(Lik_Layer):
         vout += sn2 / alpha
         logZ = np.sum(-0.5 * (np.log(2 * np.pi * vout) +
                               (y - mout)**2 / vout))
-        print vout
         logZ += y.shape[0] * self.D * (0.5 * np.log(2 * np.pi * sn2 / alpha)
                             - 0.5 * alpha * np.log(2 * np.pi * sn2))
         dlogZ_dm = (y - mout) / vout
@@ -656,9 +655,9 @@ class SGPLVM(EP_Model):
                         logZn, dmn, dvn = \
                             self.lik_layer.compute_log_Z(mn, vn, yn, alpha)
                         grad_hyper, grad_cav = self.sgp_layer.backprop_grads_lvm(
-                            mn, vn, dmn, dvn, extra_res, xn, alpha=alpha)
+                            mn, vn, dmn, dvn, extra_res, cav_m_n, cav_v_n, alpha=alpha)
                         self.sgp_layer.update_factor([n], alpha, grad_cav, extra_res)
-                        self.update_x_factor([n], alpha, grad_cav, cav_m_n, cav_v_n)
+                        self.update_factor_x([n], alpha, grad_cav, cav_m_n, cav_v_n, decay=decay)
                 else:
                     # parallel update for entire dataset
                     # TODO: minibatch parallel
@@ -701,6 +700,12 @@ class SGPLVM(EP_Model):
         tx2_new = (1-alpha) * cur_t2 + frac_t2
         tx1_new = decay * cur_t1 + (1-decay) * tx1_new
         tx2_new = decay * cur_t2 + (1-decay) * tx2_new
+
+        neg_idxs = np.where(tx2_new < 0)
+        print neg_idxs
+        tx2_new[neg_idxs] = cur_t2[neg_idxs]
+        tx1_new[neg_idxs] = cur_t1[neg_idxs]
+
         self.tx1[n, :] = tx1_new
         self.tx2[n, :] = tx2_new
 
