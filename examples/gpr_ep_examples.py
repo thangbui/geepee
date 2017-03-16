@@ -101,9 +101,6 @@ def run_banana():
 	model_aep.optimise(method='L-BFGS-B', alpha=alpha, maxiter=200)
 	plot(model_aep)
 
-	
-	plot(model)
-
 	start_time = time.time()
 	model = ep.SGPR(Xtrain, Ytrain, M, lik='Probit')
 	model.update_hypers(model_aep.get_hypers())
@@ -185,6 +182,6 @@ def run_step_1D():
 	plt.show()
 
 if __name__ == '__main__':
-	run_regression_1D()
-	# run_banana()
-	# run_step_1D()
+	# run_regression_1D()
+	run_banana()
+	run_step_1D()
