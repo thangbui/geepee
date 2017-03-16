@@ -84,14 +84,14 @@ class SGP_Layer(object):
     def _forward_prop_deterministic_thru_cav(self, n, x, alpha):
         muhat, Suhat, SuinvMuhat, Suinvhat = self.compute_cavity(n, alpha)
         Kuuinv = self.Kuuinv
-        Ahat = np.einsum('ab,db->da', Kuuinv, muhat)
+        Ahat = np.einsum('ab,ndb->nda', Kuuinv, muhat)
         Bhat = np.einsum(
-            'ab,dbc->dac', 
-            Kuuinv, np.einsum('dab,bc->dac', Suhat, Kuuinv)) - Kuuinv
+            'ab,ndbc->ndac', 
+            Kuuinv, np.einsum('ndab,bc->ndac', Suhat, Kuuinv)) - Kuuinv
         kff = np.exp(2*self.sf)
         kfu = compute_kernel(2*self.ls, 2*self.sf, x, self.zu)
-        mout = np.einsum('nm,dm->nd', kfu, Ahat)
-        Bkfukuf = np.einsum('dab,na,nb->nd', Bhat, kfu, kfu)
+        mout = np.einsum('nm,ndm->nd', kfu, Ahat)
+        Bkfukuf = np.einsum('ndab,na,nb->nd', Bhat, kfu, kfu)
         vout = kff + Bkfukuf
         extra_res = [kfu, Ahat, Bhat, muhat, Suhat, SuinvMuhat, Suinvhat]
         return mout, vout, extra_res
@@ -222,11 +222,11 @@ class SGP_Layer(object):
         kfu = extra_args[0]
         Kuuinv = self.Kuuinv
         # compute grads wrt Ahat and Bhat
-        dAhat = np.einsum('nd,nm->dm', dm, kfu)
-        dBhat = np.einsum('nd,na,nb->dab', dv, kfu, kfu)
+        dAhat = np.einsum('nd,nm->ndm', dm, kfu)
+        dBhat = np.einsum('nd,na,nb->ndab', dv, kfu, kfu)
 
-        dvcav = np.einsum('ab,dbc,ce->dae', Kuuinv, dBhat, Kuuinv)
-        dmcav = np.einsum('ab,db->da', Kuuinv, dAhat)
+        dvcav = np.einsum('ab,ndbc,ce->ndae', Kuuinv, dBhat, Kuuinv)
+        dmcav = np.einsum('ab,ndb->nda', Kuuinv, dAhat)
 
         grad_hyper = {}
         grad_cav = {'mcav': dmcav, 'vcav': dvcav}
@@ -239,12 +239,13 @@ class SGP_Layer(object):
         dmcav, dvcav = grad_cav['mcav'], grad_cav['vcav']
 
         # perform Power-EP update
-        munew = muhat + np.einsum('dab,db->da', Suhat, dmcav)
-        inner = np.einsum('da,db->dab', dmcav, dmcav) - 2*dvcav
+        munew = muhat + np.einsum('ndab,ndb->nda', Suhat, dmcav)
+        inner = np.einsum('nda,ndb->ndab', dmcav, dmcav) - 2*dvcav
         Sunew = Suhat - np.einsum(
-            'dab,dbc->dac', Suhat, np.einsum('dab,dbc->dac', inner, Suhat))
+            'ndab,ndbc->ndac', 
+            Suhat, np.einsum('ndab,ndbc->ndac', inner, Suhat))
         Suinvnew = np.linalg.inv(Sunew)
-        SuinvMunew = np.einsum('dab,db->da', Suinvnew, munew)
+        SuinvMunew = np.einsum('ndab,ndb->nda', Suinvnew, munew)
         t2_frac = Suinvnew - Suinvhat
         t1_frac = SuinvMunew - SuinvMuhat
         t1_old = self.t1[n, :, :]
@@ -252,14 +253,17 @@ class SGP_Layer(object):
         t1_new = (1.0-alpha) * t1_old + t1_frac
         t2_new = (1.0-alpha) * t2_old + t2_frac
 
-        # TODO: do damping here?
-        self.t1[n, :, :] = t1_new
-        self.t2[n, :, :, :] = t2_new
-        # TODO: update posterior
-        self.Su = Sunew
-        self.mu = munew
-        self.Suinv = Suinvnew
-        self.SuinvMu = SuinvMunew
+        if t1_new.shape[0] == 1:
+            # TODO: do damping here?
+            self.t1[n, :, :] = t1_new
+            self.t2[n, :, :, :] = t2_new
+            # TODO: update posterior
+            self.Su = Sunew
+            self.mu = munew
+            self.Suinv = Suinvnew
+            self.SuinvMu = SuinvMunew
+        else:
+            pass # TODO
 
     def sample(self, x):
         Su = self.Su
@@ -297,7 +301,7 @@ class SGP_Layer(object):
         Suinvhat = self.Suinv - alpha*t2n
         SuinvMuhat = self.SuinvMu - alpha*t1n
         Suhat = np.linalg.inv(Suinvhat)
-        muhat = np.einsum('dab,db->da', Suhat, SuinvMuhat)
+        muhat = np.einsum('ndab,ndb->nda', Suhat, SuinvMuhat)
         return muhat, Suhat, SuinvMuhat, Suinvhat
 
     def update_posterior(self):
@@ -568,7 +572,7 @@ class SGPR(EP_Model):
         else:
             raise NotImplementedError('likelihood not implemented')
 
-    def inference(self, alpha=1.0, no_epochs=10, parallel=True):
+    def inference(self, alpha=1.0, no_epochs=10, parallel=False):
         try:
             for e in range(no_epochs):
                 print 'epoch %d/%d' % (e, no_epochs)
@@ -576,15 +580,26 @@ class SGPR(EP_Model):
                     for n in range(self.N):
                         yn = self.y_train[n, :].reshape([1, self.Dout])
                         xn = self.x_train[n, :].reshape([1, self.Din])
-
                         (mn, vn, extra_res) = \
-                            self.sgp_layer.forward_prop_thru_cav(n, xn, alpha=alpha)
+                            self.sgp_layer.forward_prop_thru_cav([n], xn, alpha=alpha)
                         logZn, dmn, dvn = \
                             self.lik_layer.compute_log_Z(mn, vn, yn, alpha)
-                        # update gp_layer
                         grad_hyper, grad_cav = self.sgp_layer.backprop_grads_reg(
                             mn, vn, dmn, dvn, extra_res, xn, alpha=alpha)
-                        self.sgp_layer.update_factor(n, alpha, grad_cav, extra_res)
+                        self.sgp_layer.update_factor([n], alpha, grad_cav, extra_res)
+                else:
+                    # TOOD: minibatch parallel
+                    idxs = np.arange(self.N)
+                    y = self.y_train[idxs, :]
+                    x = self.x_train[idxs, :]
+                    (m, v, extra_res) = \
+                        self.sgp_layer.forward_prop_thru_cav(idxs, x, alpha=alpha)
+                    logZ, dm, dv = \
+                        self.lik_layer.compute_log_Z(m, v, y, alpha)
+                    grad_hyper, grad_cav = self.sgp_layer.backprop_grads_reg(
+                        m, v, dm, dv, extra_res, x, alpha=alpha)
+                    self.sgp_layer.update_factor(idxs, alpha, grad_cav, extra_res)
+
         except KeyboardInterrupt:
             print 'Caught KeyboardInterrupt ...'
 
