@@ -188,7 +188,7 @@ def run_semicircle():
 	# inference
 	print "inference ..."
 	M = 10
-	D = 2
+	D = 1
 	alpha = 0.2
 	lvm_aep = aep.SGPLVM(Y, D, M, lik='Gaussian')
 	lvm_aep.optimise(method='L-BFGS-B', alpha=alpha, maxiter=2000)
@@ -295,5 +295,5 @@ def run_xor():
 if __name__ == '__main__':
 	# run_cluster()
 	run_semicircle()
-	run_pinwheel()
-	run_xor()
+	# run_pinwheel()
+	# run_xor()

@@ -110,6 +110,8 @@ class SGP_Layer(object):
         Bhatpsi2 = np.einsum('ndab,nab->nd', Bhat, psi2)
         vout = psi0 + Bhatpsi2 - mout**2
         extra_res = [muhat, Suhat, SuinvMuhat, Suinvhat, Smm, psi1, psi2, Ahat, Bhat]
+        if len(np.where(vout<0)[0]) > 0:
+            pdb.set_trace()
         return mout, vout, extra_res
 
     def forward_prop_thru_post(self, mx, vx=None):
