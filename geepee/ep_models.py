@@ -14,7 +14,7 @@ from kernels import *
 
 
 # ideally these should be moved to some config file
-jitter = 1e-5
+jitter = 1e-6
 gh_degree = 10
 
 
@@ -112,7 +112,7 @@ class SGP_Layer(object):
         extra_res = [muhat, Suhat, SuinvMuhat, Suinvhat, Smm, psi1, psi2, Ahat, Bhat]
         return mout, vout, extra_res
 
-    def forward_prop_thru_post(self, mx, vx=None, alpha=1.0):
+    def forward_prop_thru_post(self, mx, vx=None):
         if vx is None:
             return self._forward_prop_deterministic_thru_post(mx)
         else:
@@ -321,20 +321,8 @@ class SGP_Layer(object):
         Dout = self.Dout
         params['ls' + key_suffix] = self.ls
         params['sf' + key_suffix] = self.sf
-        triu_ind = np.triu_indices(M)
-        diag_ind = np.diag_indices(M)
-        params_eta2 = self.theta_2
-        params_eta1_R = np.zeros((Dout, M * (M + 1) / 2))
         params_zu_i = self.zu
-
-        for d in range(Dout):
-            Rd = self.theta_1_R[d, :, :]
-            Rd[diag_ind] = np.log(Rd[diag_ind])
-            params_eta1_R[d, :] = Rd[triu_ind]
-
         params['zu' + key_suffix] = self.zu
-        params['eta1_R' + key_suffix] = params_eta1_R
-        params['eta2' + key_suffix] = params_eta2
         return params
 
     def update_hypers(self, params, key_suffix=''):
@@ -379,6 +367,8 @@ class Gauss_Layer(Lik_Layer):
         # real valued data, gaussian lik
         sn2 = np.exp(2.0 * self.sn)
         vout += sn2 / alpha
+        if len(np.where(vout<0)[0]) > 0:
+            pdb.set_trace()
         logZ = np.sum(-0.5 * (np.log(2 * np.pi * vout) +
                               (y - mout)**2 / vout))
         logZ += y.shape[0] * self.D * (0.5 * np.log(2 * np.pi * sn2 / alpha)
@@ -638,10 +628,6 @@ class SGPLVM(EP_Model):
         self.t01 = prior_mean / prior_var
         self.t02 = 1.0 / prior_var
 
-        self.px1 = np.zeros((N, Din))
-        self.px2 = np.zeros((N, Din))
-
-
     def inference(self, alpha=1.0, no_epochs=10, parallel=False, decay=0):
         try:
             for e in range(no_epochs):
@@ -671,7 +657,33 @@ class SGPLVM(EP_Model):
                     grad_hyper, grad_cav = self.sgp_layer.backprop_grads_lvm(
                         m, v, dm, dv, extra_res, cav_m, cav_v, alpha=alpha)
                     self.sgp_layer.update_factor(idxs, alpha, grad_cav, extra_res, decay=decay)
-                    self.update_factor_x(idxs, alpha, grad_cav, cav_m, cav_v, decay=decay)
+                    # self.update_factor_x(idxs, alpha, grad_cav, cav_m, cav_v, decay=decay)
+                    dmx = grad_cav['mx']
+                    dvx = grad_cav['vx']
+                    new_m = cav_m + cav_v * dmx
+                    new_v = cav_v - cav_v**2 * (dmx**2 - 2*dvx)
+                    new_p2 = 1.0 / new_v
+                    new_p1 = new_p2 * new_m
+
+                    frac_t2 = new_p2 - 1.0 / cav_v
+                    frac_t1 = new_p1 - cav_m / cav_v
+                    cur_t1 = self.tx1[idxs, :]
+                    cur_t2 = self.tx2[idxs, :]
+                    tx1_new = (1-alpha) * cur_t1 + frac_t1
+                    tx2_new = (1-alpha) * cur_t2 + frac_t2
+                    tx1_new = decay * cur_t1 + (1-decay) * tx1_new
+                    tx2_new = decay * cur_t2 + (1-decay) * tx2_new
+
+                    neg_idxs = np.where(np.abs(tx2_new) < 1e-6) and np.where(tx2_new < 0)
+                    tx2_new[neg_idxs] = 0
+                    print neg_idxs
+                    # if len(neg_idxs[0]) > 0:
+                    #     pdb.set_trace()
+                    # tx2_new[neg_idxs] = cur_t2[neg_idxs]
+                    # tx1_new[neg_idxs] = cur_t1[neg_idxs]
+
+                    self.tx1[idxs, :] = tx1_new
+                    self.tx2[idxs, :] = tx2_new
 
         except KeyboardInterrupt:
             print 'Caught KeyboardInterrupt ...'

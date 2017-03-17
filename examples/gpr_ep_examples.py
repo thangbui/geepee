@@ -182,6 +182,6 @@ def run_step_1D():
 	plt.show()
 
 if __name__ == '__main__':
-	# run_regression_1D()
+	run_regression_1D()
 	run_banana()
 	run_step_1D()

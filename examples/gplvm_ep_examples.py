@@ -47,30 +47,9 @@ def run_cluster():
 	plt.plot(zu[:, inds[0]], zu[:, inds[1]], 'ko')
 	plt.show()
 
-	# X = np.random.normal(0, 1, (N, 5))
-	# A = np.random.multivariate_normal(np.zeros(N), k1.K(X), 10).T
-	# B = np.random.multivariate_normal(np.zeros(N), k2.K(X), 10).T
-	# C = np.random.multivariate_normal(np.zeros(N), k3.K(X), 10).T
-	# Y_test = np.vstack((A,B,C))
-	# labels_test = np.hstack((np.zeros(A.shape[0]), np.ones(B.shape[0]), np.ones(C.shape[0])*2))
-
-	# for i in range(Y_test.shape[0]):
-	# 	Y_i = Y_test[i, :]
-	# 	D = Y_i.shape[0]
-	# 	missing_idx_i = np.random.choice(D, np.round(D/2), replace=False)
-	# 	y_missing = Y_i.copy()
-	# 	y_missing[missing_idx_i] = 0
-	# 	my_i, vy_i = lvm.impute_missing(y_missing, missing_idx_i, alpha=0.5, no_iters=10)
-	# 	pdb.set_trace()
-
-
 
 def run_oil():
-
-	# data_path = '/Users/thangbui/Desktop/gplvm/tmp/data/'
-	# data_path = '../tmp/data/'
 	data_path = './tmp/data/'
-
 
 	def oil(data_set='oil'):
 	    """The three phase oil data from Bishop and James (1993)."""
@@ -233,8 +212,10 @@ def run_semicircle():
 
 
 	lvm = ep.SGPLVM(Y, D, M, lik='Gaussian')
-	lvm.update_hypers(lvm_aep.get_hypers())
-	lvm.inference(alpha=alpha, no_epochs=200, parallel=False, decay=0.1)
+	hypers = lvm_aep.get_hypers()
+	# hypers['sn'] = np.log(0.00001)
+	lvm.update_hypers(hypers)
+	lvm.inference(alpha=alpha, no_epochs=200, parallel=True, decay=0.5)
 
 	plt.figure()
 	plt.plot(Y[:, 0], Y[:, 1], 'sb')
@@ -308,23 +289,11 @@ def run_xor():
 		plt.xlim(*lims)
 		plt.ylim(*lims)
 
-	# Y_test = np.array([[1, -1, 1], [-1, 1, 1], [-1, -1, -1], [1, 1, -1]])
-	# # impute missing data
-	# for k in range(3):
-	# 	Y_test_k = Y_test
-	# 	missing_mask = np.ones_like(Y_test_k)
-	# 	missing_mask[:, k] = 0
-	# 	my_pred, vy_pred = lvm.impute_missing(
-	# 		Y_test_k, missing_mask, 
-	# 		alpha=0.1, no_iters=100, add_noise=False)
-
-	# 	print k, my_pred, vy_pred, Y_test_k
-
 	plt.show()
 
 
 if __name__ == '__main__':
 	# run_cluster()
 	run_semicircle()
-	# run_pinwheel()
-	# run_xor()
+	run_pinwheel()
+	run_xor()

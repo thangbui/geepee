@@ -1,7 +1,7 @@
 ## General
 
 - [ ] save/load models: is saving parameters enough?
-- [ ] remove for loops in aep_models update_posterior, compute_cavity
+- [x] remove for loops in aep_models update_posterior, compute_cavity
 - [ ] separate parameters for different output dimensions
 
 ## AEP (BB-alpha) modules
@@ -17,7 +17,7 @@ for other alphas, what do we do?
 
 ## EP modules
 
-- [ ] sparse GPR/C inference
+- [x] sparse GPR/C inference
 - [ ] sparse GPR/C learning
 - [ ] GPLVM inference
 - [ ] GPLVM learning
@@ -29,7 +29,7 @@ for other alphas, what do we do?
 
 ## VI modules
 
-- [ ] Titsias's VI for GPR/C
+- [x] Titsias's VI for GPR/C
 - [ ] Titsias's VI for GPLVM (collapsed bound)
 - [ ] Frigola's VI for GPSSM
 - [ ] Hensman's VI compression for Deep GPR/C, LVM
