@@ -198,6 +198,11 @@ class SGP_Layer(object):
             extra_args[0], extra_args[1], extra_args[2], extra_args[3]
         dmcav, dvcav = grad_cav['mcav'], grad_cav['vcav']
 
+        # fig, axs = plt.subplots(2, 1)
+        # axs[0].errorbar(self.zu[:, 0], self.mu[0, :], fmt='+k', yerr=np.sqrt(np.diag(self.Su[0, :, :])))
+        # axs[1].errorbar(self.zu[:, 0], self.mu[1, :], fmt='+k', yerr=np.sqrt(np.diag(self.Su[1, :, :])))
+
+
         # perform Power-EP update
         munew = muhat + np.einsum('ndab,ndb->nda', Suhat, dmcav)
         inner = np.einsum('nda,ndb->ndab', dmcav, dmcav) - 2*dvcav
@@ -218,15 +223,20 @@ class SGP_Layer(object):
             self.t1[n, :, :] = t1_new
             self.t2[n, :, :, :] = t2_new
             # TODO: update posterior
-            self.Su = Sunew
-            self.mu = munew
-            self.Suinv = Suinvnew
-            self.SuinvMu = SuinvMunew
+            self.Su = Sunew[0, :, :, :]
+            self.mu = munew[0, :, :]
+            self.Suinv = Suinvnew[0, :, :, :]
+            self.SuinvMu = SuinvMunew[0, :, :]
         else:
             # parallel update
             self.t1[n, :, :] = decay * t1_old + (1-decay) * t1_new
             self.t2[n, :, :] = decay * t2_old + (1-decay) * t2_new
             self.update_posterior()
+
+        # axs[0].errorbar(self.zu[:, 0]+0.05, self.mu[0, :], fmt='+r', yerr=np.sqrt(np.diag(self.Su[0, :, :])))
+        # axs[1].errorbar(self.zu[:, 0]+0.05, self.mu[1, :], fmt='+r', yerr=np.sqrt(np.diag(self.Su[1, :, :])))
+        # axs[0].set_title('n = %d' % n[0])
+        # plt.show()
 
     def sample(self, x):
         Su = self.Su
@@ -311,6 +321,21 @@ class SGP_Layer(object):
         params['sf' + key_suffix] = sf
         params['ls' + key_suffix] = ls
         params['zu' + key_suffix] = zu
+
+        # Kuu = compute_kernel(2 * ls, 2 * sf, zu, zu)
+        # Kuu += np.diag(jitter * np.ones((M, )))
+        # Kuuinv = matrixInverse(Kuu)
+
+        # for d in range(Dout):
+        #     mu = np.linspace(-1, 1, M).reshape((M, 1))
+        #     alpha = 0.1 * np.random.rand(M)
+        #     Su = np.diag(alpha)
+        #     Suinv = np.diag(1 / alpha)
+
+        #     theta1 = np.dot(Suinv, mu)
+        #     theta2 = Suinv - Kuuinv
+        #     self.t1[:, d, :] = np.tile(theta1[np.newaxis, np.newaxis, :] / N, [N, 1, 1])
+        #     self.t2[:, d, :, :] = np.tile(theta1[np.newaxis, np.newaxis, :, :] / N, [N, 1, 1, 1])
 
         return params
 
@@ -626,6 +651,17 @@ class SGPLVM(EP_Model):
         self.t01 = prior_mean / prior_var
         self.t02 = 1.0 / prior_var
 
+        # TODO: alternatitve method for non real-valued data
+        post_m = PCA_reduce(y_train, self.Din)
+        post_m_mean = np.mean(post_m, axis=0)
+        post_m_std = np.std(post_m, axis=0)
+        post_m = (post_m - post_m_mean) / post_m_std
+        post_v = 0.1 * np.ones_like(post_m)
+        post_2 = 1.0 / post_v
+        post_1 = post_2 * post_m
+        self.tx1 = post_1 - self.t01
+        self.tx2 = post_2 - self.t02
+
     def inference(self, alpha=1.0, no_epochs=10, parallel=False, decay=0):
         try:
             for e in range(no_epochs):
@@ -640,7 +676,7 @@ class SGPLVM(EP_Model):
                             self.lik_layer.compute_log_Z(mn, vn, yn, alpha)
                         grad_hyper, grad_cav = self.sgp_layer.backprop_grads_lvm(
                             mn, vn, dmn, dvn, extra_res, cav_m_n, cav_v_n, alpha=alpha)
-                        self.sgp_layer.update_factor([n], alpha, grad_cav, extra_res)
+                        self.sgp_layer.update_factor([n], alpha, grad_cav, extra_res, decay=decay)
                         self.update_factor_x([n], alpha, grad_cav, cav_m_n, cav_v_n, decay=decay)
                 else:
                     # parallel update for entire dataset
@@ -655,32 +691,8 @@ class SGPLVM(EP_Model):
                     grad_hyper, grad_cav = self.sgp_layer.backprop_grads_lvm(
                         m, v, dm, dv, extra_res, cav_m, cav_v, alpha=alpha)
                     self.sgp_layer.update_factor(idxs, alpha, grad_cav, extra_res, decay=decay)
-                    # self.update_factor_x(idxs, alpha, grad_cav, cav_m, cav_v, decay=decay)
-                    dmx = grad_cav['mx']
-                    dvx = grad_cav['vx']
-                    new_m = cav_m + cav_v * dmx
-                    new_v = cav_v - cav_v**2 * (dmx**2 - 2*dvx)
-                    new_p2 = 1.0 / new_v
-                    new_p1 = new_p2 * new_m
-
-                    frac_t2 = new_p2 - 1.0 / cav_v
-                    frac_t1 = new_p1 - cav_m / cav_v
-                    cur_t1 = self.tx1[idxs, :]
-                    cur_t2 = self.tx2[idxs, :]
-                    tx1_new = (1-alpha) * cur_t1 + frac_t1
-                    tx2_new = (1-alpha) * cur_t2 + frac_t2
-                    tx1_new = decay * cur_t1 + (1-decay) * tx1_new
-                    tx2_new = decay * cur_t2 + (1-decay) * tx2_new
-
-                    neg_idxs = np.where(np.abs(tx2_new) < 1e-6) and np.where(tx2_new < 0)
-                    # tx2_new[neg_idxs] = 0
-                    # print neg_idxs
-                    tx1_new[neg_idxs] = cur_t1[neg_idxs]
-                    tx2_new[neg_idxs] = cur_t2[neg_idxs]
-
-                    self.tx1[idxs, :] = tx1_new
-                    self.tx2[idxs, :] = tx2_new
-
+                    self.update_factor_x(idxs, alpha, grad_cav, cav_m, cav_v, decay=decay)
+                    
         except KeyboardInterrupt:
             print 'Caught KeyboardInterrupt ...'
 
@@ -702,17 +714,14 @@ class SGPLVM(EP_Model):
 
         frac_t2 = new_p2 - 1.0 / cav_v
         frac_t1 = new_p1 - cav_m / cav_v
+        neg_idxs = np.where(frac_t2 < 0)
+        frac_t2[neg_idxs] = 0
         cur_t1 = self.tx1[n, :]
         cur_t2 = self.tx2[n, :]
         tx1_new = (1-alpha) * cur_t1 + frac_t1
         tx2_new = (1-alpha) * cur_t2 + frac_t2
         tx1_new = decay * cur_t1 + (1-decay) * tx1_new
         tx2_new = decay * cur_t2 + (1-decay) * tx2_new
-
-        neg_idxs = np.where(tx2_new < 0)
-        print neg_idxs
-        tx2_new[neg_idxs] = cur_t2[neg_idxs]
-        tx1_new[neg_idxs] = cur_t1[neg_idxs]
 
         self.tx1[n, :] = tx1_new
         self.tx2[n, :] = tx2_new
@@ -755,10 +764,11 @@ class SGPLVM(EP_Model):
         self.lik_layer.update_hypers(params)
 
     def init_hypers(self):
-        sgp_params = self.sgp_layer.init_hypers(self.x_train)
+        sgp_params = self.sgp_layer.init_hypers()
         lik_params = self.lik_layer.init_hypers()
         init_params = dict(sgp_params)
         init_params.update(lik_params)
+        
         return init_params
 
     def get_hypers(self):

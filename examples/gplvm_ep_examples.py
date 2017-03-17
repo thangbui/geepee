@@ -35,12 +35,12 @@ def run_cluster():
 
 	lvm = ep.SGPLVM(Y, D, M, lik='Gaussian')
 	lvm.update_hypers(lvm_aep.get_hypers())
-	# a quick hack to initialise the factors
-	lvm.sgp_layer.t1 = np.tile(lvm_aep.sgp_layer.theta_2[np.newaxis, :, :] / lvm.N, [lvm.N, 1, 1])
-	lvm.sgp_layer.t2 = np.tile(lvm_aep.sgp_layer.theta_1[np.newaxis, :, :, :] / lvm.N, [lvm.N, 1, 1, 1])
-	lvm.sgp_layer.update_posterior()
-	lvm.tx1 = lvm_aep.factor_x1
-	lvm.tx2 = lvm_aep.factor_x2
+	# # a quick hack to initialise the factors
+	# lvm.sgp_layer.t1 = np.tile(lvm_aep.sgp_layer.theta_2[np.newaxis, :, :] / lvm.N, [lvm.N, 1, 1])
+	# lvm.sgp_layer.t2 = np.tile(lvm_aep.sgp_layer.theta_1[np.newaxis, :, :, :] / lvm.N, [lvm.N, 1, 1, 1])
+	# lvm.sgp_layer.update_posterior()
+	# lvm.tx1 = lvm_aep.factor_x1
+	# lvm.tx2 = lvm_aep.factor_x2
 	lvm.inference(alpha=0.1, no_epochs=10, parallel=True, decay=0.5)
 
 	ls = np.exp(lvm.sgp_layer.ls)
@@ -163,12 +163,12 @@ def run_pinwheel():
 
 	lvm = ep.SGPLVM(Y, D, M, lik='Gaussian')
 	lvm.update_hypers(lvm_aep.get_hypers())
-	# a quick hack to initialise the factors
-	lvm.sgp_layer.t1 = np.tile(lvm_aep.sgp_layer.theta_2[np.newaxis, :, :] / lvm.N, [lvm.N, 1, 1])
-	lvm.sgp_layer.t2 = np.tile(lvm_aep.sgp_layer.theta_1[np.newaxis, :, :, :] / lvm.N, [lvm.N, 1, 1, 1])
-	lvm.sgp_layer.update_posterior()
-	lvm.tx1 = lvm_aep.factor_x1
-	lvm.tx2 = lvm_aep.factor_x2
+	# # a quick hack to initialise the factors
+	# lvm.sgp_layer.t1 = np.tile(lvm_aep.sgp_layer.theta_2[np.newaxis, :, :] / lvm.N, [lvm.N, 1, 1])
+	# lvm.sgp_layer.t2 = np.tile(lvm_aep.sgp_layer.theta_1[np.newaxis, :, :, :] / lvm.N, [lvm.N, 1, 1, 1])
+	# lvm.sgp_layer.update_posterior()
+	# lvm.tx1 = lvm_aep.factor_x1
+	# lvm.tx2 = lvm_aep.factor_x2
 	lvm.inference(alpha=0.1, no_epochs=100, parallel=True, decay=0.5)
 
 	mx, vx = lvm.get_posterior_x()
@@ -228,12 +228,12 @@ def run_semicircle():
 	# hypers['sn'] = np.log(0.00001)
 	lvm.update_hypers(hypers)
 
-	# a quick hack to initialise the factors
-	lvm.sgp_layer.t1 = np.tile(lvm_aep.sgp_layer.theta_2[np.newaxis, :, :] / lvm.N, [lvm.N, 1, 1])
-	lvm.sgp_layer.t2 = np.tile(lvm_aep.sgp_layer.theta_1[np.newaxis, :, :, :] / lvm.N, [lvm.N, 1, 1, 1])
-	lvm.sgp_layer.update_posterior()
-	lvm.tx1 = lvm_aep.factor_x1
-	lvm.tx2 = lvm_aep.factor_x2
+	# # a quick hack to initialise the factors
+	# lvm.sgp_layer.t1 = np.tile(lvm_aep.sgp_layer.theta_2[np.newaxis, :, :] / lvm.N, [lvm.N, 1, 1])
+	# lvm.sgp_layer.t2 = np.tile(lvm_aep.sgp_layer.theta_1[np.newaxis, :, :, :] / lvm.N, [lvm.N, 1, 1, 1])
+	# lvm.sgp_layer.update_posterior()
+	# lvm.tx1 = lvm_aep.factor_x1
+	# lvm.tx2 = lvm_aep.factor_x2
 
 	lvm.inference(alpha=alpha, no_epochs=200, parallel=True, decay=0.5)
 
@@ -308,12 +308,12 @@ def run_xor():
 
 	lvm = ep.SGPLVM(Ytrain, D, M, lik='Probit')
 	lvm.update_hypers(lvm_aep.get_hypers())
-	# a quick hack to initialise the factors
-	lvm.sgp_layer.t1 = np.tile(lvm_aep.sgp_layer.theta_2[np.newaxis, :, :] / lvm.N, [lvm.N, 1, 1])
-	lvm.sgp_layer.t2 = np.tile(lvm_aep.sgp_layer.theta_1[np.newaxis, :, :, :] / lvm.N, [lvm.N, 1, 1, 1])
-	lvm.sgp_layer.update_posterior()
-	lvm.tx1 = lvm_aep.factor_x1
-	lvm.tx2 = lvm_aep.factor_x2
+	# # a quick hack to initialise the factors
+	# lvm.sgp_layer.t1 = np.tile(lvm_aep.sgp_layer.theta_2[np.newaxis, :, :] / lvm.N, [lvm.N, 1, 1])
+	# lvm.sgp_layer.t2 = np.tile(lvm_aep.sgp_layer.theta_1[np.newaxis, :, :, :] / lvm.N, [lvm.N, 1, 1, 1])
+	# lvm.sgp_layer.update_posterior()
+	# lvm.tx1 = lvm_aep.factor_x1
+	# lvm.tx2 = lvm_aep.factor_x2
 	lvm.inference(alpha=alpha, no_epochs=100, parallel=True, decay=0.5)
 
 	# predict given inputs
@@ -342,6 +342,6 @@ def run_xor():
 
 if __name__ == '__main__':
 	run_cluster()
-	# run_semicircle()
-	# run_pinwheel()
-	# run_xor()
+	run_semicircle()
+	run_pinwheel()
+	run_xor()
