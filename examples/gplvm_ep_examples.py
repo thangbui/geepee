@@ -35,6 +35,12 @@ def run_cluster():
 
 	lvm = ep.SGPLVM(Y, D, M, lik='Gaussian')
 	lvm.update_hypers(lvm_aep.get_hypers())
+	# a quick hack to initialise the factors
+	lvm.sgp_layer.t1 = np.tile(lvm_aep.sgp_layer.theta_2[np.newaxis, :, :] / lvm.N, [lvm.N, 1, 1])
+	lvm.sgp_layer.t2 = np.tile(lvm_aep.sgp_layer.theta_1[np.newaxis, :, :, :] / lvm.N, [lvm.N, 1, 1, 1])
+	lvm.sgp_layer.update_posterior()
+	lvm.tx1 = lvm_aep.factor_x1
+	lvm.tx2 = lvm_aep.factor_x2
 	lvm.inference(alpha=0.1, no_epochs=10, parallel=True, decay=0.5)
 
 	ls = np.exp(lvm.sgp_layer.ls)
@@ -157,6 +163,12 @@ def run_pinwheel():
 
 	lvm = ep.SGPLVM(Y, D, M, lik='Gaussian')
 	lvm.update_hypers(lvm_aep.get_hypers())
+	# a quick hack to initialise the factors
+	lvm.sgp_layer.t1 = np.tile(lvm_aep.sgp_layer.theta_2[np.newaxis, :, :] / lvm.N, [lvm.N, 1, 1])
+	lvm.sgp_layer.t2 = np.tile(lvm_aep.sgp_layer.theta_1[np.newaxis, :, :, :] / lvm.N, [lvm.N, 1, 1, 1])
+	lvm.sgp_layer.update_posterior()
+	lvm.tx1 = lvm_aep.factor_x1
+	lvm.tx2 = lvm_aep.factor_x2
 	lvm.inference(alpha=0.1, no_epochs=100, parallel=True, decay=0.5)
 
 	mx, vx = lvm.get_posterior_x()
@@ -215,6 +227,14 @@ def run_semicircle():
 	hypers = lvm_aep.get_hypers()
 	# hypers['sn'] = np.log(0.00001)
 	lvm.update_hypers(hypers)
+
+	# a quick hack to initialise the factors
+	lvm.sgp_layer.t1 = np.tile(lvm_aep.sgp_layer.theta_2[np.newaxis, :, :] / lvm.N, [lvm.N, 1, 1])
+	lvm.sgp_layer.t2 = np.tile(lvm_aep.sgp_layer.theta_1[np.newaxis, :, :, :] / lvm.N, [lvm.N, 1, 1, 1])
+	lvm.sgp_layer.update_posterior()
+	lvm.tx1 = lvm_aep.factor_x1
+	lvm.tx2 = lvm_aep.factor_x2
+
 	lvm.inference(alpha=alpha, no_epochs=200, parallel=True, decay=0.5)
 
 	plt.figure()
@@ -254,18 +274,46 @@ def run_xor():
 	        Y_ij = np.hstack((a, b, c))
 	        Y = np.vstack((Y, Y_ij))
 
-	Y = 2*Y - 1
+	Ytrain = 2*Y - 1
 
 	# inference
 	print "inference ..."
 	M = 10
 	D = 2
 	alpha = 0.1
-	lvm_aep = aep.SGPLVM(Y, D, M, lik='Probit')
+	lvm_aep = aep.SGPLVM(Ytrain, D, M, lik='Probit')
 	lvm_aep.optimise(method='L-BFGS-B', alpha=alpha, maxiter=2000)
 
-	lvm = ep.SGPLVM(Y, D, M, lik='Probit')
+	# predict given inputs
+	mx, vx = lvm_aep.get_posterior_x()
+	lims = [-1.5, 1.5]
+	x = np.linspace(*lims, num=101)
+	y = np.linspace(*lims, num=101)
+	X, Y = np.meshgrid(x, y)
+	X_ravel = X.ravel()
+	Y_ravel = Y.ravel()
+	inputs = np.vstack((X_ravel, Y_ravel)).T
+	my, vy = lvm_aep.predict_f(inputs)
+	t = my / np.sqrt(1 + vy)
+	Z = 0.5 * (1 + special.erf(t / np.sqrt(2)))
+	for d in range(3):
+		plt.figure()
+		plt.scatter(mx[:, 0], mx[:, 1])
+		zu = lvm_aep.sgp_layer.zu
+		plt.plot(zu[:, 0], zu[:, 1], 'ko')
+		plt.contour(X, Y, np.log(Z[:, d]+1e-16).reshape(X.shape))
+		plt.xlim(*lims)
+		plt.ylim(*lims)
+
+
+	lvm = ep.SGPLVM(Ytrain, D, M, lik='Probit')
 	lvm.update_hypers(lvm_aep.get_hypers())
+	# a quick hack to initialise the factors
+	lvm.sgp_layer.t1 = np.tile(lvm_aep.sgp_layer.theta_2[np.newaxis, :, :] / lvm.N, [lvm.N, 1, 1])
+	lvm.sgp_layer.t2 = np.tile(lvm_aep.sgp_layer.theta_1[np.newaxis, :, :, :] / lvm.N, [lvm.N, 1, 1, 1])
+	lvm.sgp_layer.update_posterior()
+	lvm.tx1 = lvm_aep.factor_x1
+	lvm.tx2 = lvm_aep.factor_x2
 	lvm.inference(alpha=alpha, no_epochs=100, parallel=True, decay=0.5)
 
 	# predict given inputs
@@ -293,7 +341,7 @@ def run_xor():
 
 
 if __name__ == '__main__':
-	# run_cluster()
-	run_semicircle()
+	run_cluster()
+	# run_semicircle()
 	# run_pinwheel()
 	# run_xor()

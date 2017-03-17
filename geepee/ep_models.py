@@ -110,8 +110,6 @@ class SGP_Layer(object):
         Bhatpsi2 = np.einsum('ndab,nab->nd', Bhat, psi2)
         vout = psi0 + Bhatpsi2 - mout**2
         extra_res = [muhat, Suhat, SuinvMuhat, Suinvhat, Smm, psi1, psi2, Ahat, Bhat]
-        if len(np.where(vout<0)[0]) > 0:
-            pdb.set_trace()
         return mout, vout, extra_res
 
     def forward_prop_thru_post(self, mx, vx=None):
@@ -369,8 +367,6 @@ class Gauss_Layer(Lik_Layer):
         # real valued data, gaussian lik
         sn2 = np.exp(2.0 * self.sn)
         vout += sn2 / alpha
-        if len(np.where(vout<0)[0]) > 0:
-            pdb.set_trace()
         logZ = np.sum(-0.5 * (np.log(2 * np.pi * vout) +
                               (y - mout)**2 / vout))
         logZ += y.shape[0] * self.D * (0.5 * np.log(2 * np.pi * sn2 / alpha)
@@ -677,12 +673,10 @@ class SGPLVM(EP_Model):
                     tx2_new = decay * cur_t2 + (1-decay) * tx2_new
 
                     neg_idxs = np.where(np.abs(tx2_new) < 1e-6) and np.where(tx2_new < 0)
-                    tx2_new[neg_idxs] = 0
-                    print neg_idxs
-                    # if len(neg_idxs[0]) > 0:
-                    #     pdb.set_trace()
-                    # tx2_new[neg_idxs] = cur_t2[neg_idxs]
-                    # tx1_new[neg_idxs] = cur_t1[neg_idxs]
+                    # tx2_new[neg_idxs] = 0
+                    # print neg_idxs
+                    tx1_new[neg_idxs] = cur_t1[neg_idxs]
+                    tx2_new[neg_idxs] = cur_t2[neg_idxs]
 
                     self.tx1[idxs, :] = tx1_new
                     self.tx2[idxs, :] = tx2_new

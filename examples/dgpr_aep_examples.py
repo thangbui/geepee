@@ -114,6 +114,7 @@ def run_step_1D():
 		plt.errorbar(zu, mean_u, yerr=2*np.sqrt(var_u), fmt='ro')
 
 		no_samples = 20
+		xx = np.linspace(-3, 3, 500)[:,None]
 		f_samples = m.sample_f(xx, no_samples)
 		for i in range(no_samples):
 			plt.plot(xx, f_samples[:, :, i], linewidth=0.5, alpha=0.5)
