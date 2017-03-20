@@ -19,7 +19,7 @@ for other alphas, what do we do?
 
 - [x] sparse GPR/C inference
 - [ ] sparse GPR/C learning
-- [ ] GPLVM inference
+- [x] GPLVM inference
 - [ ] GPLVM learning
 - [ ] Deep-GP inference
 - [ ] Deep-GP learning

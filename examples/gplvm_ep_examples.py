@@ -5,6 +5,8 @@ import matplotlib.pylab as plt
 from .context import aep, ep
 from scipy import special
 
+np.random.seed(42)
+
 
 def run_cluster():
 	import GPy
@@ -341,7 +343,7 @@ def run_xor():
 
 
 if __name__ == '__main__':
-	run_cluster()
-	run_semicircle()
-	run_pinwheel()
+	# run_cluster()
+	# run_semicircle()
+	# run_pinwheel()
 	run_xor()
