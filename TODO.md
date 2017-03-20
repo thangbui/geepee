@@ -25,6 +25,7 @@ for other alphas, what do we do?
 - [ ] Deep-GP learning
 - [ ] GP SSM inference
 - [ ] GP SSM learning
+- [ ] GP SSM inference and learning with control signal
 - [ ] should work with all alphas
 
 ## VI modules
