@@ -1,7 +1,7 @@
 import numpy as np
 import scipy.linalg as spla
 from scipy.spatial.distance import cdist
-from scipy import weave
+import weave
 import pdb
 
 # class RBF(): 

@@ -621,7 +621,7 @@ class SGPLVM(EP_Model):
         self.Din = Din = hidden_size
         self.M = M = no_pseudo
 
-        self.sgp_layer = SGP_Layer(N, Din, Din, M)
+        self.sgp_layer = SGP_Layer(N, Din, Dout, M)
         if lik.lower() == 'gaussian':
             self.lik_layer = Gauss_Layer(N, Dout)
         elif lik.lower() == 'probit':
@@ -790,12 +790,12 @@ class Gauss_Emis():
 
     def compute_factor(self, x_cav_m, x_cav_v, alpha):
         # this update does not depend on the cavity information and alpha
-        CTR = self.C.T * self.R
-        t2 = np.sum(CTR * self.C.T, axis=1)
-        t1 = np.dot(CTR, self.y.T)
-        t2rep = np.tile(t2[np.newaxis, :, :], [self.N, 1, 1])
+        CTRinv = self.C.T / self.R
+        t2 = np.sum(CTRinv * self.C.T, axis=1)
+        t1 = np.dot(CTRinv, self.y.T)
+        t2rep = np.tile(t2[np.newaxis, :], [self.N, 1])
         t1 = t1.T
-        return t1, t2
+        return t1, t2rep
 
     def output_probabilistic(self, mf, vf):
         my = np.einsum('ab,nb->na', self.C, mf)
@@ -806,14 +806,14 @@ class SGPSSM(EP_Model):
 
     def __init__(self, y_train, hidden_size, no_pseudo, 
         lik='Gaussian', prior_mean=0, prior_var=1):
-        super(SGPLVM, self).__init__(y_train)
+        super(SGPSSM, self).__init__(y_train)
         self.N = N = y_train.shape[0]
         self.Dout = Dout = y_train.shape[1]
         self.Din = Din = hidden_size
         self.M = M = no_pseudo
         self.lik = lik.lower()
 
-        self.sgp_layer = SGP_Layer(N-1, Din, Dout, M)
+        self.sgp_layer = SGP_Layer(N-1, Din, Din, M)
         if lik.lower() == 'gaussian':
             self.emi_layer = Gauss_Emis(y_train, Dout, Din)
         elif lik.lower() == 'probit':
@@ -834,53 +834,141 @@ class SGPSSM(EP_Model):
         self.sn = 0
         self.UP, self.PREV, self.NEXT = 'UP', 'PREV', 'NEXT'
 
-    def inference(self, alpha=1.0, no_epochs=10, decay=0):
+    def plot(self):
+        def kink_true(x):
+            fx = np.zeros(x.shape)
+            for t in range(x.shape[0]):
+                xt = x[t]
+                if xt < 4:
+                    fx[t] = xt + 1
+                else:
+                    fx[t] = -4*xt + 21
+            return fx
+        N_test = 100
+        x_test = np.linspace(-7, 8, N_test)
+        x_test = np.reshape(x_test, [N_test, 1])
+        self.sgp_layer.update_posterior()
+        mf, vf = self.predict_f(x_test)
+        # plot function
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        ax.plot(x_test[:,0], kink_true(x_test[:,0]), '-', color='k')
+        ax.plot(x_test[:,0], mf[:,0], '-', color='b', label='EP')
+        ax.fill_between(
+            x_test[:,0], 
+            mf[:,0] + 2*np.sqrt(vf[:,0]), 
+            mf[:,0] - 2*np.sqrt(vf[:,0]), 
+            alpha=0.5, edgecolor='b', facecolor='b')
+        ax.plot(
+            self.emi_layer.y[0:self.N-1], 
+            self.emi_layer.y[1:self.N], 
+            'k+', alpha=0.3)
+        ax.set_xlabel(r'$x_{t-1}$')
+        ax.set_ylabel(r'$x_{t}$')
+        # ax.set_ylim(-6, 6)
+        # ax.set_xlim(-7, 8)
+        ax.legend(loc='lower center')
+        plt.show()
+
+    def inf_parallel(self, epoch, alpha, decay):
+        # merge info from output
+        cav_up_m, cav_up_v, _, _ = self.compute_cavity_x(self.UP, alpha)
+        # only do this once at the begining for gaussian emission lik
+        if self.lik == 'gaussian' and epoch == 0:
+            up_1, up_2 = self.emi_layer.compute_factor(
+                cav_up_m, cav_up_v, alpha)
+            self.x_up_1 = up_1
+            self.x_up_2 = up_2
+        else:
+            up_1, up_2 = self.emi_layer.compute_factor(
+                cav_up_m, cav_up_v, alpha)
+            self.x_up_1 = up_1
+            self.x_up_2 = up_2
+        # deal with the dynamics factors here
+        cav_t_m, cav_t_v, cav_t_1, cav_t_2 = \
+            self.compute_cavity_x(self.PREV, alpha)
+        cav_tm1_m, cav_tm1_v, cav_tm1_1, cav_tm1_2 = \
+            self.compute_cavity_x(self.NEXT, alpha)
+        
+        idxs = np.arange(self.N-1)
+        (mprop, vprop, extra_res) = \
+            self.sgp_layer.forward_prop_thru_cav(
+                idxs, cav_tm1_m, cav_tm1_v, alpha=alpha)
+        logZ, dmprop, dvprop, dmt, dvt = \
+            self.compute_transition_tilted(
+                mprop, vprop, cav_t_m, cav_t_v, alpha)
+        grad_hyper, grad_cav = self.sgp_layer.backprop_grads_lvm(
+            mprop, vprop, dmprop, dvprop, 
+            extra_res, cav_tm1_m, cav_tm1_v, alpha=alpha)
+        self.sgp_layer.update_factor(
+            idxs, alpha, grad_cav, extra_res, decay=decay)
+        
+        self.update_factor_x(
+            self.NEXT,
+            grad_cav['mx'], grad_cav['vx'], 
+            cav_tm1_m, cav_tm1_v, cav_tm1_1, cav_tm1_2,
+            decay=decay, alpha=alpha)
+        self.update_factor_x(
+            self.PREV,
+            dmt, dvt, 
+            cav_t_m, cav_t_v, cav_t_1, cav_t_2,
+            decay=decay, alpha=alpha)
+
+    def inf_sequential(self, epoch, alpha, decay):
+        # merge info from output
+        cav_up_m, cav_up_v, _, _ = self.compute_cavity_x(self.UP, alpha)
+        # only do this once at the begining for gaussian emission lik
+        if self.lik == 'gaussian' and epoch == 0:
+            up_1, up_2 = self.emi_layer.compute_factor(
+                cav_up_m, cav_up_v, alpha)
+            self.x_up_1 = up_1
+            self.x_up_2 = up_2
+        else:
+            up_1, up_2 = self.emi_layer.compute_factor(
+                cav_up_m, cav_up_v, alpha)
+            self.x_up_1 = up_1
+            self.x_up_2 = up_2
+
+        for n in range(0, self.N-1):
+            # deal with the dynamics factors here
+            cav_t_m, cav_t_v, cav_t_1, cav_t_2 = \
+                self.compute_cavity_x_sequential(self.PREV, [n+1], alpha)
+            cav_tm1_m, cav_tm1_v, cav_tm1_1, cav_tm1_2 = \
+                self.compute_cavity_x_sequential(self.NEXT, [n], alpha)
+            
+            (mprop, vprop, extra_res) = \
+                self.sgp_layer.forward_prop_thru_cav(
+                    [n], cav_tm1_m, cav_tm1_v, alpha=alpha)
+            logZ, dmprop, dvprop, dmt, dvt = \
+                self.compute_transition_tilted(
+                    mprop, vprop, cav_t_m, cav_t_v, alpha)
+            grad_hyper, grad_cav = self.sgp_layer.backprop_grads_lvm(
+                mprop, vprop, dmprop, dvprop, 
+                extra_res, cav_tm1_m, cav_tm1_v, alpha=alpha)
+            self.sgp_layer.update_factor(
+                [n], alpha, grad_cav, extra_res, decay=decay)
+            
+            self.update_factor_x_sequential(
+                self.NEXT,
+                grad_cav['mx'], grad_cav['vx'], 
+                cav_tm1_m, cav_tm1_v, cav_tm1_1, cav_tm1_2, [n],
+                decay=decay, alpha=alpha)
+            self.update_factor_x_sequential(
+                self.PREV,
+                dmt, dvt, 
+                cav_t_m, cav_t_v, cav_t_1, cav_t_2, [n+1],
+                decay=decay, alpha=alpha)
+
+    def inference(self, alpha=1.0, no_epochs=10, parallel=True, decay=0):
         try:
             for e in range(no_epochs):
                 print 'epoch %d/%d' % (e, no_epochs)
-                # merge info from output
-                cav_up_m, cav_up_v, _, _ = self.compute_cavity_x(self.UP, alpha)
-                # only do this once at the begining for gaussian emission lik
-                if self.lik == 'gaussian' and e == 0:
-                    up_1, up_2 = self.emi_layer.compute_factor(
-                        cav_up_m, cav_up_v, alpha)
-                    self.x_up_1 = up_1
-                    self.x_up_2 = up_2
+                if parallel:
+                    self.inf_parallel(e, alpha, decay)
                 else:
-                    up_1, up_2 = self.emi_layer.compute_factor(
-                        cav_up_m, cav_up_v, alpha)
-                    self.x_up_1 = up_1
-                    self.x_up_2 = up_2    
-
-                # deal with the dynamics factors here
-                cav_t_m, cav_t_v, cav_t_1, cav_t_2 = \
-                    self.compute_cavity_x(self.PREV, alpha)
-                cav_tm1_m, cav_tm1_v, cav_tm1_1, cav_tm1_2 = \
-                    self.compute_cavity_x(self.NEXT, alpha)
-                
-                idxs = np.arange(self.N-1)
-                (mprop, vprop, extra_res) = \
-                    self.sgp_layer.forward_prop_thru_cav(
-                        idxs, cav_tm1_m, cav_tm1_v, alpha=alpha)
-                logZ, dmprop, dvprop, dmt, dvt = \
-                    self.compute_transition_tilted(
-                        mprop, vprop, cav_t_m, cav_t_v, alpha)
-                grad_hyper, grad_cav = self.sgp_layer.backprop_grads_lvm(
-                    mprop, vprop, dmprop, dvprop, 
-                    extra_res, cav_tm1_m, cav_tm1_v, alpha=alpha)
-                self.sgp_layer.update_factor(
-                    idxs, alpha, grad_cav, extra_res, decay=decay)
-                
-                self.update_factor_x(
-                    self.NEXT,
-                    grad_cav['mx'], grad_cav['vx'], 
-                    cav_tm1_m, cav_tm1_v, cav_tm1_1, cav_tm1_2,
-                    decay=decay, alpha=alpha)
-                self.update_factor_x(
-                    self.PREV,
-                    dmt, dmv, 
-                    cav_t_m, cav_t_v, cav_t_1, cav_t_2,
-                    decay=decay, alpha=alpha)
+                    self.inf_sequential(e, alpha, decay)
+                if e % 5 == 0:
+                    self.plot()
                     
         except KeyboardInterrupt:
             print 'Caught KeyboardInterrupt ...'
@@ -891,18 +979,40 @@ class SGPSSM(EP_Model):
             cav_up_2 = self.x_prev_2 + self.x_next_2 + (1-alpha) * self.x_up_2
             cav_up_1[0, :] += self.x_prior_1
             cav_up_2[0, :] += self.x_prior_2
-            return cav_up_1/cav_up_2, 1.0/cav_up_2, cav_up_1, cav_up_2
+            return cav_up_1/(cav_up_2+1e-16), 1.0/(cav_up_2+1e-16), cav_up_1, cav_up_2
         elif mode == self.PREV:
             idxs = np.arange(1, self.N)
             cav_prev_1 = self.x_up_1[idxs, :] + self.x_next_1[idxs, :]
-            cav_prev_2 = self.x_up_2[idxs, :] + self.x_next_1[idxs, :]
+            cav_prev_2 = self.x_up_2[idxs, :] + self.x_next_2[idxs, :]
             cav_prev_1 += (1-alpha) * self.x_prev_1[idxs, :]
             cav_prev_2 += (1-alpha) * self.x_prev_2[idxs, :]
             return cav_prev_1/cav_prev_2, 1.0/cav_prev_2, cav_prev_1, cav_prev_2
         elif mode == self.NEXT:
             idxs = np.arange(0, self.N-1)
             cav_next_1 = self.x_up_1[idxs, :] + self.x_prev_1[idxs, :]
-            cav_next_2 = self.x_up_2[idxs, :] + self.x_prev_1[idxs, :]
+            cav_next_2 = self.x_up_2[idxs, :] + self.x_prev_2[idxs, :]
+            cav_next_1 += (1-alpha) * self.x_next_1[idxs, :]
+            cav_next_2 += (1-alpha) * self.x_next_2[idxs, :]
+            return cav_next_1/cav_next_2, 1.0/cav_next_2, cav_next_1, cav_next_2
+        else:
+            raise NotImplementedError('unknown mode')
+
+    def compute_cavity_x_sequential(self, mode, idxs, alpha):
+        if mode == self.UP:
+            cav_up_1 = self.x_prev_1 + self.x_next_1 + (1-alpha) * self.x_up_1
+            cav_up_2 = self.x_prev_2 + self.x_next_2 + (1-alpha) * self.x_up_2
+            cav_up_1[0, :] += self.x_prior_1
+            cav_up_2[0, :] += self.x_prior_2
+            return cav_up_1/(cav_up_2+1e-16), 1.0/(cav_up_2+1e-16), cav_up_1, cav_up_2
+        elif mode == self.PREV:
+            cav_prev_1 = self.x_up_1[idxs, :] + self.x_next_1[idxs, :]
+            cav_prev_2 = self.x_up_2[idxs, :] + self.x_next_2[idxs, :]
+            cav_prev_1 += (1-alpha) * self.x_prev_1[idxs, :]
+            cav_prev_2 += (1-alpha) * self.x_prev_2[idxs, :]
+            return cav_prev_1/cav_prev_2, 1.0/cav_prev_2, cav_prev_1, cav_prev_2
+        elif mode == self.NEXT:
+            cav_next_1 = self.x_up_1[idxs, :] + self.x_prev_1[idxs, :]
+            cav_next_2 = self.x_up_2[idxs, :] + self.x_prev_2[idxs, :]
             cav_next_1 += (1-alpha) * self.x_next_1[idxs, :]
             cav_next_2 += (1-alpha) * self.x_next_2[idxs, :]
             return cav_next_1/cav_next_2, 1.0/cav_next_2, cav_next_1, cav_next_2
@@ -912,7 +1022,7 @@ class SGPSSM(EP_Model):
     def compute_transition_tilted(self, m_prop, v_prop, m_t, v_t, alpha):
         sn2 = np.exp(2*self.sn)
         v_sum = v_t + v_prop + sn2 / alpha
-        m_diff = mt - m_prop
+        m_diff = m_t - m_prop
         exp_term = -0.5 * m_diff**2 / v_sum
         const_term = -0.5 * np.log(2*np.pi*v_sum)
         alpha_term = 0.5 * (1-alpha) * np.log(2*np.pi*sn2) - 0.5*np.log(alpha)
@@ -920,14 +1030,14 @@ class SGPSSM(EP_Model):
 
         dvt = -0.5 / v_sum + 0.5 * m_diff**2 / v_sum**2
         dvprop = -0.5 / v_sum + 0.5 * m_diff**2 / v_sum**2
-        dmt = -m_diff / v_sum
-        dmprop = mdiff / v_sum
+        dmt = m_diff / v_sum
+        dmprop = m_diff / v_sum
         return logZ, dmprop, dvprop, dmt, dvt
 
     def update_factor_x(
         self, mode, dmcav, dvcav, mcav, vcav, n1cav, n2cav, 
         decay=0.0, alpha=1.0):
-        new_m = vcav + vcav * dmcav
+        new_m = mcav + vcav * dmcav
         new_v = vcav - vcav**2 * (dmcav**2 - 2*dvcav)
         new_n2 = 1.0 / new_v
         new_n1 = new_n2 * new_m
@@ -943,6 +1053,32 @@ class SGPSSM(EP_Model):
             self.x_next_2[idxs, :] = decay * cur_n2 + (1-decay) * n2_new
         elif mode == self.PREV:
             idxs = np.arange(1, self.N)
+            cur_n1 = self.x_prev_1[idxs, :]
+            cur_n2 = self.x_prev_2[idxs, :]
+            n1_new = (1-alpha) * cur_n1 + frac_n1
+            n2_new = (1-alpha) * cur_n2 + frac_n2
+            self.x_prev_1[idxs, :] = decay * cur_n1 + (1-decay) * n1_new
+            self.x_prev_2[idxs, :] = decay * cur_n2 + (1-decay) * n2_new
+        else:
+            raise NotImplementedError('unknown mode')
+
+    def update_factor_x_sequential(
+        self, mode, dmcav, dvcav, mcav, vcav, n1cav, n2cav, 
+        idxs, decay=0.0, alpha=1.0):
+        new_m = mcav + vcav * dmcav
+        new_v = vcav - vcav**2 * (dmcav**2 - 2*dvcav)
+        new_n2 = 1.0 / new_v
+        new_n1 = new_n2 * new_m
+        frac_n2 = new_n2 - n2cav
+        frac_n1 = new_n1 - n1cav
+        if mode == self.NEXT:
+            cur_n1 = self.x_next_1[idxs, :]
+            cur_n2 = self.x_next_2[idxs, :]
+            n1_new = (1-alpha) * cur_n1 + frac_n1
+            n2_new = (1-alpha) * cur_n2 + frac_n2
+            self.x_next_1[idxs, :] = decay * cur_n1 + (1-decay) * n1_new
+            self.x_next_2[idxs, :] = decay * cur_n2 + (1-decay) * n2_new
+        elif mode == self.PREV:
             cur_n1 = self.x_prev_1[idxs, :]
             cur_n2 = self.x_prev_2[idxs, :]
             n1_new = (1-alpha) * cur_n1 + frac_n1
