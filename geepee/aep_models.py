@@ -1205,8 +1205,8 @@ class Gauss_Emis():
 
     def init_hypers(self):
         params = {}
-        params['C'] = np.ones((Dout, Din)) / (Dout*Din)
-        params['R'] = np.log(0.01) * np.ones(Dout)
+        params['C'] = np.ones((self.Dout, self.Din)) / (self.Dout*self.Din)
+        params['R'] = np.log(0.01) * np.ones(self.Dout)
         return params
 
     def get_hypers(self):
@@ -1267,7 +1267,7 @@ class SGPSSM(AEP_Model):
 
     def __init__(self, y_train, hidden_size, no_pseudo, 
         lik='Gaussian', prior_mean=0, prior_var=1):
-        super(SGPLVM, self).__init__(y_train)
+        super(SGPSSM, self).__init__(y_train)
         self.N = N = y_train.shape[0]
         self.Dout = Dout = y_train.shape[1]
         self.Din = Din = hidden_size
@@ -1294,6 +1294,8 @@ class SGPSSM(AEP_Model):
         self.x_post_1 = np.zeros((N, Din))
         self.x_post_2 = np.zeros((N, Din))
 
+        self.UP, self.PREV, self.NEXT = 'UP', 'PREV', 'NEXT'
+
     def objective_function(self, params, idxs, alpha=1.0):
         N = self.N
         # TODO: deal with minibatch here
@@ -1302,32 +1304,21 @@ class SGPSSM(AEP_Model):
         scale_logZ_dyn = - (N-1) * 1.0 / batch_size_dyn / alpha
         batch_size_emi = N
         scale_logZ_emi = - N * 1.0 / batch_size_emi / alpha
-        scale_poste = N * 1.0 / alpha - 1.0
-        scale_cav = - N * 1.0 / alpha
-        scale_prior = 1
         
         # update model with new hypers
-        self.update_hypers(params)
+        self.update_hypers(params, alpha)
         
         # deal with the transition/dynamic factors here
-        # compute cavity
         cav_t_m, cav_t_v, cav_t_1, cav_t_2 = \
             self.compute_cavity_x(self.PREV, alpha)
         cav_tm1_m, cav_tm1_v, cav_tm1_1, cav_tm1_2 = \
             self.compute_cavity_x(self.NEXT, alpha)
-        # propagate x cavity forward
         mprop, vprop, psi1, psi2 = self.sgp_layer.forward_prop_thru_cav(
             cav_tm1_m, cav_tm1_v)
         logZ_dyn, dmprop, dvprop, dmt, dvt, dsn = self.compute_transition_tilted(
-            mprop, vprop, cav_t_m, cav_t_v, alpha)
-        logZ_dyn_scaled = scale_logZ_dyn * logZ_dyn
-        dmprop_scaled = scale_logZ_dyn * dmprop
-        dvprop_scaled = scale_logZ_dyn * dvprop
-        dmt_scaled = scale_logZ_dyn * dmt
-        dvt_scaled = scale_logZ_dyn * dvt
-        dsn_scaled = scale_logZ_dyn * dsn
+            mprop, vprop, cav_t_m, cav_t_v, alpha, scale_logZ_dyn)
         sgp_grad_hyper, sgp_grad_input = self.sgp_layer.backprop_grads_lvm(
-            mprop, vprop, dmprop_scaled, dvprop_scaled, 
+            mprop, vprop, dmprop, dvprop, 
             psi1, psi2, cav_tm1_m, cav_tm1_v, alpha)
         
         # deal with the emission factors here
@@ -1336,48 +1327,154 @@ class SGPSSM(AEP_Model):
         logZ_emi, input_grads, emi_grads = self.emi_layer.compute_emission_tilted(
             cav_up_m, cav_up_v, alpha, scale_logZ_emi)
 
+        # collect emission and GP hyperparameters
+        grad_all = {'sn': dsn}
+        for key in sgp_grad_hyper.keys():
+            grad_all[key] = sgp_grad_hyper[key]
+        for key in emi_grads.keys():
+            grad_all[key] = emi_grads[key]
+
         dmcav_up, dvcav_up = input_grads['mx'], input_grads['vx']
         dmcav_prev, dvcav_prev = dmt, dvt
         dmcav_next, dvcav_next = sgp_grad_input['mx'], sgp_grad_input['vx']
         
-        # compute grad wrt x params
-        dcav_dt11 = (1.0-alpha) * cav_t1 / cav_t2
-        dcav_dt12 = (1.0-alpha) * (-0.5*cav_t1**2/cav_t2**2 - 0.5/cav_t2)
-        dmx = sgp_grad_input['mx']
-        dvx = sgp_grad_input['vx']
-        dlogZ_dt11 = (1.0-alpha) * dmx/cav_t2
-        dlogZ_dt12 = (1.0-alpha) * (-dmx*cav_t1/cav_t2**2 - dvx/cav_t2**2)
+        # compute posterior
+        grads_x_via_post = self.compute_posterior_grad_x(alpha)
+        grads_x_via_cavity = self.compute_cavity_grad_x(
+            alpha,
+            cav_up_1, cav_up_2,
+            cav_t_1, cav_t_2,
+            cav_tm1_1, cav_tm1_2)
+        grads_x_via_logZ = self.compute_logZ_grad_x(
+            alpha,
+            dmcav_up, dvcav_up, cav_up_1, cav_up_2,
+            dmcav_prev, dvcav_prev, cav_t_1, cav_t_2,
+            dmcav_next, dvcav_next, cav_tm1_1, cav_tm1_2)
+        grads_x = {}
+        for key in ['x_up_1', 'x_up_2', 'x_prev_1', 'x_prev_2', 'x_next_1', 'x_next_2']:
+            # grads_x[key] = grads_x_via_post[key] + grads_x_via_cavity[key] + grads_x_via_logZ[key]
+            # grads_x[key] = grads_x_via_logZ[key]
+            grads_x[key] = grads_x_via_cavity[key]
+        grads_x['x_prev_1'][0, :] = 0
+        grads_x['x_prev_2'][0, :] = 0
+        grads_x['x_next_1'][-1, :] = 0
+        grads_x['x_next_2'][-1, :] = 0
 
-        post_t1 = t01 + t11
-        post_t2 = t02 + t12
-        dpost_dt11 = post_t1 / post_t2
-        dpost_dt12 = - 0.5 * post_t1**2 / post_t2**2 - 0.5 / post_t2
-
-        scale_x = N * 1.0 / batch_size
-        grad_all['x1'] = dlogZ_dt11 + scale_x * (
-            - 1.0 / alpha * dcav_dt11 - (1.0 - 1.0 / alpha) * dpost_dt11)
-        grad_all['x2'] = dlogZ_dt12 + scale_x * (
-            - 1.0 / alpha * dcav_dt12 - (1.0 - 1.0 / alpha) * dpost_dt12)
-        grad_all['x2'] *= 2 * t12
+        for key in grads_x.keys():
+            grad_all[key] = grads_x[key]
 
         # compute objective
         sgp_contrib = self.sgp_layer.compute_phi(alpha)
-
-        phi_prior_x = self.compute_phi_prior_x(idxs)
-        phi_poste_x = self.compute_phi_posterior_x(idxs)
-        phi_cavity_x = self.compute_phi_cavity_x(idxs, alpha)
-        x_contrib = scale_x * (
-            phi_prior_x - 1.0/alpha*phi_cavity_x 
-            - (1.0 - 1.0/alpha)*phi_poste_x)
-
-        energy = logZ_scale + x_contrib + sgp_contrib
+        phi_prior_x = self.compute_phi_prior_x()
+        phi_poste_x = self.compute_phi_posterior_x(alpha)
+        phi_cavity_x = self.compute_phi_cavity_x(alpha)
+        x_contrib = phi_prior_x + phi_poste_x + phi_cavity_x
+        energy = logZ_dyn + logZ_emi + x_contrib + sgp_contrib
+        energy = phi_cavity_x
 
         for p in self.fixed_params:
             grad_all[p] = np.zeros_like(grad_all[p])
 
         return energy, grad_all
 
-    def compute_transition_tilted(self, m_prop, v_prop, m_t, v_t, alpha):
+    def compute_posterior_grad_x(self, alpha):
+        post_1 = self.x_post_1
+        post_2 = self.x_post_2
+        dpost_1 = post_1 / post_2
+        dpost_2 = - 0.5 * post_1**2 / post_2**2 - 0.5 / post_2
+        scale_x_post = - (1.0 - 1.0 / alpha) * np.ones((self.N, 1))
+        scale_x_post[0:self.N-1] = scale_x_post[0:self.N-1] + 1/alpha
+        scale_x_post[1:self.N] = scale_x_post[1:self.N] + 1/alpha
+        grads_x_1 = scale_x_post * dpost_1
+        grads_x_2 = scale_x_post * dpost_2
+        grads = {}
+        grads['x_up_1'] = grads_x_1
+        grads['x_prev_1'] = grads_x_1
+        grads['x_next_1'] = grads_x_1
+        grads['x_up_2'] = grads_x_2 * 2 * self.x_up_2
+        grads['x_prev_2'] = grads_x_2 * 2 * self.x_prev_2
+        grads['x_next_2'] = grads_x_2 * 2 * self.x_next_2
+        return grads
+
+    def compute_logZ_grad_x(self, alpha, 
+        dmcav_up, dvcav_up, cav_up_1, cav_up_2, 
+        dmcav_prev, dvcav_prev, cav_prev_1, cav_prev_2, 
+        dmcav_next, dvcav_next, cav_next_1, cav_next_2):
+
+        grads_x_1 = dmcav_up / cav_up_2
+        grads_x_2 = - dmcav_up * cav_up_1 / cav_up_2**2 -  dvcav_up / cav_up_2**2
+        grads = {}
+        grads['x_up_1'] = grads_x_1 * (1-alpha)
+        grads['x_prev_1'] = grads_x_1
+        grads['x_next_1'] = grads_x_1
+        grads['x_up_2'] = grads_x_2 * (1-alpha) * 2 * self.x_up_2
+        grads['x_prev_2'] = grads_x_2 * 2 * self.x_prev_2
+        grads['x_next_2'] = grads_x_2 * 2 * self.x_next_2
+
+        grads_x_1 = dmcav_prev / cav_prev_2
+        grads_x_2 = - dmcav_prev * cav_prev_1 / cav_prev_2**2 -  dvcav_prev / cav_prev_2**2
+        idxs = np.arange(1, self.N)
+        grads['x_up_1'][idxs, :] += grads_x_1
+        grads['x_prev_1'][idxs, :] += grads_x_1 * (1-alpha)
+        grads['x_next_1'][idxs, :] += grads_x_1
+        grads['x_up_2'][idxs, :] += grads_x_2 * 2 * self.x_up_2[idxs, :]
+        grads['x_prev_2'][idxs, :] += grads_x_2 * (1-alpha) * 2 * self.x_prev_2[idxs, :]
+        grads['x_next_2'][idxs, :] += grads_x_2 * 2 * self.x_next_2[idxs, :]
+
+        grads_x_1 = dmcav_next / cav_next_2
+        grads_x_2 = - dmcav_next * cav_next_1 / cav_next_2**2 -  dvcav_next / cav_next_2**2
+        idxs = np.arange(0, self.N-1)
+        grads['x_up_1'][idxs, :] += grads_x_1
+        grads['x_prev_1'][idxs, :] += grads_x_1
+        grads['x_next_1'][idxs, :] += grads_x_1 * (1-alpha)
+        grads['x_up_2'][idxs, :] += grads_x_2 * 2 * self.x_up_2[idxs, :]
+        grads['x_prev_2'][idxs, :] += grads_x_2 * 2 * self.x_prev_2[idxs, :]
+        grads['x_next_2'][idxs, :] += grads_x_2 * (1-alpha) * 2 * self.x_next_2[idxs, :]
+
+        return grads
+
+    def compute_cavity_grad_x(self, alpha, cav_up_1, cav_up_2, 
+        cav_prev_1, cav_prev_2, cav_next_1, cav_next_2):
+        scale = -1.0/alpha
+        dcav_1 = cav_up_1 / cav_up_2
+        dcav_2 = - 0.5 * cav_up_1**2 / cav_up_2**2 - 0.5 / cav_up_2
+        grads_x_1 = scale * dcav_1
+        grads_x_2 = scale * dcav_2
+        grads = {}
+        grads['x_up_1'] = grads_x_1 * (1-alpha)
+        grads['x_prev_1'] = grads_x_1
+        grads['x_next_1'] = grads_x_1
+        grads['x_up_2'] = grads_x_2 * (1-alpha) * 2 * self.x_up_2
+        grads['x_prev_2'] = grads_x_2 * 2 * self.x_prev_2
+        grads['x_next_2'] = grads_x_2 * 2 * self.x_next_2
+
+        dcav_1 = cav_prev_1 / cav_prev_2
+        dcav_2 = - 0.5 * cav_prev_1**2 / cav_prev_2**2 - 0.5 / cav_prev_2
+        grads_x_1 = scale * dcav_1
+        grads_x_2 = scale * dcav_2
+        idxs = np.arange(1, self.N)
+        grads['x_up_1'][idxs, :] += grads_x_1
+        grads['x_prev_1'][idxs, :] += grads_x_1 * (1-alpha)
+        grads['x_next_1'][idxs, :] += grads_x_1
+        grads['x_up_2'][idxs, :] += grads_x_2 * 2 * self.x_up_2[idxs, :]
+        grads['x_prev_2'][idxs, :] += grads_x_2 * (1-alpha) * 2 * self.x_prev_2[idxs, :]
+        grads['x_next_2'][idxs, :] += grads_x_2 * 2 * self.x_next_2[idxs, :]
+
+        dcav_1 = cav_next_1 / cav_next_2
+        dcav_2 = - 0.5 * cav_next_1**2 / cav_next_2**2 - 0.5 / cav_next_2
+        grads_x_1 = scale * dcav_1
+        grads_x_2 = scale * dcav_2
+        idxs = np.arange(0, self.N-1)
+        grads['x_up_1'][idxs, :] += grads_x_1
+        grads['x_prev_1'][idxs, :] += grads_x_1
+        grads['x_next_1'][idxs, :] += grads_x_1 * (1-alpha)
+        grads['x_up_2'][idxs, :] += grads_x_2 * 2 * self.x_up_2[idxs, :]
+        grads['x_prev_2'][idxs, :] += grads_x_2 * 2 * self.x_prev_2[idxs, :]
+        grads['x_next_2'][idxs, :] += grads_x_2 * (1-alpha) * 2 * self.x_next_2[idxs, :]
+
+        return grads
+
+    def compute_transition_tilted(self, m_prop, v_prop, m_t, v_t, alpha, scale):
         sn2 = np.exp(2*self.sn)
         v_sum = v_t + v_prop + sn2 / alpha
         m_diff = - m_t + m_prop
@@ -1394,61 +1491,59 @@ class SGPSSM(AEP_Model):
 
         dv_sum = np.sum(dvt)
         dsn = dv_sum*2*sn2/alpha + m_prop.shape[0]*self.Din*(1-alpha)
-        return logZ, dmprop, dvprop, dmt, dvt, dsn
+        return scale*logZ, scale*dmprop, scale*dvprop, scale*dmt, scale*dvt, scale*dsn
 
     def compute_cavity_x(self, mode, alpha):
         if mode == self.UP:
-            cav_up_1 = self.x_prev_1 + self.x_next_1 + (1-alpha) * self.x_up_1
-            cav_up_2 = self.x_prev_2 + self.x_next_2 + (1-alpha) * self.x_up_2
-            cav_up_1[0, :] += self.x_prior_1
-            cav_up_2[0, :] += self.x_prior_2
+            cav_up_1 = self.x_post_1 - alpha*self.x_up_1
+            cav_up_2 = self.x_post_2 - alpha*self.x_up_2
             return cav_up_1/(cav_up_2+1e-16), 1.0/(cav_up_2+1e-16), cav_up_1, cav_up_2
         elif mode == self.PREV:
             idxs = np.arange(1, self.N)
-            cav_prev_1 = self.x_up_1[idxs, :] + self.x_next_1[idxs, :]
-            cav_prev_2 = self.x_up_2[idxs, :] + self.x_next_2[idxs, :]
-            cav_prev_1 += (1-alpha) * self.x_prev_1[idxs, :]
-            cav_prev_2 += (1-alpha) * self.x_prev_2[idxs, :]
+            cav_prev_1 = self.x_post_1[idxs, :] - alpha*self.x_prev_1[idxs, :]
+            cav_prev_2 = self.x_post_2[idxs, :] - alpha*self.x_prev_2[idxs, :]
             return cav_prev_1/cav_prev_2, 1.0/cav_prev_2, cav_prev_1, cav_prev_2
         elif mode == self.NEXT:
             idxs = np.arange(0, self.N-1)
-            cav_next_1 = self.x_up_1[idxs, :] + self.x_prev_1[idxs, :]
-            cav_next_2 = self.x_up_2[idxs, :] + self.x_prev_2[idxs, :]
-            cav_next_1 += (1-alpha) * self.x_next_1[idxs, :]
-            cav_next_2 += (1-alpha) * self.x_next_2[idxs, :]
+            cav_next_1 = self.x_post_1[idxs, :] - alpha*self.x_next_1[idxs, :]
+            cav_next_2 = self.x_post_2[idxs, :] - alpha*self.x_next_2[idxs, :]
             return cav_next_1/cav_next_2, 1.0/cav_next_2, cav_next_1, cav_next_2
         else:
             raise NotImplementedError('unknown mode')
 
-    def compute_phi_prior_x(self, idxs):
-        t1 = self.prior_x1
-        t2 = self.prior_x2
+    def compute_phi_prior_x(self):
+        t1 = self.x_prior_1
+        t2 = self.x_prior_2
         m = t1 / t2
         v = 1.0 / t2
-        Nb = idxs.shape[0]
-        return 0.5 * Nb * self.Din * (m**2 / v + np.log(v))
+        return 0.5 * self.Din * (m**2 / v + np.log(v))
 
-    def compute_phi_posterior_x(self, idxs):
-        t01 = self.prior_x1
-        t02 = self.prior_x2
-        t11 = self.factor_x1[idxs, :]
-        t12 = self.factor_x2[idxs, :]
-        t1 = t01 + t11
-        t2 = t02 + t12
-        m = t1 / t2
-        v = 1.0 / t2
-        return np.sum(0.5 * (m**2 / v + np.log(v)))
+    def compute_phi_posterior_x(self, alpha):
+        post_1 = self.x_post_1
+        post_2 = self.x_post_2
+        phi_post = 0.5 * (post_1**2 / post_2 - np.log(post_2))
+        scale_x_post = - (1.0 - 1.0 / alpha) * np.ones((self.N, 1))
+        scale_x_post[0:self.N-1] = scale_x_post[0:self.N-1] + 1/alpha
+        scale_x_post[1:self.N] = scale_x_post[1:self.N] + 1/alpha
 
-    def compute_phi_cavity_x(self, idxs, alpha=1.0):
-        t01 = self.prior_x1
-        t02 = self.prior_x2
-        t11 = self.factor_x1[idxs, :]
-        t12 = self.factor_x2[idxs, :]
-        t1 = t01 + (1.0 - alpha) * t11
-        t2 = t02 + (1.0 - alpha) * t12
-        m = t1 / t2
-        v = 1.0 / t2
-        return np.sum(0.5 * (m**2 / v + np.log(v)))
+        return np.sum(scale_x_post * phi_post)
+
+    def compute_phi_cavity_x(self, alpha):
+        scale = -1.0/alpha
+        cav_up_1 = self.x_post_1 - alpha*self.x_up_1
+        cav_up_2 = self.x_post_2 - alpha*self.x_up_2
+        phi_cav = np.sum(scale * 0.5 * (cav_up_1**2 / cav_up_2 - np.log(cav_up_2)))
+    
+        idxs = np.arange(1, self.N)
+        cav_prev_1 = self.x_post_1[idxs, :] - alpha*self.x_prev_1[idxs, :]
+        cav_prev_2 = self.x_post_2[idxs, :] - alpha*self.x_prev_2[idxs, :]
+        phi_cav += np.sum(scale * 0.5 * (cav_prev_1**2 / cav_prev_2 - np.log(cav_prev_2)))
+
+        idxs = np.arange(0, self.N-1)
+        cav_next_1 = self.x_post_1[idxs, :] - alpha*self.x_next_1[idxs, :]
+        cav_next_2 = self.x_post_2[idxs, :] - alpha*self.x_next_2[idxs, :]
+        phi_cav += np.sum(scale * 0.5 * (cav_next_1**2 / cav_next_2 - np.log(cav_next_2)))
+        return phi_cav
 
     def predict_f(self, inputs):
         if not self.updated:
@@ -1466,65 +1561,15 @@ class SGPSSM(AEP_Model):
         return my, vy
 
     def get_posterior_x(self):
-        post_1 = self.prior_x1 + self.factor_x1
-        post_2 = self.prior_x2 + self.factor_x2
+        post_1 = self.x_post_1
+        post_2 = self.x_post_2
         vx = 1.0 / post_2
         mx = post_1 / post_2
         return mx, vx
 
-    def impute_missing(self, y, missing_mask, alpha=0.5, no_iters=10, add_noise=False):
-        # TODO
-        # find latent conditioned on observed variables
-        if not self.updated:
-            self.sgp_layer.update_posterior_for_prediction()
-            self.updated = True
-
-        N_test = y.shape[0]
-        Q = self.Din
-        # np.zeros((N_test, Q))
-        factor_x1 = np.zeros((N_test, Q))
-        factor_x2 = np.zeros((N_test, Q))
-        for i in range(no_iters):
-            # compute cavity of x
-            cav_x1 = self.prior_x1 + (1 - alpha) * factor_x1
-            cav_x2 = self.prior_x2 + (1 - alpha) * factor_x2
-            cav_m = cav_x1 / cav_x2
-            cav_v = 1.0 / cav_x2
-
-            # propagate x through posterior and get gradients wrt mx and vx
-            logZ, m, v, dlogZ_dmx, dlogZ_dvx = \
-                self.sgp_layer.compute_logZ_and_gradients_imputation(
-                    cav_m, cav_v,
-                    y, missing_mask, alpha=alpha)
-            
-            # compute new posterior
-            new_m = cav_m + cav_v * dlogZ_dmx
-            new_v = cav_v - cav_v**2 * (dlogZ_dmx**2 - 2 * dlogZ_dvx)
-
-            new_x2 = 1.0 / new_v
-            new_x1 = new_x2 * new_m
-            frac_x1 = new_x1 - cav_x1
-            frac_x2 = new_x2 - cav_x2
-
-            # update factor
-            factor_x1 = (1 - alpha) * factor_x1 + frac_x1
-            factor_x2 = (1 - alpha) * factor_x2 + frac_x2
-
-        # compute posterior of x
-        post_x1 = self.prior_x1 + factor_x1
-        post_x2 = self.prior_x2 + factor_x2
-        post_m = post_x1 / post_x2
-        post_v = 1.0 / post_x2
-
-        # propagate x forward to predict missing points
-        my, vy = self.sgp_layer.forward_prop_thru_post(
-            post_m, post_v, add_noise=add_noise)
-
-        return my, vy
-
     def init_hypers(self, y_train):
         sgp_params = self.sgp_layer.init_hypers()
-        lik_params = self.emi_layer.init_hypers()
+        emi_params = self.emi_layer.init_hypers()
         # TODO: alternatitve method for non real-valued data
         post_m = PCA_reduce(y_train, self.Din)
         post_m_mean = np.mean(post_m, axis=0)
@@ -1533,39 +1578,53 @@ class SGPSSM(AEP_Model):
         post_v = 0.1 * np.ones_like(post_m)
         post_2 = 1.0 / post_v
         post_1 = post_2 * post_m
-        x_params = {}
-        x_params['x1'] = post_1
-        x_params['x2'] = np.log(post_2 - 1) / 2
+        ssm_params = {'sn': np.log(0.001)}
+        ssm_params['x_up_1'] = post_1/3
+        ssm_params['x_up_2'] = np.log(post_2/3) / 2
+        ssm_params['x_next_1'] = post_1/3
+        ssm_params['x_next_2'] = np.log(post_2/3) / 2
+        ssm_params['x_prev_1'] = post_1/3
+        ssm_params['x_prev_2'] = np.log(post_2/3) / 2
 
         init_params = dict(sgp_params)
-        init_params.update(lik_params)
-        init_params.update(x_params)
+        init_params.update(emi_params)
+        init_params.update(ssm_params)
         return init_params
 
     def get_hypers(self):
         sgp_params = self.sgp_layer.get_hypers()
-        lik_params = self.emi_layer.get_hypers()
-        x_params = {}
-        x_params['x1_up'] = self.x_up_1
-        x_params['x2_up'] = np.log(self.x_up_2) / 2.0
-        x_params['x1_next'] = self.x_next_1
-        x_params['x2_next'] = np.log(self.x_next_2) / 2.0
-        x_params['x1_prev'] = self.x_prev_1
-        x_params['x2_prev'] = np.log(self.x_prev_2) / 2.0
-        ssm_params = {'sn': self.sn}
+        emi_params = self.emi_layer.get_hypers()
+        ssm_params = {}
+        ssm_params['x_up_1'] = self.x_up_1
+        ssm_params['x_up_2'] = np.log(self.x_up_2) / 2.0
+        ssm_params['x_next_1'] = self.x_next_1
+        ssm_params['x_next_2'] = np.log(self.x_next_2) / 2.0
+        ssm_params['x_prev_1'] = self.x_prev_1
+        ssm_params['x_prev_2'] = np.log(self.x_prev_2) / 2.0
+        ssm_params['sn'] = self.sn
         params = dict(sgp_params)
-        params.update(lik_params)
-        params.update(x_params)
+        params.update(emi_params)
         params.update(ssm_params)
         return params
 
-    def update_hypers(self):
+    def update_hypers(self, params, alpha):
         self.sgp_layer.update_hypers(params, alpha=alpha)
         self.emi_layer.update_hypers(params)
-        self.x_up_1 = params['x1_up']
-        self.x_up_2 = np.exp(2*params['x2_up'])
-        self.x_next_1 = params['x1_next']
-        self.x_next_2 = np.exp(2*params['x2_next'])
-        self.x_prev_1 = params['x1_prev']
-        self.x_prev_2 = np.exp(2*params['x2_prev'])
+        self.x_up_1 = params['x_up_1']
+        self.x_up_2 = np.exp(2*params['x_up_2'])
+        self.x_next_1 = params['x_next_1']
+        self.x_next_2 = np.exp(2*params['x_next_2'])
+        self.x_prev_1 = params['x_prev_1']
+        self.x_prev_2 = np.exp(2*params['x_prev_2'])
         self.sn = params['sn']
+        # force the first and last messages to be flat
+        self.x_prev_1[0, :] = np.zeros(self.Din)
+        self.x_prev_2[0, :] = np.zeros(self.Din) + 1e-16
+        self.x_next_1[-1, :] = np.zeros(self.Din)
+        self.x_next_2[-1, :] = np.zeros(self.Din) + 1e-16
+
+        self.x_post_1 = self.x_next_1 + self.x_prev_1 + self.x_up_1
+        self.x_post_2 = self.x_next_2 + self.x_prev_2 + self.x_up_2
+        self.x_post_1[0, :] += self.x_prior_1
+        self.x_post_2[0, :] += self.x_prior_2
+        
