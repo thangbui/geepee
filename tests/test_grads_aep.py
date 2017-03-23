@@ -983,7 +983,7 @@ def test_gpssm_aep_gaussian():
     # generate some datapoints for testing
     N_train = 5
     alpha = 0.5
-    M = 10
+    M = 4
     D = 3
     Q = 2
     y_train = np.random.randn(N_train, D)
