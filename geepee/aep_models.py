@@ -1511,6 +1511,9 @@ class SGPSSM(AEP_Model):
         dcav_1 = cav_prev_1 / cav_prev_2
         dcav_2 = - 0.5 * cav_prev_1**2 / cav_prev_2**2 - 0.5 / cav_prev_2
         grads_x_1 = scale * dcav_1
+
+
+
         grads_x_2 = scale * dcav_2
         idxs = np.arange(1, self.N)
         grads['x_up_1'][idxs, :] += grads_x_1
@@ -1694,3 +1697,359 @@ class SGPSSM(AEP_Model):
         self.x_post_1[0, :] += self.x_prior_1
         self.x_post_2[0, :] += self.x_prior_2
         
+
+class SGPSSM_tied(AEP_Model):
+
+    def __init__(self, y_train, hidden_size, no_pseudo, 
+        lik='Gaussian', prior_mean=0, prior_var=1):
+        super(SGPSSM_tied, self).__init__(y_train)
+        self.N = N = y_train.shape[0]
+        self.Dout = Dout = y_train.shape[1]
+        self.Din = Din = hidden_size
+        self.M = M = no_pseudo
+
+        self.sgp_layer = SGP_Layer(N-1, Din, Din, M)
+        if lik.lower() == 'gaussian':
+            self.emi_layer = Gauss_Emis(y_train, Dout, Din)
+        elif lik.lower() == 'probit':
+            self.emi_layer = Probit_Emis(y_train, Dout, Din)
+        else:
+            raise NotImplementedError('likelihood not implemented')
+
+        # natural params for latent variables
+        self.x_factor_1 = np.zeros((N, Din))
+        self.x_factor_2 = np.zeros((N, Din))
+        self.x_prior_1 = prior_mean / prior_var
+        self.x_prior_2 = 1.0 / prior_var
+
+        self.x_post_1 = np.zeros((N, Din))
+        self.x_post_2 = np.zeros((N, Din))
+
+        self.UP, self.PREV, self.NEXT = 'UP', 'PREV', 'NEXT'
+
+    def plot(self):
+        def kink_true(x):
+            fx = np.zeros(x.shape)
+            for t in range(x.shape[0]):
+                xt = x[t]
+                if xt < 4:
+                    fx[t] = xt + 1
+                else:
+                    fx[t] = -4*xt + 21
+            return fx
+        N_test = 100
+        x_test = np.linspace(-4, 6, N_test)
+        x_test = np.reshape(x_test, [N_test, 1])
+        self.sgp_layer.update_posterior_for_prediction()
+        zu = self.sgp_layer.zu
+        mu, vu = self.predict_f(zu)
+        mf, vf = self.predict_f(x_test)
+        my, vy = self.predict_y(x_test)
+        # plot function
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
+        ax.plot(x_test[:,0], kink_true(x_test[:,0]), '-', color='k')
+        ax.plot(x_test[:,0], my[:,0], '-', color='r', label='y')
+        ax.fill_between(
+            x_test[:,0], 
+            my[:,0] + 2*np.sqrt(vy[:, 0, 0]), 
+            my[:,0] - 2*np.sqrt(vy[:, 0, 0]), 
+            alpha=0.2, edgecolor='r', facecolor='r')
+        ax.plot(zu, mu, 'ob')
+        ax.plot(x_test[:,0], mf[:,0], '-', color='b', label='f')
+        ax.fill_between(
+            x_test[:,0], 
+            mf[:,0] + 2*np.sqrt(vf[:,0]), 
+            mf[:,0] - 2*np.sqrt(vf[:,0]), 
+            alpha=0.2, edgecolor='b', facecolor='b')
+        ax.plot(
+            self.emi_layer.y[0:self.N-1], 
+            self.emi_layer.y[1:self.N], 
+            'r+', alpha=0.5)
+        mx, vx = self.get_posterior_x()
+        ax.plot(mx[0:self.N-1], mx[1:self.N], 'og', alpha=0.3)
+        ax.set_xlabel(r'$x_{t-1}$')
+        ax.set_ylabel(r'$x_{t}$')
+        # ax.set_ylim(-6, 6)
+        # ax.set_xlim(-7, 8)
+        ax.legend(loc='lower center')
+        plt.show()
+
+    def objective_function(self, params, idxs, alpha=1.0):
+        # self.plot()
+        N = self.N
+        # TODO: deal with minibatch here
+        # yb = self.y_train[idxs, :]
+        batch_size_dyn = (N-1)
+        scale_logZ_dyn = - 1.0 / alpha
+        batch_size_emi = N
+        scale_logZ_emi = - 1.0 / alpha
+        
+        # update model with new hypers
+        self.update_hypers(params, alpha)
+        cav_m, cav_v, cav_1, cav_2 = self.compute_cavity_x(alpha)
+        # deal with the transition/dynamic factors here
+        idxs_prev = np.arange(1, self.N)
+        cav_t_m, cav_t_v = cav_m[idxs_prev, :], cav_v[idxs_prev, :]
+        idxs_next = np.arange(0, self.N-1)
+        cav_tm1_m, cav_tm1_v = cav_m[idxs_next, :], cav_v[idxs_next, :]
+        mprop, vprop, psi1, psi2 = self.sgp_layer.forward_prop_thru_cav(
+            cav_tm1_m, cav_tm1_v)
+        logZ_dyn, dmprop, dvprop, dmt, dvt, dsn = self.compute_transition_tilted(
+            mprop, vprop, cav_t_m, cav_t_v, alpha, scale_logZ_dyn)
+        sgp_grad_hyper, sgp_grad_input = self.sgp_layer.backprop_grads_lvm(
+            mprop, vprop, dmprop, dvprop, 
+            psi1, psi2, cav_tm1_m, cav_tm1_v, alpha)
+        
+        # plt.figure()
+        # plt.plot(cav_tm1_m, mprop, '+r')
+        # plt.plot(cav_tm1_m, cav_t_m, 'ob')
+
+        # deal with the emission factors here
+        idxs_up = np.arange(0, self.N)
+        cav_up_m, cav_up_v = cav_m[idxs_up, :], cav_v[idxs_up, :]
+        logZ_emi, input_grads, emi_grads = self.emi_layer.compute_emission_tilted(
+            cav_up_m, cav_up_v, alpha, scale_logZ_emi)
+
+        # collect emission and GP hyperparameters
+        grad_all = {'sn': dsn}
+        for key in sgp_grad_hyper.keys():
+            grad_all[key] = sgp_grad_hyper[key]
+        for key in emi_grads.keys():
+            grad_all[key] = emi_grads[key]
+
+        dmcav_up, dvcav_up = input_grads['mx'], input_grads['vx']
+        dmcav_prev, dvcav_prev = dmt, dvt
+        dmcav_next, dvcav_next = sgp_grad_input['mx'], sgp_grad_input['vx']
+        
+        # compute posterior
+        grads_x_via_post = self.compute_posterior_grad_x(alpha)
+        grads_x_via_cavity = self.compute_cavity_grad_x(
+            alpha,
+            cav_1, cav_2)
+        grads_x_via_logZ = self.compute_logZ_grad_x(
+            alpha, cav_1, cav_2, dmcav_up, dvcav_up,
+            dmcav_prev, dvcav_prev, dmcav_next, dvcav_next)
+
+        grads_x = {}
+        for key in ['x_factor_1', 'x_factor_2']:
+            grads_x[key] = grads_x_via_post[key] + grads_x_via_cavity[key] + grads_x_via_logZ[key]
+            # grads_x[key] = grads_x_via_logZ[key]
+            # grads_x[key] = grads_x_via_cavity[key]
+            # grads_x[key] = grads_x_via_post[key]
+
+        for key in grads_x.keys():
+            grad_all[key] = grads_x[key]
+
+        # compute objective
+        sgp_contrib = self.sgp_layer.compute_phi(alpha)
+        phi_prior_x = self.compute_phi_prior_x()
+        phi_poste_x = self.compute_phi_posterior_x(alpha)
+        phi_cavity_x = self.compute_phi_cavity_x(alpha)
+        x_contrib = phi_prior_x + phi_poste_x + phi_cavity_x
+        energy = logZ_dyn + logZ_emi + x_contrib + sgp_contrib
+        # energy = phi_cavity_x
+        # energy = phi_poste_x
+        # energy = logZ_dyn + logZ_emi
+        for p in self.fixed_params:
+            grad_all[p] = np.zeros_like(grad_all[p])
+        # pp.pprint([energy, logZ_dyn, logZ_emi, x_contrib, sgp_contrib])
+        # pp.pprint(self.sgp_layer.get_hypers())
+        # pp.pprint(params)
+        return energy, grad_all
+
+    def compute_posterior_grad_x(self, alpha):
+        post_1 = self.x_post_1
+        post_2 = self.x_post_2
+        dpost_1 = post_1 / post_2
+        dpost_2 = - 0.5 * post_1**2 / post_2**2 - 0.5 / post_2
+        scale_x_post = - (1.0 - 1.0 / alpha) * np.ones((self.N, 1))
+        scale_x_post[0:self.N-1] = scale_x_post[0:self.N-1] + 1.0/alpha
+        scale_x_post[1:self.N] = scale_x_post[1:self.N] + 1.0/alpha
+        grads_x_1 = scale_x_post * dpost_1
+        grads_x_2 = scale_x_post * dpost_2
+        grads = {}
+        grads['x_factor_1'] = 3.0*grads_x_1
+        grads['x_factor_2'] = 6.0*grads_x_2*self.x_factor_2
+        grads['x_factor_1'][[0, -1], :] = 2.0*grads_x_1[[0, -1], :]
+        grads['x_factor_2'][[0, -1], :] = (
+            4.0*grads_x_2[[0, -1], :] * self.x_factor_2[[0, -1], :])
+        return grads
+
+    def compute_logZ_grad_x(self, alpha, cav_1, cav_2, dmcav_up, dvcav_up, 
+        dmcav_prev, dvcav_prev, dmcav_next, dvcav_next):
+
+        grads_up_1 = dmcav_up / cav_2
+        grads_up_2 = - dmcav_up * cav_1 / cav_2**2 - dvcav_up / cav_2**2
+        grads_x_1 = grads_up_1
+        grads_x_2 = grads_up_2
+
+        idxs = np.arange(1, self.N)
+        grads_prev_1 = dmcav_prev / cav_2[idxs, :]
+        grads_prev_2 = (- dmcav_prev * cav_1[idxs, :] / cav_2[idxs, :]**2 
+            - dvcav_prev / cav_2[idxs, :]**2)
+        grads_x_1[idxs, :] += grads_prev_1
+        grads_x_2[idxs, :] += grads_prev_2
+
+        idxs = np.arange(0, self.N-1)
+        grads_next_1 = dmcav_next / cav_2[idxs, :]
+        grads_next_2 = (- dmcav_next * cav_1[idxs, :] / cav_2[idxs, :]**2 
+            - dvcav_next / cav_2[idxs, :]**2)
+        grads_x_1[idxs, :] += grads_next_1
+        grads_x_2[idxs, :] += grads_next_2
+
+        scale_x_cav = (3.0 - alpha)*np.ones((self.N, 1))
+        scale_x_cav[0] = 2.0 - alpha
+        scale_x_cav[-1] = 2.0 - alpha
+        grad_1 = grads_x_1 * scale_x_cav
+        grad_2 = grads_x_2 * scale_x_cav
+        grads = {}
+        grads['x_factor_1'] = grad_1
+        grads['x_factor_2'] = grad_2 * 2 * self.x_factor_2
+        return grads
+
+    def compute_cavity_grad_x(self, alpha, cav_1, cav_2):
+        scale = -1.0/alpha
+        dcav_1 = cav_1 / cav_2
+        dcav_2 = - 0.5 * cav_1**2 / cav_2**2 - 0.5 / cav_2
+        scale_x_cav = scale * np.ones((self.N, 1))
+        scale_x_cav[0:self.N-1] = scale_x_cav[0:self.N-1] + scale
+        scale_x_cav[1:self.N] = scale_x_cav[1:self.N] + scale
+        grads_x_1 = scale_x_cav * dcav_1
+        grads_x_2 = scale_x_cav * dcav_2
+
+        scale_x_cav = (3.0 - alpha)*np.ones((self.N, 1))
+        scale_x_cav[0] = 2.0 - alpha
+        scale_x_cav[-1] = 2.0 - alpha
+        grad_1 = grads_x_1 * scale_x_cav
+        grad_2 = grads_x_2 * scale_x_cav
+        grads = {}
+        grads['x_factor_1'] = grad_1
+        grads['x_factor_2'] = grad_2 * 2 * self.x_factor_2
+        return grads
+
+    def compute_transition_tilted(self, m_prop, v_prop, m_t, v_t, alpha, scale):
+        sn2 = np.exp(2*self.sn)
+        v_sum = v_t + v_prop + sn2 / alpha
+        m_diff = m_t - m_prop
+        exp_term = -0.5 * m_diff**2 / v_sum
+        const_term = -0.5 * np.log(2*np.pi*v_sum)
+        alpha_term = 0.5 * (1-alpha) * np.log(2*np.pi*sn2) - 0.5*np.log(alpha)
+        logZ = exp_term + const_term + alpha_term
+        logZ = np.sum(logZ)
+
+        dvt = -0.5 / v_sum + 0.5 * m_diff**2 / v_sum**2
+        dvprop = -0.5 / v_sum + 0.5 * m_diff**2 / v_sum**2
+        dmt = -m_diff / v_sum
+        dmprop = m_diff / v_sum
+
+        dv_sum = np.sum(dvt)
+        dsn = dv_sum*2*sn2/alpha + m_prop.shape[0]*self.Din*(1-alpha)
+        return scale*logZ, scale*dmprop, scale*dvprop, scale*dmt, scale*dvt, scale*dsn
+
+    def compute_cavity_x(self, alpha):
+        cav_1 = self.x_post_1 - alpha*self.x_factor_1
+        cav_2 = self.x_post_2 - alpha*self.x_factor_2
+        return cav_1/(cav_2+1e-16), 1.0/(cav_2+1e-16), cav_1, cav_2
+
+    def compute_phi_prior_x(self):
+        t1 = self.x_prior_1
+        t2 = self.x_prior_2
+        m = t1 / t2
+        v = 1.0 / t2
+        return 0.5 * self.Din * (m**2 / v + np.log(v))
+
+    def compute_phi_posterior_x(self, alpha):
+        post_1 = self.x_post_1
+        post_2 = self.x_post_2
+        phi_post = 0.5 * (post_1**2 / post_2 - np.log(post_2))
+        scale_x_post = - (1.0 - 1.0 / alpha) * np.ones((self.N, 1))
+        scale_x_post[0:self.N-1] = scale_x_post[0:self.N-1] + 1/alpha
+        scale_x_post[1:self.N] = scale_x_post[1:self.N] + 1/alpha
+        return np.sum(scale_x_post * phi_post)
+
+    def compute_phi_cavity_x(self, alpha):
+        scale = -1.0/alpha
+        cav_1 = self.x_post_1 - alpha*self.x_factor_1
+        cav_2 = self.x_post_2 - alpha*self.x_factor_2
+        phi_cav = 0.5 * (cav_1**2 / cav_2 - np.log(cav_2))
+
+        scale_x_cav = scale * np.ones((self.N, 1))
+        scale_x_cav[0:self.N-1] = scale_x_cav[0:self.N-1] + scale
+        scale_x_cav[1:self.N] = scale_x_cav[1:self.N] + scale
+        phi_cav_sum = np.sum(scale_x_cav * phi_cav)
+        return phi_cav_sum
+
+    def predict_f(self, inputs):
+        if not self.updated:
+            self.sgp_layer.update_posterior_for_prediction()
+            self.updated = True
+        mf, vf = self.sgp_layer.forward_prop_thru_post(inputs)
+        return mf, vf
+
+    def predict_y(self, inputs):
+        if not self.updated:
+            self.sgp_layer.update_posterior_for_prediction()
+            self.updated = True
+        mf, vf = self.sgp_layer.forward_prop_thru_post(inputs)
+        my, vy = self.emi_layer.output_probabilistic(mf, vf)
+        return my, vy
+
+    def get_posterior_x(self):
+        post_1 = self.x_post_1
+        post_2 = self.x_post_2
+        vx = 1.0 / post_2
+        mx = post_1 / post_2
+        return mx, vx
+
+    def init_hypers(self, y_train):
+        # TODO: alternatitve method for non real-valued data
+        if self.Din == 1 and self.Dout == 1:
+            post_m = np.copy(y_train)
+            post_v = 0.01 * np.ones_like(post_m)
+        else:
+            post_m = PCA_reduce(y_train, self.Din)
+            post_m_mean = np.mean(post_m, axis=0)
+            post_m_std = np.std(post_m, axis=0)
+            post_m = (post_m - post_m_mean) / post_m_std
+            post_v = 0.01 * np.ones_like(post_m)
+
+        sgp_params = self.sgp_layer.init_hypers()
+        emi_params = self.emi_layer.init_hypers()
+        
+        post_2 = 1.0 / post_v
+        post_1 = post_2 * post_m
+        ssm_params = {'sn': np.log(0.5)}
+        ssm_params['x_factor_1'] = post_1/3
+        ssm_params['x_factor_2'] = np.log(post_2/3) / 2
+        init_params = dict(sgp_params)
+        init_params.update(emi_params)
+        init_params.update(ssm_params)
+        return init_params
+
+    def get_hypers(self):
+        sgp_params = self.sgp_layer.get_hypers()
+        emi_params = self.emi_layer.get_hypers()
+        ssm_params = {}
+        ssm_params['x_factor_1'] = self.x_factor_1
+        ssm_params['x_factor_2'] = np.log(self.x_factor_2) / 2.0
+        ssm_params['sn'] = self.sn
+        params = dict(sgp_params)
+        params.update(emi_params)
+        params.update(ssm_params)
+        return params
+
+    def update_hypers(self, params, alpha):
+        self.sgp_layer.update_hypers(params, alpha=alpha)
+        self.emi_layer.update_hypers(params)
+        self.sn = params['sn']
+        self.x_factor_1 = params['x_factor_1']
+        self.x_factor_2 = np.exp(2*params['x_factor_2'])
+
+        self.x_post_1 = 3*self.x_factor_1
+        self.x_post_2 = 3*self.x_factor_2
+        self.x_post_1[[0, -1], :] = 2*self.x_factor_1[[0, -1], :]
+        self.x_post_2[[0, -1], :] = 2*self.x_factor_2[[0, -1], :]
+        self.x_post_1[0, :] += self.x_prior_1
+        self.x_post_2[0, :] += self.x_prior_2
+
