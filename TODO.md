@@ -11,20 +11,21 @@
 are the same with sparse GPLVM when variance = 0
 - [x] sparse Deep GP regression and classification
 - [ ] sparse Deep GP latent variable models
+- [x] sparse GP state space models
 - [ ] for sparse Deep GP: alpha = 1.0 do moment matching, 
 for other alphas, what do we do?
 - [ ] moment matching vs linearisation vs quadrature/MC
 
 ## EP modules
-
+- [ ] numerical instability/invalid updates
 - [x] sparse GPR/C inference
 - [ ] sparse GPR/C learning
 - [x] GPLVM inference
-- [ ] GPLVM learning
+- [ ] GPLVM learning, half-ticked, could use AEP learning insteard
 - [ ] Deep-GP inference
 - [ ] Deep-GP learning
-- [ ] GP SSM inference
-- [ ] GP SSM learning
+- [x] GP SSM inference
+- [ ] GP SSM learning, half-ticked, could use AEP learning instead
 - [ ] GP SSM inference and learning with control signal
 - [ ] should work with all alphas
 

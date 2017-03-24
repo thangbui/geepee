@@ -967,8 +967,8 @@ class SGPSSM(EP_Model):
                     self.inf_parallel(e, alpha, decay)
                 else:
                     self.inf_sequential(e, alpha, decay)
-                if e % 5 == 0:
-                    self.plot()
+                # if e % 5 == 0:
+                #     self.plot()
                     
         except KeyboardInterrupt:
             print 'Caught KeyboardInterrupt ...'
