@@ -3,6 +3,9 @@
 - [ ] save/load models: is saving parameters enough?
 - [x] remove for loops in aep_models update_posterior, compute_cavity
 - [ ] separate parameters for different output dimensions
+- [ ] stochastic optimisations for all models, 
+check that gradients are correct and bias is small
+- [ ] moment matching vs linearisation vs quadrature/MC
 
 ## AEP (BB-alpha) modules
 
@@ -11,10 +14,10 @@
 are the same with sparse GPLVM when variance = 0
 - [x] sparse Deep GP regression and classification
 - [ ] sparse Deep GP latent variable models
+- [ ] sparse Deep GP with hidden variables
 - [x] sparse GP state space models
-- [ ] for sparse Deep GP: alpha = 1.0 do moment matching, 
+- [ ] for sparse Deep GP with no hidden variables: alpha = 1.0 do moment matching, 
 for other alphas, what do we do?
-- [ ] moment matching vs linearisation vs quadrature/MC
 
 ## EP modules
 - [ ] numerical instability/invalid updates
