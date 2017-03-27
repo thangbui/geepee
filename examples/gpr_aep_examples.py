@@ -185,7 +185,8 @@ def run_spiral():
 def run_boston():
 	np.random.seed(100)
 	# We load the dataset
-	datapath = '/scratch/tdb40/datasets/reg/bostonHousing/data/'
+	# datapath = '/scratch/tdb40/datasets/reg/bostonHousing/data/'
+	datapath = '/tmp/bostonHousing/data/'
 	datafile = datapath + 'data.txt'
 	data = np.loadtxt(datafile)
 
