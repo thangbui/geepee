@@ -834,42 +834,6 @@ class SGPSSM(EP_Model):
         self.sn = 0
         self.UP, self.PREV, self.NEXT = 'UP', 'PREV', 'NEXT'
 
-    def plot(self):
-        def kink_true(x):
-            fx = np.zeros(x.shape)
-            for t in range(x.shape[0]):
-                xt = x[t]
-                if xt < 4:
-                    fx[t] = xt + 1
-                else:
-                    fx[t] = -4*xt + 21
-            return fx
-        N_test = 100
-        x_test = np.linspace(-7, 8, N_test)
-        x_test = np.reshape(x_test, [N_test, 1])
-        self.sgp_layer.update_posterior()
-        mf, vf = self.predict_f(x_test)
-        # plot function
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
-        ax.plot(x_test[:,0], kink_true(x_test[:,0]), '-', color='k')
-        ax.plot(x_test[:,0], mf[:,0], '-', color='b', label='EP')
-        ax.fill_between(
-            x_test[:,0], 
-            mf[:,0] + 2*np.sqrt(vf[:,0]), 
-            mf[:,0] - 2*np.sqrt(vf[:,0]), 
-            alpha=0.5, edgecolor='b', facecolor='b')
-        ax.plot(
-            self.emi_layer.y[0:self.N-1], 
-            self.emi_layer.y[1:self.N], 
-            'k+', alpha=0.3)
-        ax.set_xlabel(r'$x_{t-1}$')
-        ax.set_ylabel(r'$x_{t}$')
-        # ax.set_ylim(-6, 6)
-        # ax.set_xlim(-7, 8)
-        ax.legend(loc='lower center')
-        plt.show()
-
     def inf_parallel(self, epoch, alpha, decay):
         # merge info from output
         cav_up_m, cav_up_v, _, _ = self.compute_cavity_x(self.UP, alpha)
@@ -967,8 +931,6 @@ class SGPSSM(EP_Model):
                     self.inf_parallel(e, alpha, decay)
                 else:
                     self.inf_sequential(e, alpha, decay)
-                # if e % 5 == 0:
-                #     self.plot()
                     
         except KeyboardInterrupt:
             print 'Caught KeyboardInterrupt ...'
