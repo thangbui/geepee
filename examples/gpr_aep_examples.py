@@ -4,8 +4,15 @@ import pdb
 import matplotlib.pylab as plt
 from scipy import special
 
-from .datautils import step, spiral
-from .context import aep
+# from .datautils import step, spiral
+# from .context import aep
+
+import sys
+import os
+sys.path.insert(0, os.path.abspath(
+    os.path.join(os.path.dirname(__file__), '..')))
+import geepee.aep_models as aep
+from datautils import step, spiral
 
 
 def run_regression_1D():
@@ -69,10 +76,14 @@ def run_banana():
 			'o', color=col2, mew=0, alpha=0.5)
 		zu = m.sgp_layer.zu
 		plt.plot(zu[:,0], zu[:,1], 'ro', mew=0, ms=4)
-		plt.contour(xx, yy, mf.reshape(*xx.shape), [0], colors='k', linewidths=1.8, zorder=100)
+		plt.contour(
+			xx, yy, mf.reshape(*xx.shape), [0], 
+			colors='k', linewidths=1.8, zorder=100)
 
-	Xtrain = np.loadtxt('./examples/data/banana_X_train.txt', delimiter=',')
-	Ytrain = np.loadtxt('./examples/data/banana_Y_train.txt', delimiter=',').reshape(-1,1)
+	Xtrain = np.loadtxt(
+		'./examples/data/banana_X_train.txt', delimiter=',')
+	Ytrain = np.loadtxt(
+		'./examples/data/banana_Y_train.txt', delimiter=',').reshape(-1,1)
 	Ytrain[np.where(Ytrain==0)[0]] = -1
 	M = 50
 	model = aep.SGPR(Xtrain, Ytrain, M, lik='Probit')
@@ -171,8 +182,54 @@ def run_spiral():
 	plt.show()
 
 
+def run_boston():
+	np.random.seed(100)
+	# We load the dataset
+	datapath = '/scratch/tdb40/datasets/reg/bostonHousing/data/'
+	datafile = datapath + 'data.txt'
+	data = np.loadtxt(datafile)
+
+	# We obtain the features and the targets
+	xindexfile = datapath + 'index_features.txt'
+	yindexfile = datapath + 'index_target.txt'
+	xindices = np.loadtxt(xindexfile, dtype=np.int)
+	yindex = np.loadtxt(yindexfile, dtype=np.int)
+	X = data[:, xindices]
+	y = data[:, yindex]
+	y = y.reshape([y.shape[0], 1])
+	train_ind_file = datapath + 'index_train_0.txt'
+	test_ind_file = datapath + 'index_test_0.txt'
+	index_train = np.loadtxt(train_ind_file, dtype=np.int)
+	index_test = np.loadtxt(test_ind_file, dtype=np.int)
+	X_train = X[index_train, :]
+	y_train = y[index_train, :]
+	X_test = X[index_test, :]
+	y_test = y[index_test, :]
+
+	mean_y_train = np.mean(y_train)
+	std_y_train = np.std(y_train)
+	y_train_normalized = (y_train - mean_y_train) / std_y_train
+
+	M = 50
+	alpha = 0.5
+	model = aep.SGPR(X_train, y_train_normalized, M, lik='Gaussian')
+	model.optimise(method='L-BFGS-B', alpha=alpha, maxiter=2000)
+
+	my, vy = model.predict_y(X_test)
+	my = std_y_train*my + mean_y_train
+	vy = std_y_train**2 * vy
+	# We compute the test RMSE
+	test_rmse = np.sqrt(np.mean((y_test - my)**2))
+	print 'RMSE %.3f' % test_rmse
+
+	# We compute the test log-likelihood
+	test_nll = np.mean(-0.5*np.log(2*np.pi*vy) - 0.5*(y_test - my)**2 / vy)
+	print 'MLL %.3f' % test_nll
+
+
 if __name__ == '__main__':
 	# run_regression_1D()
 	# run_banana()
-	run_step_1D()
+	# run_step_1D()
 	# run_spiral()
+	run_boston()

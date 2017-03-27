@@ -384,7 +384,7 @@ def test_gplvm_aep_probit_scipy():
 def test_gpr_aep_gaussian():
 
     # generate some datapoints for testing
-    N_train = 5
+    N_train = 20
     alpha = 0.5
     M = 10
     idxs = np.arange(N_train)
@@ -615,7 +615,7 @@ def test_gpr_aep_probit():
 
 def test_gpr_aep_gaussian_scipy():
     # generate some datapoints for testing
-    N_train = 5
+    N_train = 20
     alpha = 0.5
     M = 10
     idxs = np.arange(N_train)
@@ -643,9 +643,9 @@ def test_gpr_aep_gaussian_scipy():
 
 def test_gpr_aep_probit_scipy():
     # generate some datapoints for testing
-    N_train = 5
+    N_train = 10
     alpha = 0.5
-    M = 10
+    M = 5
     idxs = np.arange(N_train)
     D = 2
     Q = 3
@@ -1289,16 +1289,16 @@ if __name__ == '__main__':
     # test_gplvm_aep_gaussian_scipy()
     # test_gplvm_aep_probit_scipy()
 
-    # test_gpr_aep_gaussian()
-    # test_gpr_aep_probit()
-    # test_gpr_aep_gaussian_scipy()
-    # test_gpr_aep_probit_scipy()
+    test_gpr_aep_gaussian()
+    test_gpr_aep_probit()
+    test_gpr_aep_gaussian_scipy()
+    test_gpr_aep_probit_scipy()
 
-    # test_dgpr_aep_gaussian()
-    # test_dgpr_aep_probit()
-    # test_dgpr_aep_gaussian_scipy()
-    # test_dgpr_aep_probit_scipy()
+    test_dgpr_aep_gaussian()
+    test_dgpr_aep_probit()
+    test_dgpr_aep_gaussian_scipy()
+    test_dgpr_aep_probit_scipy()
 
     # test_gpssm_aep_gaussian()
-    np.random.seed(42)
-    test_gpssm_aep_gaussian_kink()
+    # np.random.seed(42)
+    # test_gpssm_aep_gaussian_kink()
