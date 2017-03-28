@@ -13,22 +13,6 @@ def inverse_sigmoid(x):
     return np.log(x / (1 - x))
 
 
-def adam(func, init_params, callback=None, maxiter=1000,
-         step_size=0.001, b1=0.9, b2=0.999, eps=1e-8, args=None):
-    """Adam as described in http://arxiv.org/pdf/1412.6980.pdf."""
-    x = init_params
-    m = np.zeros_like(x)
-    v = np.zeros_like(x)
-    for i in range(maxiter):
-        f, g = func(x, *args)
-        m = (1 - b1) * g + b1 * m  # First  moment estimate.
-        v = (1 - b2) * (g**2) + b2 * v  # Second moment estimate.
-        mhat = m / (1 - b1**(i + 1))    # Bias correction.
-        vhat = v / (1 - b2**(i + 1))
-        x = x - step_size * mhat / (np.sqrt(vhat) + eps)
-    return x
-
-
 def make_batches(N_data, batch_size):
     return [slice(i, min(i + batch_size, N_data)) for i in range(0, N_data, batch_size)]
 

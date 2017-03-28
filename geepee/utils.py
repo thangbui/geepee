@@ -1,6 +1,13 @@
 import numpy as np
 import scipy.linalg as spla
+import __builtin__
 
+
+try:
+    profile = __builtin__.profile
+except AttributeError:
+    # No line profiler, provide a pass-through version
+    def profile(func): return func
 
 def chol2inv(chol):
     return spla.cho_solve((chol, False), np.eye(chol.shape[0]))
@@ -62,3 +69,23 @@ def unflatten_dict(params, params_args):
     for i, key in enumerate(sorted(keys)):
         params_dict[key] = np.reshape(vals[i], shapes[key])
     return params_dict
+
+
+def adam(func, init_params, callback=None, maxiter=1000,
+         step_size=0.001, b1=0.9, b2=0.999, eps=1e-8, args=None):
+    """Adam as described in http://arxiv.org/pdf/1412.6980.pdf."""
+    x = init_params
+    m = np.zeros_like(x)
+    v = np.zeros_like(x)
+    for i in range(maxiter):
+        f, g = func(x, *args)
+        if i % 100 == 0:
+            print 'iter %d \t obj %.3f' % (i, f)
+        if callback: callback(x, i, g)
+        m = (1 - b1) * g + b1 * m  # First  moment estimate.
+        v = (1 - b2) * (g**2) + b2 * v  # Second moment estimate.
+        mhat = m / (1 - b1**(i + 1))    # Bias correction.
+        vhat = v / (1 - b2**(i + 1))
+        x = x - step_size * mhat / (np.sqrt(vhat) + eps)
+    return x
+    

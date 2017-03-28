@@ -9,6 +9,7 @@ import time
 import pdb
 from scipy.cluster.vq import kmeans2
 import pprint
+from utils import profile
 
 pp = pprint.PrettyPrinter(indent=4)
 
@@ -85,7 +86,6 @@ class SGP_Layer(object):
             self.Suhat, self.muhat))
         return phi_cavity
 
-    # @profile
     def compute_phi(self, alpha=1.0):
         N = self.N
         scale_post = N * 1.0 / alpha - 1.0
@@ -228,7 +228,7 @@ class SGP_Layer(object):
 
         return grad_hyper, grad_input
 
-    # @profile
+    @profile
     def backprop_grads_reg(self, m, v, dm, dv, kfu, x, alpha=1.0):
         N = self.N
         M = self.M
@@ -637,7 +637,7 @@ class AEP_Model(object):
 
     def optimise(
         self, method='L-BFGS-B', tol=None, reinit_hypers=True, 
-        callback=None, maxiter=1000, alpha=0.5, adam_lr=0.05, **kargs):
+        callback=None, maxiter=1000, alpha=0.5, mb_size=None, adam_lr=0.001, **kargs):
         self.updated = False
 
         if reinit_hypers:
@@ -648,15 +648,18 @@ class AEP_Model(object):
         init_params_vec, params_args = flatten_dict(init_params_dict)
 
         N = self.N
-        idxs = np.arange(N)
-
         try:
             if method.lower() == 'adam':
+                # TODO: do replacement sampling for now since this is faster
+                # alternative would be
+                # idxs = np.random.permutation(N)[:mb_size]
+                idxs = np.random.randint(N, size=mb_size)
                 results = adam(objective_wrapper, init_params_vec,
                                step_size=adam_lr,
                                maxiter=maxiter,
                                args=(params_args, self, idxs, alpha))
             else:
+                idxs = np.arange(N)
                 options = {'maxiter': maxiter, 'disp': True, 'gtol': 1e-8}
                 results = minimize(
                     fun=objective_wrapper,
@@ -667,7 +670,6 @@ class AEP_Model(object):
                     tol=tol,
                     callback=callback,
                     options=options)
-
         except KeyboardInterrupt:
             print 'Caught KeyboardInterrupt ...'
             results = []
@@ -951,7 +953,7 @@ class SGPR(AEP_Model):
         else:
             raise NotImplementedError('likelihood not implemented')
 
-    # @profile
+    @profile
     def objective_function(self, params, idxs, alpha=1.0):
         N = self.N
         xb = self.x_train[idxs, :]
