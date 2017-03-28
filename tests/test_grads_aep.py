@@ -1284,20 +1284,20 @@ def test_gpssm_aep_tied_gaussian_kink():
 
 
 if __name__ == '__main__':
-    # test_gplvm_aep_gaussian()
-    # test_gplvm_aep_probit()
-    # test_gplvm_aep_gaussian_scipy()
-    # test_gplvm_aep_probit_scipy()
+    test_gplvm_aep_gaussian()
+    test_gplvm_aep_probit()
+    test_gplvm_aep_gaussian_scipy()
+    test_gplvm_aep_probit_scipy()
 
-    test_gpr_aep_gaussian()
-    test_gpr_aep_probit()
-    test_gpr_aep_gaussian_scipy()
-    test_gpr_aep_probit_scipy()
+    # test_gpr_aep_gaussian()
+    # test_gpr_aep_probit()
+    # test_gpr_aep_gaussian_scipy()
+    # test_gpr_aep_probit_scipy()
 
-    test_dgpr_aep_gaussian()
-    test_dgpr_aep_probit()
-    test_dgpr_aep_gaussian_scipy()
-    test_dgpr_aep_probit_scipy()
+    # test_dgpr_aep_gaussian()
+    # test_dgpr_aep_probit()
+    # test_dgpr_aep_gaussian_scipy()
+    # test_dgpr_aep_probit_scipy()
 
     # test_gpssm_aep_gaussian()
     # np.random.seed(42)

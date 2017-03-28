@@ -2,15 +2,23 @@ print "importing stuff..."
 import numpy as np
 import pdb
 import matplotlib.pylab as plt
-from .context import aep
 from scipy import special
 
+# from .context import aep
+
+import sys
+import os
+sys.path.insert(0, os.path.abspath(
+    os.path.join(os.path.dirname(__file__), '..')))
+import geepee.aep_models as aep
+
+np.random.seed(42)
 
 def run_cluster():
 	import GPy
 	# create dataset
 	print "creating dataset..."
-	N = 50
+	N = 100
 	k1 = GPy.kern.RBF(5, variance=1, lengthscale=1. /
 	                  np.random.dirichlet(np.r_[10, 10, 10, 0.1, 0.1]), ARD=True)
 	k2 = GPy.kern.RBF(5, variance=1, lengthscale=1. /
@@ -28,7 +36,7 @@ def run_cluster():
 
 	# inference
 	print "inference ..."
-	M = 20
+	M = 30
 	D = 5
 	lvm = aep.SGPLVM(Y, D, M, lik='Gaussian')
 
@@ -121,11 +129,7 @@ def run_mnist():
 
 
 def run_oil():
-
-	# data_path = '/Users/thangbui/Desktop/gplvm/tmp/data/'
-	# data_path = '../tmp/data/'
-	data_path = './tmp/data/'
-
+	data_path = '/scratch/tdb40/datasets/lvm/three_phase_oil_flow/'
 
 	def oil(data_set='oil'):
 	    """The three phase oil data from Bishop and James (1993)."""
@@ -389,6 +393,7 @@ def run_frey():
 
 if __name__ == '__main__':
 	run_cluster()
-	run_semicircle()
-	run_pinwheel()
-	run_xor()
+	# run_semicircle()
+	# run_pinwheel()
+	# run_xor()
+	# run_oil()

@@ -141,7 +141,7 @@ class SGP_Layer(object):
         vout = psi0 + Bpsi2 - mout**2
         return mout, vout
 
-    # @profile
+    @profile
     def backprop_grads_lvm(self, m, v, dm, dv, psi1, psi2, mx, vx, alpha=1.0):
         N = self.N
         M = self.M
@@ -713,6 +713,7 @@ class SGPLVM(AEP_Model):
         self.x_post_1 = np.zeros((N, Din))
         self.x_post_2 = np.zeros((N, Din))
 
+    @profile
     def objective_function(self, params, idxs, alpha=1.0):
         N = self.N
         yb = self.y_train[idxs, :]
