@@ -1237,6 +1237,338 @@ def test_dgpr_aep_probit():
                     % (d, j, grad_all[name][d][j], dR_id, (grad_all[name][d][j]-dR_id)/dR_id))
 
 
+def test_dgpr_aep_gaussian_stochastic():
+
+    # generate some datapoints for testing
+    N_train = 10
+    alpha = 1
+    M = 5
+    idxs = np.arange(N_train)[:M]
+    D = 2
+    Q = 3
+    y_train = np.random.randn(N_train, Q)
+    x_train = np.random.randn(N_train, D)
+    hidden_size = [3, 2]
+    # params  tied
+    model = aep.SDGPR(x_train, y_train, M, hidden_size, lik='Gaussian')
+
+    # init hypers, inducing points and q(u) params
+    init_params = model.init_hypers(y_train)
+    params = init_params.copy()
+    logZ, grad_all = model.objective_function(params, idxs, alpha=alpha)
+    # pp.pprint(logZ)
+    # pp.pprint(params)
+    # pdb.set_trace()
+
+    eps = 1e-5
+    # check grad ls
+    size = model.size
+    Ms = model.Ms
+    L = model.L
+    for i in range(L):
+        Din_i = size[i]
+        M_i = Ms[i]
+        Dout_i = size[i+1]
+        suffix = '_%d' % (i)
+        name = 'ls' + suffix
+        for d in range(Din_i):
+            params1 = copy.deepcopy(params)
+            params1[name][d] = params1[name][d] + eps
+            logZ1, grad1 = model.objective_function(
+                params1, idxs, alpha=alpha)
+
+            params2 = copy.deepcopy(params)
+            params2[name][d] = params2[name][d] - eps
+            logZ2, grad2 = model.objective_function(
+                params2, idxs, alpha=alpha)
+
+            dls_id = (logZ1 - logZ2) / eps / 2
+            # print logZ1, logZ2
+            print ('ls d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
+                % (d, grad_all[name][d], dls_id, (grad_all[name][d]-dls_id)/dls_id))
+
+        # check grad sf
+        name = 'sf' + suffix
+        params1 = copy.deepcopy(params)
+        params1[name] = params1[name] + eps
+        logZ1, grad1 = model.objective_function(
+            params1, idxs, alpha=alpha)
+        params2 = copy.deepcopy(params)
+        params2[name] = params2[name] - eps
+        logZ2, grad2 = model.objective_function(
+            params2, idxs, alpha=alpha)
+
+        dsf_i = (logZ1 - logZ2) / eps / 2
+        print ('sf computed=%.5f, numerical=%.5f, diff=%.5f' 
+            % (grad_all[name], dsf_i, (grad_all[name] - dsf_i) / dsf_i))
+
+        # check grad zu
+        name = 'zu' + suffix
+        for m in range(M_i):
+            for k in range(Din_i):
+                params1 = copy.deepcopy(params)
+                eps1 = 0.0 * params1[name]
+                eps1[m, k] = eps
+                params1[name] = params1[name] + eps1
+                logZ1, grad1 = model.objective_function(
+                    params1, idxs, alpha=alpha)
+                params2 = copy.deepcopy(params)
+                params2[name] = params2[name] - eps1
+                logZ2, grad2 = model.objective_function(
+                    params2, idxs, alpha=alpha)
+
+                dzu_id = (logZ1 - logZ2) / eps / 2
+                print ('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
+                    % (m, k, grad_all[name][m, k], dzu_id, (grad_all[name][m, k]-dzu_id)/dzu_id))
+
+        # check grad theta_1
+        name = 'eta1_R' + suffix
+        for d in range(Dout_i):
+            for j in range(M_i * (M_i + 1) / 2):
+                params1 = copy.deepcopy(params)
+                params1[name][d][j, ] = params1[name][d][j, ] + eps
+                logZ1, grad1 = model.objective_function(
+                    params1, idxs, alpha=alpha)
+                params2 = copy.deepcopy(params)
+                params2[name][d][j, ] = params2[name][d][j, ] - eps
+                logZ2, grad2 = model.objective_function(
+                    params2, idxs, alpha=alpha)
+
+                dR_id = (logZ1 - logZ2) / eps / 2
+                print ('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
+                    % (d, j, grad_all[name][d][j], dR_id, (grad_all[name][d][j]-dR_id)/dR_id))
+
+        # check grad theta_2
+        name = 'eta2' + suffix
+        for d in range(Dout_i):
+            for j in range(M_i):
+                params1 = copy.deepcopy(params)
+                params1[name][d][j, ] = params1[name][d][j, ] + eps
+                logZ1, grad1 = model.objective_function(
+                    params1, idxs, alpha=alpha)
+                params2 = copy.deepcopy(params)
+                params2[name][d][j, ] = params2[name][d][j, ] - eps
+                logZ2, grad2 = model.objective_function(
+                    params2, idxs, alpha=alpha)
+
+                dR_id = (logZ1 - logZ2) / eps / 2
+                print ('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
+                    % (d, j, grad_all[name][d][j], dR_id, (grad_all[name][d][j]-dR_id)/dR_id))
+
+    # check grad sn
+    params1 = copy.deepcopy(params)
+    params1['sn'] = params1['sn'] + eps
+    logZ1, grad1 = model.objective_function(
+        params1, idxs, alpha=alpha)
+    params2 = copy.deepcopy(params)
+    params2['sn'] = params2['sn'] - eps
+    logZ2, grad2 = model.objective_function(
+        params2, idxs, alpha=alpha)
+
+    dsn_i = (logZ1 - logZ2) / eps / 2
+    print ('sn computed=%.5f, numerical=%.5f, diff=%.5f' 
+        % (grad_all['sn'], dsn_i, (grad_all['sn'] - dsn_i) / dsn_i))
+
+
+def test_dgpr_aep_probit_stochastic():
+
+    # generate some datapoints for testing
+    N_train = 5
+    alpha = 1
+    M = 3
+    idxs = np.arange(N_train)[:M]
+    D = 2
+    Q = 3
+    hidden_size = [3, 2]
+    x_train = np.random.randn(N_train, D)
+    y_train = 2*np.random.randint(0, 2, size=(N_train, Q)) - 1
+    model = aep.SDGPR(x_train, y_train, M, hidden_size, lik='Probit')
+
+    # init hypers, inducing points and q(u) params
+    init_params = model.init_hypers(y_train)
+    params = init_params.copy()
+    logZ, grad_all = model.objective_function(params, idxs, alpha=alpha)
+    # pp.pprint(logZ)
+    # pp.pprint(params)
+
+    eps = 1e-5
+    # check grad ls
+    size = model.size
+    Ms = model.Ms
+    L = model.L
+    for i in range(L):
+        Din_i = size[i]
+        M_i = Ms[i]
+        Dout_i = size[i+1]
+        suffix = '_%d' % (i)
+        name = 'ls' + suffix
+        for d in range(Din_i):
+            params1 = copy.deepcopy(params)
+            params1[name][d] = params1[name][d] + eps
+            logZ1, grad1 = model.objective_function(
+                params1, idxs, alpha=alpha)
+
+            params2 = copy.deepcopy(params)
+            params2[name][d] = params2[name][d] - eps
+            logZ2, grad2 = model.objective_function(
+                params2, idxs, alpha=alpha)
+
+            dls_id = (logZ1 - logZ2) / eps / 2
+            # print logZ1, logZ2
+            print ('ls d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
+                % (d, grad_all[name][d], dls_id, (grad_all[name][d]-dls_id)/dls_id))
+
+        # check grad sf
+        name = 'sf' + suffix
+        params1 = copy.deepcopy(params)
+        params1[name] = params1[name] + eps
+        logZ1, grad1 = model.objective_function(
+            params1, idxs, alpha=alpha)
+        params2 = copy.deepcopy(params)
+        params2[name] = params2[name] - eps
+        logZ2, grad2 = model.objective_function(
+            params2, idxs, alpha=alpha)
+
+        dsf_i = (logZ1 - logZ2) / eps / 2
+        print ('sf computed=%.5f, numerical=%.5f, diff=%.5f' 
+            % (grad_all[name], dsf_i, (grad_all[name] - dsf_i) / dsf_i))
+
+        # check grad zu
+        name = 'zu' + suffix
+        for m in range(M_i):
+            for k in range(Din_i):
+                params1 = copy.deepcopy(params)
+                eps1 = 0.0 * params1[name]
+                eps1[m, k] = eps
+                params1[name] = params1[name] + eps1
+                logZ1, grad1 = model.objective_function(
+                    params1, idxs, alpha=alpha)
+                params2 = copy.deepcopy(params)
+                params2[name] = params2[name] - eps1
+                logZ2, grad2 = model.objective_function(
+                    params2, idxs, alpha=alpha)
+
+                dzu_id = (logZ1 - logZ2) / eps / 2
+                print ('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
+                    % (m, k, grad_all[name][m, k], dzu_id, (grad_all[name][m, k]-dzu_id)/dzu_id))
+
+        # check grad theta_1
+        name = 'eta1_R' + suffix
+        for d in range(Dout_i):
+            for j in range(M_i * (M_i + 1) / 2):
+                params1 = copy.deepcopy(params)
+                params1[name][d][j, ] = params1[name][d][j, ] + eps
+                logZ1, grad1 = model.objective_function(
+                    params1, idxs, alpha=alpha)
+                params2 = copy.deepcopy(params)
+                params2[name][d][j, ] = params2[name][d][j, ] - eps
+                logZ2, grad2 = model.objective_function(
+                    params2, idxs, alpha=alpha)
+
+                dR_id = (logZ1 - logZ2) / eps / 2
+                print ('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
+                    % (d, j, grad_all[name][d][j], dR_id, (grad_all[name][d][j]-dR_id)/dR_id))
+
+        # check grad theta_2
+        name = 'eta2' + suffix
+        for d in range(Dout_i):
+            for j in range(M_i):
+                params1 = copy.deepcopy(params)
+                params1[name][d][j, ] = params1[name][d][j, ] + eps
+                logZ1, grad1 = model.objective_function(
+                    params1, idxs, alpha=alpha)
+                params2 = copy.deepcopy(params)
+                params2[name][d][j, ] = params2[name][d][j, ] - eps
+                logZ2, grad2 = model.objective_function(
+                    params2, idxs, alpha=alpha)
+
+                dR_id = (logZ1 - logZ2) / eps / 2
+                print ('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
+                    % (d, j, grad_all[name][d][j], dR_id, (grad_all[name][d][j]-dR_id)/dR_id))
+
+
+def plot_dgpr_aep_gaussian_stochastic():
+
+    # generate some datapoints for testing
+    N_train = 2000
+    alpha = 0.5
+    M = 50
+    idxs = np.arange(N_train)
+    D = 2
+    Q = 3
+    y_train = np.random.randn(N_train, Q)
+    x_train = np.random.randn(N_train, D)
+    hidden_size = [3, 2]
+    model = aep.SDGPR(x_train, y_train, M, hidden_size, lik='Gaussian')
+
+    # init hypers, inducing points and q(u) params
+    params = model.init_hypers(y_train)
+    logZ, grad_all = model.objective_function(params, idxs, alpha=alpha)
+    mbs = np.logspace(-2, 0, 10)
+    reps = 20
+    times = np.zeros(len(mbs))
+    objs = np.zeros((len(mbs), reps))
+    for i, mb in enumerate(mbs):
+        no_points = int(N_train * mb)
+        start_time = time.time()
+        for k in range(reps):
+            idxs_ik = np.random.permutation(N_train)[:no_points]
+            objs[i, k] = model.objective_function(params, idxs_ik, alpha=alpha)[0]
+        times[i] = time.time() - start_time
+
+    f, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
+    ax1.plot(mbs, times, 'x-')
+    ax1.set_xlabel("Minibatch proportion")
+    ax1.set_ylabel("Time taken")
+
+    ax2.plot(mbs, objs, 'kx')
+    ax2.axhline(logZ, color='b')
+    ax2.set_xlabel("Minibatch proportion")
+    ax2.set_ylabel("ELBO estimates")
+    plt.savefig('/tmp/gaussian_stochastic_aep_dgpr.pdf')
+
+
+def plot_dgpr_aep_probit_stochastic():
+
+    # generate some datapoints for testing
+    N_train = 2000
+    alpha = 0.5
+    M = 50
+    D = 2
+    Q = 3
+    x_train = np.random.randn(N_train, D)
+    y_train = 2*np.random.randint(0, 2, size=(N_train, Q)) - 1
+    hidden_size = [3, 2]
+    model = aep.SDGPR(x_train, y_train, M, hidden_size, lik='Gaussian')
+
+    # init hypers, inducing points and q(u) params
+    params = model.init_hypers(y_train)
+    idxs = np.arange(N_train)
+    logZ, grad_all = model.objective_function(params, idxs, alpha=alpha)
+    mbs = np.logspace(-2, 0, 10)
+    reps = 20
+    times = np.zeros(len(mbs))
+    objs = np.zeros((len(mbs), reps))
+    for i, mb in enumerate(mbs):
+        no_points = int(N_train * mb)
+        start_time = time.time()
+        for k in range(reps):
+            idxs_ik = np.random.permutation(N_train)[:no_points]
+            objs[i, k] = model.objective_function(params, idxs_ik, alpha=alpha)[0]
+        times[i] = time.time() - start_time
+
+    f, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
+    ax1.plot(mbs, times, 'x-')
+    ax1.set_xlabel("Minibatch proportion")
+    ax1.set_ylabel("Time taken")
+
+    ax2.plot(mbs, objs, 'kx')
+    ax2.axhline(logZ, color='b')
+    ax2.set_xlabel("Minibatch proportion")
+    ax2.set_ylabel("ELBO estimates")
+    plt.savefig('/tmp/probit_stochastic_aep_dgpr.pdf')
+
+
 def test_dgpr_aep_gaussian_scipy():
     # generate some datapoints for testing
     N_train = 10
@@ -1614,13 +1946,18 @@ if __name__ == '__main__':
 
     # plot_gpr_aep_probit_stochastic()
     # plot_gpr_aep_gaussian_stochastic()
-    test_gpr_aep_probit_stochastic()
-    test_gpr_aep_gaussian_stochastic()
+    # test_gpr_aep_probit_stochastic()
+    # test_gpr_aep_gaussian_stochastic()
 
     # test_dgpr_aep_gaussian()
     # test_dgpr_aep_probit()
     # test_dgpr_aep_gaussian_scipy()
     # test_dgpr_aep_probit_scipy()
+
+    plot_dgpr_aep_probit_stochastic()
+    plot_dgpr_aep_gaussian_stochastic()
+    # test_dgpr_aep_probit_stochastic()
+    # test_dgpr_aep_gaussian_stochastic()
 
     # test_gpssm_aep_gaussian()
     # np.random.seed(42)

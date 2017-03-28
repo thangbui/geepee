@@ -133,7 +133,7 @@ def run_regression_1D_stoc():
 	model.optimise(method='adam', alpha=0.2, maxiter=100000, mb_size=3*M, adam_lr=0.001)
 	plot(model)
 	plt.show()
-	plt.savefig('/tmp/reg_1D_stoc.pdf')
+	plt.savefig('/tmp/aep_gpr_1D_stoc.pdf')
 
 
 def run_banana_stoc():
@@ -178,7 +178,7 @@ def run_banana_stoc():
 	model.optimise(method='adam', alpha=0.5, maxiter=100000, mb_size=3*M, adam_lr=0.005)
 	plot(model)
 	plt.show()
-	plt.savefig('/tmp/cla_probit_stoc.pdf')
+	plt.savefig('/tmp/aep_gpc_banana_stoc.pdf')
 
 
 def run_step_1D():
