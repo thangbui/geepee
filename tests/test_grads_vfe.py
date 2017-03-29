@@ -32,7 +32,6 @@ def test_gpr_vfe_gaussian():
     N_train = 5
     alpha = 0.5
     M = 4
-    idxs = np.arange(N_train)
     D = 2
     Q = 1
     y_train = np.random.randn(N_train, Q)
@@ -43,7 +42,7 @@ def test_gpr_vfe_gaussian():
     # init hypers, inducing points and q(u) params
     init_params = model.init_hypers()
     params = init_params.copy()
-    logZ, grad_all = model.objective_function(params, idxs, alpha=alpha)
+    logZ, grad_all = model.objective_function(params, None, alpha=alpha)
     pp.pprint(logZ)
     pp.pprint(params)
 
@@ -56,12 +55,12 @@ def test_gpr_vfe_gaussian():
         params1 = copy.deepcopy(params)
         params1['ls'][d] = params1['ls'][d] + eps
         logZ1, grad1 = model.objective_function(
-            params1, idxs, alpha=alpha)
+            params1, None, alpha=alpha)
 
         params2 = copy.deepcopy(params)
         params2['ls'][d] = params2['ls'][d] - eps
         logZ2, grad2 = model.objective_function(
-            params2, idxs, alpha=alpha)
+            params2, None, alpha=alpha)
 
         dls_id = (logZ1 - logZ2) / eps / 2
         # print logZ1, logZ2
@@ -72,11 +71,11 @@ def test_gpr_vfe_gaussian():
     params1 = copy.deepcopy(params)
     params1['sf'] = params1['sf'] + eps
     logZ1, grad1 = model.objective_function(
-        params1, idxs, alpha=alpha)
+        params1, None, alpha=alpha)
     params2 = copy.deepcopy(params)
     params2['sf'] = params2['sf'] - eps
     logZ2, grad2 = model.objective_function(
-        params2, idxs, alpha=alpha)
+        params2, None, alpha=alpha)
 
     dsf_i = (logZ1 - logZ2) / eps / 2
     print ('sf computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -86,11 +85,11 @@ def test_gpr_vfe_gaussian():
     params1 = copy.deepcopy(params)
     params1['sn'] = params1['sn'] + eps
     logZ1, grad1 = model.objective_function(
-        params1, idxs, alpha=alpha)
+        params1, None, alpha=alpha)
     params2 = copy.deepcopy(params)
     params2['sn'] = params2['sn'] - eps
     logZ2, grad2 = model.objective_function(
-        params2, idxs, alpha=alpha)
+        params2, None, alpha=alpha)
 
     dsn_i = (logZ1 - logZ2) / eps / 2
     print ('sn computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -107,11 +106,11 @@ def test_gpr_vfe_gaussian():
             eps1[m, k] = eps
             params1['zu'] = params1['zu'] + eps1
             logZ1, grad1 = model.objective_function(
-                params1, idxs, alpha=alpha)
+                params1, None, alpha=alpha)
             params2 = copy.deepcopy(params)
             params2['zu'] = params2['zu'] - eps1
             logZ2, grad2 = model.objective_function(
-                params2, idxs, alpha=alpha)
+                params2, None, alpha=alpha)
 
             dzu_id = (logZ1 - logZ2) / eps / 2
             print ('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -123,7 +122,6 @@ def test_gpr_vfe_gaussian_scipy():
     N_train = 5
     alpha = 0.5
     M = 4
-    idxs = np.arange(N_train)
     D = 2
     Q = 1
     x_train = np.random.randn(N_train, D)
@@ -137,13 +135,13 @@ def test_gpr_vfe_gaussian_scipy():
 
     params = init_params_dict.copy()
     logZ, grad_all = model.objective_function(
-        params, idxs, alpha=alpha)
+        params, None, alpha=alpha)
     pp.pprint(logZ)
 
-    logZ = objective(init_params_vec, params_args, model, idxs, alpha)
+    logZ = objective(init_params_vec, params_args, model, None, alpha)
     pp.pprint(logZ)
 
-    pp.pprint(check_grad(objective, gradient, init_params_vec, params_args, model, idxs, alpha))
+    pp.pprint(check_grad(objective, gradient, init_params_vec, params_args, model, None, alpha))
 
 if __name__ == '__main__':
     for i in range(10):

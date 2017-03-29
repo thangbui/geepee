@@ -1,8 +1,8 @@
 print "importing stuff..."
 import numpy as np
 import pdb
-import matplotlib
-matplotlib.use('Agg')
+# import matplotlib
+# matplotlib.use('Agg')
 import matplotlib.pylab as plt
 from scipy import special
 
@@ -118,7 +118,7 @@ def run_regression_1D_stoc():
 	M = 20
 	hidden_size = [2]
 	model = aep.SDGPR(X, Y, M, hidden_size, lik='Gaussian')
-	model.optimise(method='adam', alpha=1.0, maxiter=5000, mb_size=M, adam_lr=0.005)
+	model.optimise(method='adam', alpha=1.0, maxiter=50000, mb_size=M, adam_lr=0.001)
 	plot(model)
 	plt.show()
 	plt.savefig('/tmp/aep_dgpr_1D_stoc.pdf')
@@ -160,7 +160,7 @@ def run_banana_stoc():
 	hidden_size = [2]
 	model = aep.SDGPR(Xtrain, Ytrain, M, hidden_size, lik='Probit')
 	mb_size = int(Xtrain.shape[0]/4)
-	model.optimise(method='adam', alpha=1.0, maxiter=100000, mb_size=mb_size, adam_lr=0.01)
+	model.optimise(method='adam', alpha=1.0, maxiter=100000, mb_size=mb_size, adam_lr=0.001)
 	plot(model)
 	plt.show()
 	plt.savefig('/tmp/aep_dgpc_banana_stoc.pdf')

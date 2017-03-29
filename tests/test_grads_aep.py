@@ -37,7 +37,6 @@ def test_gplvm_aep_gaussian():
     N_train = 5
     alpha = 0.5
     M = 10
-    idxs = np.arange(N_train)
     D = 2
     Q = 3
     y_train = np.random.randn(N_train, Q)
@@ -49,7 +48,7 @@ def test_gplvm_aep_gaussian():
 
     params = init_params.copy()
     logZ, grad_all = lvm.objective_function(
-        params, idxs, alpha=alpha)
+        params, N_train, alpha=alpha)
     pp.pprint(logZ)
     pp.pprint(params)
     # pdb.set_trace()
@@ -61,12 +60,12 @@ def test_gplvm_aep_gaussian():
         params1 = copy.deepcopy(params)
         params1['ls'][d] = params1['ls'][d] + eps
         logZ1, grad1 = lvm.objective_function(
-            params1, idxs, alpha=alpha)
+            params1, N_train, alpha=alpha)
 
         params2 = copy.deepcopy(params)
         params2['ls'][d] = params2['ls'][d] - eps
         logZ2, grad2 = lvm.objective_function(
-            params2, idxs, alpha=alpha)
+            params2, N_train, alpha=alpha)
 
         dls_id = (logZ1 - logZ2) / eps / 2
         # print logZ1, logZ2
@@ -77,11 +76,11 @@ def test_gplvm_aep_gaussian():
     params1 = copy.deepcopy(params)
     params1['sf'] = params1['sf'] + eps
     logZ1, grad1 = lvm.objective_function(
-        params1, idxs, alpha=alpha)
+        params1, N_train, alpha=alpha)
     params2 = copy.deepcopy(params)
     params2['sf'] = params2['sf'] - eps
     logZ2, grad2 = lvm.objective_function(
-        params2, idxs, alpha=alpha)
+        params2, N_train, alpha=alpha)
 
     dsf_i = (logZ1 - logZ2) / eps / 2
     print ('sf computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -91,11 +90,11 @@ def test_gplvm_aep_gaussian():
     params1 = copy.deepcopy(params)
     params1['sn'] = params1['sn'] + eps
     logZ1, grad1 = lvm.objective_function(
-        params1, idxs, alpha=alpha)
+        params1, N_train, alpha=alpha)
     params2 = copy.deepcopy(params)
     params2['sn'] = params2['sn'] - eps
     logZ2, grad2 = lvm.objective_function(
-        params2, idxs, alpha=alpha)
+        params2, N_train, alpha=alpha)
 
     dsn_i = (logZ1 - logZ2) / eps / 2
     print ('sn computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -112,11 +111,11 @@ def test_gplvm_aep_gaussian():
             eps1[m, k] = eps
             params1['zu'] = params1['zu'] + eps1
             logZ1, grad1 = lvm.objective_function(
-                params1, idxs, alpha=alpha)
+                params1, N_train, alpha=alpha)
             params2 = copy.deepcopy(params)
             params2['zu'] = params2['zu'] - eps1
             logZ2, grad2 = lvm.objective_function(
-                params2, idxs, alpha=alpha)
+                params2, N_train, alpha=alpha)
 
             dzu_id = (logZ1 - logZ2) / eps / 2
             print ('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -128,11 +127,11 @@ def test_gplvm_aep_gaussian():
             params1 = copy.deepcopy(params)
             params1['eta1_R'][d][j, ] = params1['eta1_R'][d][j, ] + eps
             logZ1, grad1 = lvm.objective_function(
-                params1, idxs, alpha=alpha)
+                params1, N_train, alpha=alpha)
             params2 = copy.deepcopy(params)
             params2['eta1_R'][d][j, ] = params2['eta1_R'][d][j, ] - eps
             logZ2, grad2 = lvm.objective_function(
-                params2, idxs, alpha=alpha)
+                params2, N_train, alpha=alpha)
 
             dR_id = (logZ1 - logZ2) / eps / 2
             print ('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -144,11 +143,11 @@ def test_gplvm_aep_gaussian():
             params1 = copy.deepcopy(params)
             params1['eta2'][d][j, ] = params1['eta2'][d][j, ] + eps
             logZ1, grad1 = lvm.objective_function(
-                params1, idxs, alpha=alpha)
+                params1, N_train, alpha=alpha)
             params2 = copy.deepcopy(params)
             params2['eta2'][d][j, ] = params2['eta2'][d][j, ] - eps
             logZ2, grad2 = lvm.objective_function(
-                params2, idxs, alpha=alpha)
+                params2, N_train, alpha=alpha)
 
             dR_id = (logZ1 - logZ2) / eps / 2
             print ('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -161,11 +160,11 @@ def test_gplvm_aep_gaussian():
             params1 = copy.deepcopy(params)
             params1['x1'][n, d] = params1['x1'][n, d] + eps
             logZ1, grad1 = lvm.objective_function(
-                params1, idxs, alpha=alpha)
+                params1, N_train, alpha=alpha)
             params2 = copy.deepcopy(params)
             params2['x1'][n, d] = params2['x1'][n, d] - eps
             logZ2, grad2 = lvm.objective_function(
-                params2, idxs, alpha=alpha)
+                params2, N_train, alpha=alpha)
 
             dx1_nd = (logZ1 - logZ2) / eps / 2
             print ('x1 n=%d, d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -178,11 +177,11 @@ def test_gplvm_aep_gaussian():
             params1 = copy.deepcopy(params)
             params1['x2'][n, d] = params1['x2'][n, d] + eps
             logZ1, grad1 = lvm.objective_function(
-                params1, idxs, alpha=alpha)
+                params1, N_train, alpha=alpha)
             params2 = copy.deepcopy(params)
             params2['x2'][n, d] = params2['x2'][n, d] - eps
             logZ2, grad2 = lvm.objective_function(
-                params2, idxs, alpha=alpha)
+                params2, N_train, alpha=alpha)
 
             dx2_nd = (logZ1 - logZ2) / eps / 2
             print ('x2 n=%d, d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -195,7 +194,6 @@ def test_gplvm_aep_probit():
     N_train = 5
     alpha = 0.5
     M = 3
-    idxs = np.arange(N_train)
     D = 2
     Q = 3
     y_train = 2*np.random.randint(0, 2, size=(N_train, Q)) - 1
@@ -207,7 +205,7 @@ def test_gplvm_aep_probit():
 
     params = init_params.copy()
     logZ, grad_all = lvm.objective_function(
-        params, idxs, alpha=alpha)
+        params, N_train, alpha=alpha)
     pp.pprint(logZ)
 
     eps = 1e-5
@@ -217,12 +215,12 @@ def test_gplvm_aep_probit():
         params1 = copy.deepcopy(params)
         params1['ls'][d] = params1['ls'][d] + eps
         logZ1, grad1 = lvm.objective_function(
-            params1, idxs, alpha=alpha)
+            params1, N_train, alpha=alpha)
 
         params2 = copy.deepcopy(params)
         params2['ls'][d] = params2['ls'][d] - eps
         logZ2, grad2 = lvm.objective_function(
-            params2, idxs, alpha=alpha)
+            params2, N_train, alpha=alpha)
 
         dls_id = (logZ1 - logZ2) / eps / 2
         # print logZ1, logZ2
@@ -233,11 +231,11 @@ def test_gplvm_aep_probit():
     params1 = copy.deepcopy(params)
     params1['sf'] = params1['sf'] + eps
     logZ1, grad1 = lvm.objective_function(
-        params1, idxs, alpha=alpha)
+        params1, N_train, alpha=alpha)
     params2 = copy.deepcopy(params)
     params2['sf'] = params2['sf'] - eps
     logZ2, grad2 = lvm.objective_function(
-        params2, idxs, alpha=alpha)
+        params2, N_train, alpha=alpha)
 
     dsf_i = (logZ1 - logZ2) / eps / 2
     print ('sf computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -254,11 +252,11 @@ def test_gplvm_aep_probit():
             eps1[m, k] = eps
             params1['zu'] = params1['zu'] + eps1
             logZ1, grad1 = lvm.objective_function(
-                params1, idxs, alpha=alpha)
+                params1, N_train, alpha=alpha)
             params2 = copy.deepcopy(params)
             params2['zu'] = params2['zu'] - eps1
             logZ2, grad2 = lvm.objective_function(
-                params2, idxs, alpha=alpha)
+                params2, N_train, alpha=alpha)
 
             dzu_id = (logZ1 - logZ2) / eps / 2
             print ('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -270,11 +268,11 @@ def test_gplvm_aep_probit():
             params1 = copy.deepcopy(params)
             params1['eta1_R'][d][j, ] = params1['eta1_R'][d][j, ] + eps
             logZ1, grad1 = lvm.objective_function(
-                params1, idxs, alpha=alpha)
+                params1, N_train, alpha=alpha)
             params2 = copy.deepcopy(params)
             params2['eta1_R'][d][j, ] = params2['eta1_R'][d][j, ] - eps
             logZ2, grad2 = lvm.objective_function(
-                params2, idxs, alpha=alpha)
+                params2, N_train, alpha=alpha)
 
             dR_id = (logZ1 - logZ2) / eps / 2
             print ('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -286,11 +284,11 @@ def test_gplvm_aep_probit():
             params1 = copy.deepcopy(params)
             params1['eta2'][d][j, ] = params1['eta2'][d][j, ] + eps
             logZ1, grad1 = lvm.objective_function(
-                params1, idxs, alpha=alpha)
+                params1, N_train, alpha=alpha)
             params2 = copy.deepcopy(params)
             params2['eta2'][d][j, ] = params2['eta2'][d][j, ] - eps
             logZ2, grad2 = lvm.objective_function(
-                params2, idxs, alpha=alpha)
+                params2, N_train, alpha=alpha)
 
             dR_id = (logZ1 - logZ2) / eps / 2
             print ('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -303,11 +301,11 @@ def test_gplvm_aep_probit():
             params1 = copy.deepcopy(params)
             params1['x1'][n, d] = params1['x1'][n, d] + eps
             logZ1, grad1 = lvm.objective_function(
-                params1, idxs, alpha=alpha)
+                params1, N_train, alpha=alpha)
             params2 = copy.deepcopy(params)
             params2['x1'][n, d] = params2['x1'][n, d] - eps
             logZ2, grad2 = lvm.objective_function(
-                params2, idxs, alpha=alpha)
+                params2, N_train, alpha=alpha)
 
             dx1_nd = (logZ1 - logZ2) / eps / 2
             print ('x1 n=%d, d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -320,11 +318,11 @@ def test_gplvm_aep_probit():
             params1 = copy.deepcopy(params)
             params1['x2'][n, d] = params1['x2'][n, d] + eps
             logZ1, grad1 = lvm.objective_function(
-                params1, idxs, alpha=alpha)
+                params1, N_train, alpha=alpha)
             params2 = copy.deepcopy(params)
             params2['x2'][n, d] = params2['x2'][n, d] - eps
             logZ2, grad2 = lvm.objective_function(
-                params2, idxs, alpha=alpha)
+                params2, N_train, alpha=alpha)
 
             dx2_nd = (logZ1 - logZ2) / eps / 2
             print ('x2 n=%d, d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -336,7 +334,6 @@ def test_gplvm_aep_gaussian_scipy():
     N_train = 5
     alpha = 0.5
     M = 10
-    idxs = np.arange(N_train)
     D = 2
     Q = 3
     y_train = np.random.randn(N_train, Q)
@@ -349,13 +346,13 @@ def test_gplvm_aep_gaussian_scipy():
 
     params = init_params_dict.copy()
     logZ, grad_all = lvm.objective_function(
-        params, idxs, alpha=alpha)
+        params, N_train, alpha=alpha)
     pp.pprint(logZ)
 
-    logZ = objective(init_params_vec, params_args, lvm, idxs, alpha)
+    logZ = objective(init_params_vec, params_args, lvm, N_train, alpha)
     pp.pprint(logZ)
 
-    pp.pprint(check_grad(objective, gradient, init_params_vec, params_args, lvm, idxs, alpha))
+    pp.pprint(check_grad(objective, gradient, init_params_vec, params_args, lvm, N_train, alpha))
 
 
 def test_gplvm_aep_probit_scipy():
@@ -363,7 +360,6 @@ def test_gplvm_aep_probit_scipy():
     N_train = 5
     alpha = 0.5
     M = 10
-    idxs = np.arange(N_train)
     D = 2
     Q = 3
     y_train = 2*np.random.randint(0, 2, size=(N_train, Q)) - 1
@@ -376,13 +372,13 @@ def test_gplvm_aep_probit_scipy():
 
     params = init_params_dict.copy()
     logZ, grad_all = lvm.objective_function(
-        params, idxs, alpha=alpha)
+        params, N_train, alpha=alpha)
     pp.pprint(logZ)
 
-    logZ = objective(init_params_vec, params_args, lvm, idxs, alpha)
+    logZ = objective(init_params_vec, params_args, lvm, N_train, alpha)
     pp.pprint(logZ)
 
-    pp.pprint(check_grad(objective, gradient, init_params_vec, params_args, lvm, idxs, alpha))
+    pp.pprint(check_grad(objective, gradient, init_params_vec, params_args, lvm, N_train, alpha))
 
 
 def test_gpr_aep_gaussian():
@@ -391,7 +387,6 @@ def test_gpr_aep_gaussian():
     N_train = 20
     alpha = 0.5
     M = 10
-    idxs = np.arange(N_train)
     D = 2
     Q = 3
     y_train = np.random.randn(N_train, Q)
@@ -402,7 +397,7 @@ def test_gpr_aep_gaussian():
     # init hypers, inducing points and q(u) params
     init_params = model.init_hypers(y_train)
     params = init_params.copy()
-    logZ, grad_all = model.objective_function(params, idxs, alpha=alpha)
+    logZ, grad_all = model.objective_function(params, N_train, alpha=alpha)
     pp.pprint(logZ)
     pp.pprint(params)
     # pdb.set_trace()
@@ -414,12 +409,12 @@ def test_gpr_aep_gaussian():
         params1 = copy.deepcopy(params)
         params1['ls'][d] = params1['ls'][d] + eps
         logZ1, grad1 = model.objective_function(
-            params1, idxs, alpha=alpha)
+            params1, N_train, alpha=alpha)
 
         params2 = copy.deepcopy(params)
         params2['ls'][d] = params2['ls'][d] - eps
         logZ2, grad2 = model.objective_function(
-            params2, idxs, alpha=alpha)
+            params2, N_train, alpha=alpha)
 
         dls_id = (logZ1 - logZ2) / eps / 2
         # print logZ1, logZ2
@@ -430,11 +425,11 @@ def test_gpr_aep_gaussian():
     params1 = copy.deepcopy(params)
     params1['sf'] = params1['sf'] + eps
     logZ1, grad1 = model.objective_function(
-        params1, idxs, alpha=alpha)
+        params1, N_train, alpha=alpha)
     params2 = copy.deepcopy(params)
     params2['sf'] = params2['sf'] - eps
     logZ2, grad2 = model.objective_function(
-        params2, idxs, alpha=alpha)
+        params2, N_train, alpha=alpha)
 
     dsf_i = (logZ1 - logZ2) / eps / 2
     print ('sf computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -444,11 +439,11 @@ def test_gpr_aep_gaussian():
     params1 = copy.deepcopy(params)
     params1['sn'] = params1['sn'] + eps
     logZ1, grad1 = model.objective_function(
-        params1, idxs, alpha=alpha)
+        params1, N_train, alpha=alpha)
     params2 = copy.deepcopy(params)
     params2['sn'] = params2['sn'] - eps
     logZ2, grad2 = model.objective_function(
-        params2, idxs, alpha=alpha)
+        params2, N_train, alpha=alpha)
 
     dsn_i = (logZ1 - logZ2) / eps / 2
     print ('sn computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -465,11 +460,11 @@ def test_gpr_aep_gaussian():
             eps1[m, k] = eps
             params1['zu'] = params1['zu'] + eps1
             logZ1, grad1 = model.objective_function(
-                params1, idxs, alpha=alpha)
+                params1, N_train, alpha=alpha)
             params2 = copy.deepcopy(params)
             params2['zu'] = params2['zu'] - eps1
             logZ2, grad2 = model.objective_function(
-                params2, idxs, alpha=alpha)
+                params2, N_train, alpha=alpha)
 
             dzu_id = (logZ1 - logZ2) / eps / 2
             print ('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -481,11 +476,11 @@ def test_gpr_aep_gaussian():
             params1 = copy.deepcopy(params)
             params1['eta1_R'][d][j, ] = params1['eta1_R'][d][j, ] + eps
             logZ1, grad1 = model.objective_function(
-                params1, idxs, alpha=alpha)
+                params1, N_train, alpha=alpha)
             params2 = copy.deepcopy(params)
             params2['eta1_R'][d][j, ] = params2['eta1_R'][d][j, ] - eps
             logZ2, grad2 = model.objective_function(
-                params2, idxs, alpha=alpha)
+                params2, N_train, alpha=alpha)
 
             dR_id = (logZ1 - logZ2) / eps / 2
             print ('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -497,11 +492,11 @@ def test_gpr_aep_gaussian():
             params1 = copy.deepcopy(params)
             params1['eta2'][d][j, ] = params1['eta2'][d][j, ] + eps
             logZ1, grad1 = model.objective_function(
-                params1, idxs, alpha=alpha)
+                params1, N_train, alpha=alpha)
             params2 = copy.deepcopy(params)
             params2['eta2'][d][j, ] = params2['eta2'][d][j, ] - eps
             logZ2, grad2 = model.objective_function(
-                params2, idxs, alpha=alpha)
+                params2, N_train, alpha=alpha)
 
             dR_id = (logZ1 - logZ2) / eps / 2
             print ('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -514,7 +509,6 @@ def test_gpr_aep_probit():
     N_train = 5
     alpha = 0.5
     M = 3
-    idxs = np.arange(N_train)
     D = 2
     Q = 3
     x_train = np.random.randn(N_train, D)
@@ -525,7 +519,7 @@ def test_gpr_aep_probit():
     # init hypers, inducing points and q(u) params
     init_params = model.init_hypers(y_train)
     params = init_params.copy()
-    logZ, grad_all = model.objective_function(params, idxs, alpha=alpha)
+    logZ, grad_all = model.objective_function(params, N_train, alpha=alpha)
     pp.pprint(logZ)
     pp.pprint(params)
     # pdb.set_trace()
@@ -537,12 +531,12 @@ def test_gpr_aep_probit():
         params1 = copy.deepcopy(params)
         params1['ls'][d] = params1['ls'][d] + eps
         logZ1, grad1 = model.objective_function(
-            params1, idxs, alpha=alpha)
+            params1, N_train, alpha=alpha)
 
         params2 = copy.deepcopy(params)
         params2['ls'][d] = params2['ls'][d] - eps
         logZ2, grad2 = model.objective_function(
-            params2, idxs, alpha=alpha)
+            params2, N_train, alpha=alpha)
 
         dls_id = (logZ1 - logZ2) / eps / 2
         # print logZ1, logZ2
@@ -553,11 +547,11 @@ def test_gpr_aep_probit():
     params1 = copy.deepcopy(params)
     params1['sf'] = params1['sf'] + eps
     logZ1, grad1 = model.objective_function(
-        params1, idxs, alpha=alpha)
+        params1, N_train, alpha=alpha)
     params2 = copy.deepcopy(params)
     params2['sf'] = params2['sf'] - eps
     logZ2, grad2 = model.objective_function(
-        params2, idxs, alpha=alpha)
+        params2, N_train, alpha=alpha)
 
     dsf_i = (logZ1 - logZ2) / eps / 2
     print ('sf computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -574,11 +568,11 @@ def test_gpr_aep_probit():
             eps1[m, k] = eps
             params1['zu'] = params1['zu'] + eps1
             logZ1, grad1 = model.objective_function(
-                params1, idxs, alpha=alpha)
+                params1, N_train, alpha=alpha)
             params2 = copy.deepcopy(params)
             params2['zu'] = params2['zu'] - eps1
             logZ2, grad2 = model.objective_function(
-                params2, idxs, alpha=alpha)
+                params2, N_train, alpha=alpha)
 
             dzu_id = (logZ1 - logZ2) / eps / 2
             print ('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -590,11 +584,11 @@ def test_gpr_aep_probit():
             params1 = copy.deepcopy(params)
             params1['eta1_R'][d][j, ] = params1['eta1_R'][d][j, ] + eps
             logZ1, grad1 = model.objective_function(
-                params1, idxs, alpha=alpha)
+                params1, N_train, alpha=alpha)
             params2 = copy.deepcopy(params)
             params2['eta1_R'][d][j, ] = params2['eta1_R'][d][j, ] - eps
             logZ2, grad2 = model.objective_function(
-                params2, idxs, alpha=alpha)
+                params2, N_train, alpha=alpha)
 
             dR_id = (logZ1 - logZ2) / eps / 2
             print ('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -606,11 +600,11 @@ def test_gpr_aep_probit():
             params1 = copy.deepcopy(params)
             params1['eta2'][d][j, ] = params1['eta2'][d][j, ] + eps
             logZ1, grad1 = model.objective_function(
-                params1, idxs, alpha=alpha)
+                params1, N_train, alpha=alpha)
             params2 = copy.deepcopy(params)
             params2['eta2'][d][j, ] = params2['eta2'][d][j, ] - eps
             logZ2, grad2 = model.objective_function(
-                params2, idxs, alpha=alpha)
+                params2, N_train, alpha=alpha)
 
             dR_id = (logZ1 - logZ2) / eps / 2
             print ('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -623,9 +617,9 @@ def test_gpr_aep_gaussian_stochastic():
     N_train = 20
     alpha = 0.5
     M = 10
-    idxs = np.arange(N_train)[:M]
     D = 2
     Q = 3
+    mb_size = M
     y_train = np.random.randn(N_train, Q)
     x_train = np.random.randn(N_train, D)
     # params  tied
@@ -634,7 +628,8 @@ def test_gpr_aep_gaussian_stochastic():
     # init hypers, inducing points and q(u) params
     init_params = model.init_hypers(y_train)
     params = init_params.copy()
-    logZ, grad_all = model.objective_function(params, idxs, alpha=alpha)
+    np.random.seed(0)
+    logZ, grad_all = model.objective_function(params, mb_size, alpha=alpha)
     pp.pprint(logZ)
     pp.pprint(params)
     # pdb.set_trace()
@@ -645,13 +640,15 @@ def test_gpr_aep_gaussian_stochastic():
     for d in range(Din_i):
         params1 = copy.deepcopy(params)
         params1['ls'][d] = params1['ls'][d] + eps
+        np.random.seed(0)
         logZ1, grad1 = model.objective_function(
-            params1, idxs, alpha=alpha)
+            params1, mb_size, alpha=alpha)
 
         params2 = copy.deepcopy(params)
         params2['ls'][d] = params2['ls'][d] - eps
+        np.random.seed(0)
         logZ2, grad2 = model.objective_function(
-            params2, idxs, alpha=alpha)
+            params2, mb_size, alpha=alpha)
 
         dls_id = (logZ1 - logZ2) / eps / 2
         # print logZ1, logZ2
@@ -661,12 +658,14 @@ def test_gpr_aep_gaussian_stochastic():
     # check grad sf
     params1 = copy.deepcopy(params)
     params1['sf'] = params1['sf'] + eps
+    np.random.seed(0)
     logZ1, grad1 = model.objective_function(
-        params1, idxs, alpha=alpha)
+        params1, mb_size, alpha=alpha)
     params2 = copy.deepcopy(params)
     params2['sf'] = params2['sf'] - eps
+    np.random.seed(0)
     logZ2, grad2 = model.objective_function(
-        params2, idxs, alpha=alpha)
+        params2, mb_size, alpha=alpha)
 
     dsf_i = (logZ1 - logZ2) / eps / 2
     print ('sf computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -675,12 +674,14 @@ def test_gpr_aep_gaussian_stochastic():
     # check grad sn
     params1 = copy.deepcopy(params)
     params1['sn'] = params1['sn'] + eps
+    np.random.seed(0)
     logZ1, grad1 = model.objective_function(
-        params1, idxs, alpha=alpha)
+        params1, mb_size, alpha=alpha)
     params2 = copy.deepcopy(params)
     params2['sn'] = params2['sn'] - eps
+    np.random.seed(0)
     logZ2, grad2 = model.objective_function(
-        params2, idxs, alpha=alpha)
+        params2, mb_size, alpha=alpha)
 
     dsn_i = (logZ1 - logZ2) / eps / 2
     print ('sn computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -696,12 +697,14 @@ def test_gpr_aep_gaussian_stochastic():
             eps1 = 0.0 * params1['zu']
             eps1[m, k] = eps
             params1['zu'] = params1['zu'] + eps1
+            np.random.seed(0)
             logZ1, grad1 = model.objective_function(
-                params1, idxs, alpha=alpha)
+                params1, mb_size, alpha=alpha)
             params2 = copy.deepcopy(params)
             params2['zu'] = params2['zu'] - eps1
+            np.random.seed(0)
             logZ2, grad2 = model.objective_function(
-                params2, idxs, alpha=alpha)
+                params2, mb_size, alpha=alpha)
 
             dzu_id = (logZ1 - logZ2) / eps / 2
             print ('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -712,12 +715,14 @@ def test_gpr_aep_gaussian_stochastic():
         for j in range(M_i * (M_i + 1) / 2):
             params1 = copy.deepcopy(params)
             params1['eta1_R'][d][j, ] = params1['eta1_R'][d][j, ] + eps
+            np.random.seed(0)
             logZ1, grad1 = model.objective_function(
-                params1, idxs, alpha=alpha)
+                params1, mb_size, alpha=alpha)
             params2 = copy.deepcopy(params)
             params2['eta1_R'][d][j, ] = params2['eta1_R'][d][j, ] - eps
+            np.random.seed(0)
             logZ2, grad2 = model.objective_function(
-                params2, idxs, alpha=alpha)
+                params2, mb_size, alpha=alpha)
 
             dR_id = (logZ1 - logZ2) / eps / 2
             print ('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -728,12 +733,14 @@ def test_gpr_aep_gaussian_stochastic():
         for j in range(M_i):
             params1 = copy.deepcopy(params)
             params1['eta2'][d][j, ] = params1['eta2'][d][j, ] + eps
+            np.random.seed(0)
             logZ1, grad1 = model.objective_function(
-                params1, idxs, alpha=alpha)
+                params1, mb_size, alpha=alpha)
             params2 = copy.deepcopy(params)
             params2['eta2'][d][j, ] = params2['eta2'][d][j, ] - eps
+            np.random.seed(0)
             logZ2, grad2 = model.objective_function(
-                params2, idxs, alpha=alpha)
+                params2, mb_size, alpha=alpha)
 
             dR_id = (logZ1 - logZ2) / eps / 2
             print ('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -746,7 +753,7 @@ def test_gpr_aep_probit_stochastic():
     N_train = 5
     alpha = 0.5
     M = 3
-    idxs = np.arange(N_train)[:M]
+    mb_size = M
     D = 2
     Q = 3
     x_train = np.random.randn(N_train, D)
@@ -757,7 +764,8 @@ def test_gpr_aep_probit_stochastic():
     # init hypers, inducing points and q(u) params
     init_params = model.init_hypers(y_train)
     params = init_params.copy()
-    logZ, grad_all = model.objective_function(params, idxs, alpha=alpha)
+    np.random.seed(0)
+    logZ, grad_all = model.objective_function(params, mb_size, alpha=alpha)
     pp.pprint(logZ)
     pp.pprint(params)
     # pdb.set_trace()
@@ -768,13 +776,15 @@ def test_gpr_aep_probit_stochastic():
     for d in range(Din_i):
         params1 = copy.deepcopy(params)
         params1['ls'][d] = params1['ls'][d] + eps
+        np.random.seed(0)
         logZ1, grad1 = model.objective_function(
-            params1, idxs, alpha=alpha)
+            params1, mb_size, alpha=alpha)
 
         params2 = copy.deepcopy(params)
         params2['ls'][d] = params2['ls'][d] - eps
+        np.random.seed(0)
         logZ2, grad2 = model.objective_function(
-            params2, idxs, alpha=alpha)
+            params2, mb_size, alpha=alpha)
 
         dls_id = (logZ1 - logZ2) / eps / 2
         # print logZ1, logZ2
@@ -784,12 +794,14 @@ def test_gpr_aep_probit_stochastic():
     # check grad sf
     params1 = copy.deepcopy(params)
     params1['sf'] = params1['sf'] + eps
+    np.random.seed(0)
     logZ1, grad1 = model.objective_function(
-        params1, idxs, alpha=alpha)
+        params1, mb_size, alpha=alpha)
     params2 = copy.deepcopy(params)
     params2['sf'] = params2['sf'] - eps
+    np.random.seed(0)
     logZ2, grad2 = model.objective_function(
-        params2, idxs, alpha=alpha)
+        params2, mb_size, alpha=alpha)
 
     dsf_i = (logZ1 - logZ2) / eps / 2
     print ('sf computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -805,12 +817,14 @@ def test_gpr_aep_probit_stochastic():
             eps1 = 0.0 * params1['zu']
             eps1[m, k] = eps
             params1['zu'] = params1['zu'] + eps1
+            np.random.seed(0)
             logZ1, grad1 = model.objective_function(
-                params1, idxs, alpha=alpha)
+                params1, mb_size, alpha=alpha)
             params2 = copy.deepcopy(params)
             params2['zu'] = params2['zu'] - eps1
+            np.random.seed(0)
             logZ2, grad2 = model.objective_function(
-                params2, idxs, alpha=alpha)
+                params2, mb_size, alpha=alpha)
 
             dzu_id = (logZ1 - logZ2) / eps / 2
             print ('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -821,12 +835,14 @@ def test_gpr_aep_probit_stochastic():
         for j in range(M_i * (M_i + 1) / 2):
             params1 = copy.deepcopy(params)
             params1['eta1_R'][d][j, ] = params1['eta1_R'][d][j, ] + eps
+            np.random.seed(0)
             logZ1, grad1 = model.objective_function(
-                params1, idxs, alpha=alpha)
+                params1, mb_size, alpha=alpha)
             params2 = copy.deepcopy(params)
             params2['eta1_R'][d][j, ] = params2['eta1_R'][d][j, ] - eps
+            np.random.seed(0)
             logZ2, grad2 = model.objective_function(
-                params2, idxs, alpha=alpha)
+                params2, mb_size, alpha=alpha)
 
             dR_id = (logZ1 - logZ2) / eps / 2
             print ('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -837,12 +853,14 @@ def test_gpr_aep_probit_stochastic():
         for j in range(M_i):
             params1 = copy.deepcopy(params)
             params1['eta2'][d][j, ] = params1['eta2'][d][j, ] + eps
+            np.random.seed(0)
             logZ1, grad1 = model.objective_function(
-                params1, idxs, alpha=alpha)
+                params1, mb_size, alpha=alpha)
             params2 = copy.deepcopy(params)
             params2['eta2'][d][j, ] = params2['eta2'][d][j, ] - eps
+            np.random.seed(0)
             logZ2, grad2 = model.objective_function(
-                params2, idxs, alpha=alpha)
+                params2, mb_size, alpha=alpha)
 
             dR_id = (logZ1 - logZ2) / eps / 2
             print ('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -855,7 +873,6 @@ def plot_gpr_aep_gaussian_stochastic():
     N_train = 2000
     alpha = 0.5
     M = 50
-    idxs = np.arange(N_train)
     D = 2
     Q = 3
     y_train = np.random.randn(N_train, Q)
@@ -865,7 +882,7 @@ def plot_gpr_aep_gaussian_stochastic():
 
     # init hypers, inducing points and q(u) params
     params = model.init_hypers(y_train)
-    logZ, grad_all = model.objective_function(params, idxs, alpha=alpha)
+    logZ, grad_all = model.objective_function(params, N_train, alpha=alpha)
     mbs = np.logspace(-2, 0, 10)
     reps = 20
     times = np.zeros(len(mbs))
@@ -874,19 +891,20 @@ def plot_gpr_aep_gaussian_stochastic():
         no_points = int(N_train * mb)
         start_time = time.time()
         for k in range(reps):
-            idxs_ik = np.random.permutation(N_train)[:no_points]
-            objs[i, k] = model.objective_function(params, idxs_ik, alpha=alpha)[0]
+            objs[i, k] = model.objective_function(params, no_points, alpha=alpha)[0]
         times[i] = time.time() - start_time
 
     f, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
     ax1.plot(mbs, times, 'x-')
     ax1.set_xlabel("Minibatch proportion")
     ax1.set_ylabel("Time taken")
+    ax1.set_xscale("log", nonposx='clip')
 
     ax2.plot(mbs, objs, 'kx')
     ax2.axhline(logZ, color='b')
     ax2.set_xlabel("Minibatch proportion")
     ax2.set_ylabel("ELBO estimates")
+    ax2.set_xscale("log", nonposx='clip')
     plt.savefig('/tmp/gaussian_stochastic_aep_gpr.pdf')
 
 
@@ -905,8 +923,7 @@ def plot_gpr_aep_probit_stochastic():
 
     # init hypers, inducing points and q(u) params
     params = model.init_hypers(y_train)
-    idxs = np.arange(N_train)
-    logZ, grad_all = model.objective_function(params, idxs, alpha=alpha)
+    logZ, grad_all = model.objective_function(params, N_train, alpha=alpha)
     mbs = np.logspace(-2, 0, 10)
     reps = 20
     times = np.zeros(len(mbs))
@@ -915,8 +932,7 @@ def plot_gpr_aep_probit_stochastic():
         no_points = int(N_train * mb)
         start_time = time.time()
         for k in range(reps):
-            idxs_ik = np.random.permutation(N_train)[:no_points]
-            objs[i, k] = model.objective_function(params, idxs_ik, alpha=alpha)[0]
+            objs[i, k] = model.objective_function(params, no_points, alpha=alpha)[0]
         times[i] = time.time() - start_time
 
     f, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
@@ -936,7 +952,6 @@ def test_gpr_aep_gaussian_scipy():
     N_train = 20
     alpha = 0.5
     M = 10
-    idxs = np.arange(N_train)
     D = 2
     Q = 3
     x_train = np.random.randn(N_train, D)
@@ -950,13 +965,13 @@ def test_gpr_aep_gaussian_scipy():
 
     params = init_params_dict.copy()
     logZ, grad_all = model.objective_function(
-        params, idxs, alpha=alpha)
+        params, N_train, alpha=alpha)
     pp.pprint(logZ)
 
-    logZ = objective(init_params_vec, params_args, model, idxs, alpha)
+    logZ = objective(init_params_vec, params_args, model, N_train, alpha)
     pp.pprint(logZ)
 
-    pp.pprint(check_grad(objective, gradient, init_params_vec, params_args, model, idxs, alpha))
+    pp.pprint(check_grad(objective, gradient, init_params_vec, params_args, model, N_train, alpha))
 
 
 def test_gpr_aep_probit_scipy():
@@ -964,7 +979,6 @@ def test_gpr_aep_probit_scipy():
     N_train = 10
     alpha = 0.5
     M = 5
-    idxs = np.arange(N_train)
     D = 2
     Q = 3
     x_train = np.random.randn(N_train, D)
@@ -978,13 +992,13 @@ def test_gpr_aep_probit_scipy():
 
     params = init_params_dict.copy()
     logZ, grad_all = model.objective_function(
-        params, idxs, alpha=alpha)
+        params, N_train, alpha=alpha)
     pp.pprint(logZ)
 
-    logZ = objective(init_params_vec, params_args, model, idxs, alpha)
+    logZ = objective(init_params_vec, params_args, model, N_train, alpha)
     pp.pprint(logZ)
 
-    pp.pprint(check_grad(objective, gradient, init_params_vec, params_args, model, idxs, alpha))
+    pp.pprint(check_grad(objective, gradient, init_params_vec, params_args, model, N_train, alpha))
 
 
 def test_dgpr_aep_gaussian():
@@ -993,7 +1007,6 @@ def test_dgpr_aep_gaussian():
     N_train = 10
     alpha = 1
     M = 5
-    idxs = np.arange(N_train)
     D = 2
     Q = 3
     y_train = np.random.randn(N_train, Q)
@@ -1005,7 +1018,7 @@ def test_dgpr_aep_gaussian():
     # init hypers, inducing points and q(u) params
     init_params = model.init_hypers(y_train)
     params = init_params.copy()
-    logZ, grad_all = model.objective_function(params, idxs, alpha=alpha)
+    logZ, grad_all = model.objective_function(params, N_train, alpha=alpha)
     # pp.pprint(logZ)
     # pp.pprint(params)
     # pdb.set_trace()
@@ -1025,12 +1038,12 @@ def test_dgpr_aep_gaussian():
             params1 = copy.deepcopy(params)
             params1[name][d] = params1[name][d] + eps
             logZ1, grad1 = model.objective_function(
-                params1, idxs, alpha=alpha)
+                params1, N_train, alpha=alpha)
 
             params2 = copy.deepcopy(params)
             params2[name][d] = params2[name][d] - eps
             logZ2, grad2 = model.objective_function(
-                params2, idxs, alpha=alpha)
+                params2, N_train, alpha=alpha)
 
             dls_id = (logZ1 - logZ2) / eps / 2
             # print logZ1, logZ2
@@ -1042,11 +1055,11 @@ def test_dgpr_aep_gaussian():
         params1 = copy.deepcopy(params)
         params1[name] = params1[name] + eps
         logZ1, grad1 = model.objective_function(
-            params1, idxs, alpha=alpha)
+            params1, N_train, alpha=alpha)
         params2 = copy.deepcopy(params)
         params2[name] = params2[name] - eps
         logZ2, grad2 = model.objective_function(
-            params2, idxs, alpha=alpha)
+            params2, N_train, alpha=alpha)
 
         dsf_i = (logZ1 - logZ2) / eps / 2
         print ('sf computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -1061,11 +1074,11 @@ def test_dgpr_aep_gaussian():
                 eps1[m, k] = eps
                 params1[name] = params1[name] + eps1
                 logZ1, grad1 = model.objective_function(
-                    params1, idxs, alpha=alpha)
+                    params1, N_train, alpha=alpha)
                 params2 = copy.deepcopy(params)
                 params2[name] = params2[name] - eps1
                 logZ2, grad2 = model.objective_function(
-                    params2, idxs, alpha=alpha)
+                    params2, N_train, alpha=alpha)
 
                 dzu_id = (logZ1 - logZ2) / eps / 2
                 print ('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -1078,11 +1091,11 @@ def test_dgpr_aep_gaussian():
                 params1 = copy.deepcopy(params)
                 params1[name][d][j, ] = params1[name][d][j, ] + eps
                 logZ1, grad1 = model.objective_function(
-                    params1, idxs, alpha=alpha)
+                    params1, N_train, alpha=alpha)
                 params2 = copy.deepcopy(params)
                 params2[name][d][j, ] = params2[name][d][j, ] - eps
                 logZ2, grad2 = model.objective_function(
-                    params2, idxs, alpha=alpha)
+                    params2, N_train, alpha=alpha)
 
                 dR_id = (logZ1 - logZ2) / eps / 2
                 print ('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -1095,11 +1108,11 @@ def test_dgpr_aep_gaussian():
                 params1 = copy.deepcopy(params)
                 params1[name][d][j, ] = params1[name][d][j, ] + eps
                 logZ1, grad1 = model.objective_function(
-                    params1, idxs, alpha=alpha)
+                    params1, N_train, alpha=alpha)
                 params2 = copy.deepcopy(params)
                 params2[name][d][j, ] = params2[name][d][j, ] - eps
                 logZ2, grad2 = model.objective_function(
-                    params2, idxs, alpha=alpha)
+                    params2, N_train, alpha=alpha)
 
                 dR_id = (logZ1 - logZ2) / eps / 2
                 print ('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -1109,11 +1122,11 @@ def test_dgpr_aep_gaussian():
     params1 = copy.deepcopy(params)
     params1['sn'] = params1['sn'] + eps
     logZ1, grad1 = model.objective_function(
-        params1, idxs, alpha=alpha)
+        params1, N_train, alpha=alpha)
     params2 = copy.deepcopy(params)
     params2['sn'] = params2['sn'] - eps
     logZ2, grad2 = model.objective_function(
-        params2, idxs, alpha=alpha)
+        params2, N_train, alpha=alpha)
 
     dsn_i = (logZ1 - logZ2) / eps / 2
     print ('sn computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -1126,7 +1139,6 @@ def test_dgpr_aep_probit():
     N_train = 5
     alpha = 1
     M = 3
-    idxs = np.arange(N_train)
     D = 2
     Q = 3
     hidden_size = [3, 2]
@@ -1137,7 +1149,7 @@ def test_dgpr_aep_probit():
     # init hypers, inducing points and q(u) params
     init_params = model.init_hypers(y_train)
     params = init_params.copy()
-    logZ, grad_all = model.objective_function(params, idxs, alpha=alpha)
+    logZ, grad_all = model.objective_function(params, N_train, alpha=alpha)
     # pp.pprint(logZ)
     # pp.pprint(params)
 
@@ -1156,12 +1168,12 @@ def test_dgpr_aep_probit():
             params1 = copy.deepcopy(params)
             params1[name][d] = params1[name][d] + eps
             logZ1, grad1 = model.objective_function(
-                params1, idxs, alpha=alpha)
+                params1, N_train, alpha=alpha)
 
             params2 = copy.deepcopy(params)
             params2[name][d] = params2[name][d] - eps
             logZ2, grad2 = model.objective_function(
-                params2, idxs, alpha=alpha)
+                params2, N_train, alpha=alpha)
 
             dls_id = (logZ1 - logZ2) / eps / 2
             # print logZ1, logZ2
@@ -1173,11 +1185,11 @@ def test_dgpr_aep_probit():
         params1 = copy.deepcopy(params)
         params1[name] = params1[name] + eps
         logZ1, grad1 = model.objective_function(
-            params1, idxs, alpha=alpha)
+            params1, N_train, alpha=alpha)
         params2 = copy.deepcopy(params)
         params2[name] = params2[name] - eps
         logZ2, grad2 = model.objective_function(
-            params2, idxs, alpha=alpha)
+            params2, N_train, alpha=alpha)
 
         dsf_i = (logZ1 - logZ2) / eps / 2
         print ('sf computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -1192,11 +1204,11 @@ def test_dgpr_aep_probit():
                 eps1[m, k] = eps
                 params1[name] = params1[name] + eps1
                 logZ1, grad1 = model.objective_function(
-                    params1, idxs, alpha=alpha)
+                    params1, N_train, alpha=alpha)
                 params2 = copy.deepcopy(params)
                 params2[name] = params2[name] - eps1
                 logZ2, grad2 = model.objective_function(
-                    params2, idxs, alpha=alpha)
+                    params2, N_train, alpha=alpha)
 
                 dzu_id = (logZ1 - logZ2) / eps / 2
                 print ('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -1209,11 +1221,11 @@ def test_dgpr_aep_probit():
                 params1 = copy.deepcopy(params)
                 params1[name][d][j, ] = params1[name][d][j, ] + eps
                 logZ1, grad1 = model.objective_function(
-                    params1, idxs, alpha=alpha)
+                    params1, N_train, alpha=alpha)
                 params2 = copy.deepcopy(params)
                 params2[name][d][j, ] = params2[name][d][j, ] - eps
                 logZ2, grad2 = model.objective_function(
-                    params2, idxs, alpha=alpha)
+                    params2, N_train, alpha=alpha)
 
                 dR_id = (logZ1 - logZ2) / eps / 2
                 print ('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -1226,11 +1238,11 @@ def test_dgpr_aep_probit():
                 params1 = copy.deepcopy(params)
                 params1[name][d][j, ] = params1[name][d][j, ] + eps
                 logZ1, grad1 = model.objective_function(
-                    params1, idxs, alpha=alpha)
+                    params1, N_train, alpha=alpha)
                 params2 = copy.deepcopy(params)
                 params2[name][d][j, ] = params2[name][d][j, ] - eps
                 logZ2, grad2 = model.objective_function(
-                    params2, idxs, alpha=alpha)
+                    params2, N_train, alpha=alpha)
 
                 dR_id = (logZ1 - logZ2) / eps / 2
                 print ('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -1243,7 +1255,7 @@ def test_dgpr_aep_gaussian_stochastic():
     N_train = 10
     alpha = 1
     M = 5
-    idxs = np.arange(N_train)[:M]
+    mb_size = M
     D = 2
     Q = 3
     y_train = np.random.randn(N_train, Q)
@@ -1255,7 +1267,8 @@ def test_dgpr_aep_gaussian_stochastic():
     # init hypers, inducing points and q(u) params
     init_params = model.init_hypers(y_train)
     params = init_params.copy()
-    logZ, grad_all = model.objective_function(params, idxs, alpha=alpha)
+    np.random.seed(0)
+    logZ, grad_all = model.objective_function(params, mb_size, alpha=alpha)
     # pp.pprint(logZ)
     # pp.pprint(params)
     # pdb.set_trace()
@@ -1274,13 +1287,15 @@ def test_dgpr_aep_gaussian_stochastic():
         for d in range(Din_i):
             params1 = copy.deepcopy(params)
             params1[name][d] = params1[name][d] + eps
+            np.random.seed(0)
             logZ1, grad1 = model.objective_function(
-                params1, idxs, alpha=alpha)
+                params1, mb_size, alpha=alpha)
 
             params2 = copy.deepcopy(params)
             params2[name][d] = params2[name][d] - eps
+            np.random.seed(0)
             logZ2, grad2 = model.objective_function(
-                params2, idxs, alpha=alpha)
+                params2, mb_size, alpha=alpha)
 
             dls_id = (logZ1 - logZ2) / eps / 2
             # print logZ1, logZ2
@@ -1291,12 +1306,14 @@ def test_dgpr_aep_gaussian_stochastic():
         name = 'sf' + suffix
         params1 = copy.deepcopy(params)
         params1[name] = params1[name] + eps
+        np.random.seed(0)
         logZ1, grad1 = model.objective_function(
-            params1, idxs, alpha=alpha)
+            params1, mb_size, alpha=alpha)
         params2 = copy.deepcopy(params)
         params2[name] = params2[name] - eps
+        np.random.seed(0)
         logZ2, grad2 = model.objective_function(
-            params2, idxs, alpha=alpha)
+            params2, mb_size, alpha=alpha)
 
         dsf_i = (logZ1 - logZ2) / eps / 2
         print ('sf computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -1310,12 +1327,14 @@ def test_dgpr_aep_gaussian_stochastic():
                 eps1 = 0.0 * params1[name]
                 eps1[m, k] = eps
                 params1[name] = params1[name] + eps1
+                np.random.seed(0)
                 logZ1, grad1 = model.objective_function(
-                    params1, idxs, alpha=alpha)
+                    params1, mb_size, alpha=alpha)
                 params2 = copy.deepcopy(params)
                 params2[name] = params2[name] - eps1
+                np.random.seed(0)
                 logZ2, grad2 = model.objective_function(
-                    params2, idxs, alpha=alpha)
+                    params2, mb_size, alpha=alpha)
 
                 dzu_id = (logZ1 - logZ2) / eps / 2
                 print ('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -1327,12 +1346,14 @@ def test_dgpr_aep_gaussian_stochastic():
             for j in range(M_i * (M_i + 1) / 2):
                 params1 = copy.deepcopy(params)
                 params1[name][d][j, ] = params1[name][d][j, ] + eps
+                np.random.seed(0)
                 logZ1, grad1 = model.objective_function(
-                    params1, idxs, alpha=alpha)
+                    params1, mb_size, alpha=alpha)
                 params2 = copy.deepcopy(params)
                 params2[name][d][j, ] = params2[name][d][j, ] - eps
+                np.random.seed(0)
                 logZ2, grad2 = model.objective_function(
-                    params2, idxs, alpha=alpha)
+                    params2, mb_size, alpha=alpha)
 
                 dR_id = (logZ1 - logZ2) / eps / 2
                 print ('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -1344,12 +1365,14 @@ def test_dgpr_aep_gaussian_stochastic():
             for j in range(M_i):
                 params1 = copy.deepcopy(params)
                 params1[name][d][j, ] = params1[name][d][j, ] + eps
+                np.random.seed(0)
                 logZ1, grad1 = model.objective_function(
-                    params1, idxs, alpha=alpha)
+                    params1, mb_size, alpha=alpha)
                 params2 = copy.deepcopy(params)
                 params2[name][d][j, ] = params2[name][d][j, ] - eps
+                np.random.seed(0)
                 logZ2, grad2 = model.objective_function(
-                    params2, idxs, alpha=alpha)
+                    params2, mb_size, alpha=alpha)
 
                 dR_id = (logZ1 - logZ2) / eps / 2
                 print ('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -1358,12 +1381,14 @@ def test_dgpr_aep_gaussian_stochastic():
     # check grad sn
     params1 = copy.deepcopy(params)
     params1['sn'] = params1['sn'] + eps
+    np.random.seed(0)
     logZ1, grad1 = model.objective_function(
-        params1, idxs, alpha=alpha)
+        params1, mb_size, alpha=alpha)
     params2 = copy.deepcopy(params)
     params2['sn'] = params2['sn'] - eps
+    np.random.seed(0)
     logZ2, grad2 = model.objective_function(
-        params2, idxs, alpha=alpha)
+        params2, mb_size, alpha=alpha)
 
     dsn_i = (logZ1 - logZ2) / eps / 2
     print ('sn computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -1376,7 +1401,7 @@ def test_dgpr_aep_probit_stochastic():
     N_train = 5
     alpha = 1
     M = 3
-    idxs = np.arange(N_train)[:M]
+    mb_size = M
     D = 2
     Q = 3
     hidden_size = [3, 2]
@@ -1387,7 +1412,8 @@ def test_dgpr_aep_probit_stochastic():
     # init hypers, inducing points and q(u) params
     init_params = model.init_hypers(y_train)
     params = init_params.copy()
-    logZ, grad_all = model.objective_function(params, idxs, alpha=alpha)
+    np.random.seed(0)
+    logZ, grad_all = model.objective_function(params, mb_size, alpha=alpha)
     # pp.pprint(logZ)
     # pp.pprint(params)
 
@@ -1405,13 +1431,15 @@ def test_dgpr_aep_probit_stochastic():
         for d in range(Din_i):
             params1 = copy.deepcopy(params)
             params1[name][d] = params1[name][d] + eps
+            np.random.seed(0)
             logZ1, grad1 = model.objective_function(
-                params1, idxs, alpha=alpha)
+                params1, mb_size, alpha=alpha)
 
             params2 = copy.deepcopy(params)
             params2[name][d] = params2[name][d] - eps
+            np.random.seed(0)
             logZ2, grad2 = model.objective_function(
-                params2, idxs, alpha=alpha)
+                params2, mb_size, alpha=alpha)
 
             dls_id = (logZ1 - logZ2) / eps / 2
             # print logZ1, logZ2
@@ -1422,12 +1450,14 @@ def test_dgpr_aep_probit_stochastic():
         name = 'sf' + suffix
         params1 = copy.deepcopy(params)
         params1[name] = params1[name] + eps
+        np.random.seed(0)
         logZ1, grad1 = model.objective_function(
-            params1, idxs, alpha=alpha)
+            params1, mb_size, alpha=alpha)
         params2 = copy.deepcopy(params)
         params2[name] = params2[name] - eps
+        np.random.seed(0)
         logZ2, grad2 = model.objective_function(
-            params2, idxs, alpha=alpha)
+            params2, mb_size, alpha=alpha)
 
         dsf_i = (logZ1 - logZ2) / eps / 2
         print ('sf computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -1441,12 +1471,14 @@ def test_dgpr_aep_probit_stochastic():
                 eps1 = 0.0 * params1[name]
                 eps1[m, k] = eps
                 params1[name] = params1[name] + eps1
+                np.random.seed(0)
                 logZ1, grad1 = model.objective_function(
-                    params1, idxs, alpha=alpha)
+                    params1, mb_size, alpha=alpha)
                 params2 = copy.deepcopy(params)
                 params2[name] = params2[name] - eps1
+                np.random.seed(0)
                 logZ2, grad2 = model.objective_function(
-                    params2, idxs, alpha=alpha)
+                    params2, mb_size, alpha=alpha)
 
                 dzu_id = (logZ1 - logZ2) / eps / 2
                 print ('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -1458,12 +1490,14 @@ def test_dgpr_aep_probit_stochastic():
             for j in range(M_i * (M_i + 1) / 2):
                 params1 = copy.deepcopy(params)
                 params1[name][d][j, ] = params1[name][d][j, ] + eps
+                np.random.seed(0)
                 logZ1, grad1 = model.objective_function(
-                    params1, idxs, alpha=alpha)
+                    params1, mb_size, alpha=alpha)
                 params2 = copy.deepcopy(params)
                 params2[name][d][j, ] = params2[name][d][j, ] - eps
+                np.random.seed(0)
                 logZ2, grad2 = model.objective_function(
-                    params2, idxs, alpha=alpha)
+                    params2, mb_size, alpha=alpha)
 
                 dR_id = (logZ1 - logZ2) / eps / 2
                 print ('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -1475,12 +1509,14 @@ def test_dgpr_aep_probit_stochastic():
             for j in range(M_i):
                 params1 = copy.deepcopy(params)
                 params1[name][d][j, ] = params1[name][d][j, ] + eps
+                np.random.seed(0)
                 logZ1, grad1 = model.objective_function(
-                    params1, idxs, alpha=alpha)
+                    params1, mb_size, alpha=alpha)
                 params2 = copy.deepcopy(params)
                 params2[name][d][j, ] = params2[name][d][j, ] - eps
+                np.random.seed(0)
                 logZ2, grad2 = model.objective_function(
-                    params2, idxs, alpha=alpha)
+                    params2, mb_size, alpha=alpha)
 
                 dR_id = (logZ1 - logZ2) / eps / 2
                 print ('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -1492,7 +1528,6 @@ def plot_dgpr_aep_gaussian_stochastic():
     # generate some datapoints for testing
     N_train = 2000
     M = 50
-    idxs = np.arange(N_train)
     D = 2
     Q = 3
     y_train = np.random.randn(N_train, Q)
@@ -1502,7 +1537,7 @@ def plot_dgpr_aep_gaussian_stochastic():
 
     # init hypers, inducing points and q(u) params
     params = model.init_hypers(y_train)
-    logZ, grad_all = model.objective_function(params, idxs, alpha=1.0)
+    logZ, grad_all = model.objective_function(params, N_train, alpha=1.0)
     mbs = np.logspace(-2, 0, 10)
     reps = 20
     times = np.zeros(len(mbs))
@@ -1511,8 +1546,7 @@ def plot_dgpr_aep_gaussian_stochastic():
         no_points = int(N_train * mb)
         start_time = time.time()
         for k in range(reps):
-            idxs_ik = np.random.permutation(N_train)[:no_points]
-            objs[i, k] = model.objective_function(params, idxs_ik, alpha=1.0)[0]
+            objs[i, k] = model.objective_function(params, no_points, alpha=1.0)[0]
         times[i] = time.time() - start_time
 
     f, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
@@ -1543,8 +1577,7 @@ def plot_dgpr_aep_probit_stochastic():
 
     # init hypers, inducing points and q(u) params
     params = model.init_hypers(y_train)
-    idxs = np.arange(N_train)
-    logZ, grad_all = model.objective_function(params, idxs, alpha=1.0)
+    logZ, grad_all = model.objective_function(params, N_train, alpha=1.0)
     mbs = np.logspace(-2, 0, 10)
     reps = 20
     times = np.zeros(len(mbs))
@@ -1553,8 +1586,7 @@ def plot_dgpr_aep_probit_stochastic():
         no_points = int(N_train * mb)
         start_time = time.time()
         for k in range(reps):
-            idxs_ik = np.random.permutation(N_train)[:no_points]
-            objs[i, k] = model.objective_function(params, idxs_ik, alpha=1.0)[0]
+            objs[i, k] = model.objective_function(params, no_points, alpha=1.0)[0]
         times[i] = time.time() - start_time
 
     f, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
@@ -1576,7 +1608,6 @@ def test_dgpr_aep_gaussian_scipy():
     N_train = 10
     alpha = 1
     M = 5
-    idxs = np.arange(N_train)
     D = 2
     Q = 3
     hidden_size = [3, 2]
@@ -1592,13 +1623,13 @@ def test_dgpr_aep_gaussian_scipy():
 
     params = init_params_dict.copy()
     logZ, grad_all = model.objective_function(
-        params, idxs, alpha=alpha)
+        params, N_train, alpha=alpha)
     pp.pprint(logZ)
 
-    logZ = objective(init_params_vec, params_args, model, idxs, alpha)
+    logZ = objective(init_params_vec, params_args, model, N_train, alpha)
     pp.pprint(logZ)
 
-    pp.pprint(check_grad(objective, gradient, init_params_vec, params_args, model, idxs, alpha))
+    pp.pprint(check_grad(objective, gradient, init_params_vec, params_args, model, N_train, alpha))
 
 
 def test_dgpr_aep_probit_scipy():
@@ -1606,7 +1637,6 @@ def test_dgpr_aep_probit_scipy():
     N_train = 10
     alpha = 1
     M = 5
-    idxs = np.arange(N_train)
     D = 2
     Q = 3
     hidden_size = [3, 2]
@@ -1621,13 +1651,13 @@ def test_dgpr_aep_probit_scipy():
 
     params = init_params_dict.copy()
     logZ, grad_all = model.objective_function(
-        params, idxs, alpha=alpha)
+        params, N_train, alpha=alpha)
     pp.pprint(logZ)
 
-    logZ = objective(init_params_vec, params_args, model, idxs, alpha)
+    logZ = objective(init_params_vec, params_args, model, N_train, alpha)
     pp.pprint(logZ)
 
-    pp.pprint(check_grad(objective, gradient, init_params_vec, params_args, model, idxs, alpha))
+    pp.pprint(check_grad(objective, gradient, init_params_vec, params_args, model, N_train, alpha))
 
 
 def test_gpssm_aep_gaussian():
@@ -1642,11 +1672,11 @@ def test_gpssm_aep_gaussian():
     lvm = aep.SGPSSM(y_train, Q, M, lik='Gaussian')
 
     # init hypers, inducing points and q(u) params
-    idxs = np.arange(N_train)
+    
     init_params = lvm.init_hypers(y_train)
     params = init_params.copy()
     logZ, grad_all = lvm.objective_function(
-        params, idxs, alpha=alpha)
+        params, N_train, alpha=alpha)
     pp.pprint(logZ)
     pp.pprint(params)
     # pdb.set_trace()
@@ -1658,12 +1688,12 @@ def test_gpssm_aep_gaussian():
         params1 = copy.deepcopy(params)
         params1['ls'][d] = params1['ls'][d] + eps
         logZ1, grad1 = lvm.objective_function(
-            params1, idxs, alpha=alpha)
+            params1, N_train, alpha=alpha)
 
         params2 = copy.deepcopy(params)
         params2['ls'][d] = params2['ls'][d] - eps
         logZ2, grad2 = lvm.objective_function(
-            params2, idxs, alpha=alpha)
+            params2, N_train, alpha=alpha)
 
         dls_id = (logZ1 - logZ2) / eps / 2
         # print logZ1, logZ2
@@ -1674,11 +1704,11 @@ def test_gpssm_aep_gaussian():
     params1 = copy.deepcopy(params)
     params1['sf'] = params1['sf'] + eps
     logZ1, grad1 = lvm.objective_function(
-        params1, idxs, alpha=alpha)
+        params1, N_train, alpha=alpha)
     params2 = copy.deepcopy(params)
     params2['sf'] = params2['sf'] - eps
     logZ2, grad2 = lvm.objective_function(
-        params2, idxs, alpha=alpha)
+        params2, N_train, alpha=alpha)
 
     dsf_i = (logZ1 - logZ2) / eps / 2
     print ('sf computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -1688,11 +1718,11 @@ def test_gpssm_aep_gaussian():
     params1 = copy.deepcopy(params)
     params1['sn'] = params1['sn'] + eps
     logZ1, grad1 = lvm.objective_function(
-        params1, idxs, alpha=alpha)
+        params1, N_train, alpha=alpha)
     params2 = copy.deepcopy(params)
     params2['sn'] = params2['sn'] - eps
     logZ2, grad2 = lvm.objective_function(
-        params2, idxs, alpha=alpha)
+        params2, N_train, alpha=alpha)
 
     dsn_i = (logZ1 - logZ2) / eps / 2
     print ('sn computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -1706,11 +1736,11 @@ def test_gpssm_aep_gaussian():
             eps1[m, k] = eps
             params1['zu'] = params1['zu'] + eps1
             logZ1, grad1 = lvm.objective_function(
-                params1, idxs, alpha=alpha)
+                params1, N_train, alpha=alpha)
             params2 = copy.deepcopy(params)
             params2['zu'] = params2['zu'] - eps1
             logZ2, grad2 = lvm.objective_function(
-                params2, idxs, alpha=alpha)
+                params2, N_train, alpha=alpha)
 
             dzu_id = (logZ1 - logZ2) / eps / 2
             print ('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -1725,11 +1755,11 @@ def test_gpssm_aep_gaussian():
                 params1 = copy.deepcopy(params)
                 params1[key][n, d] = params1[key][n, d] + eps
                 logZ1, grad1 = lvm.objective_function(
-                    params1, idxs, alpha=alpha)
+                    params1, N_train, alpha=alpha)
                 params2 = copy.deepcopy(params)
                 params2[key][n, d] = params2[key][n, d] - eps
                 logZ2, grad2 = lvm.objective_function(
-                    params2, idxs, alpha=alpha)
+                    params2, N_train, alpha=alpha)
 
                 dx1_nd = (logZ1 - logZ2) / eps / 2
                 print ('%s n=%d, d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -1741,11 +1771,11 @@ def test_gpssm_aep_gaussian():
             params1 = copy.deepcopy(params)
             params1['C'][d, q] = params1['C'][d, q] + eps
             logZ1, grad1 = lvm.objective_function(
-                params1, idxs, alpha=alpha)
+                params1, N_train, alpha=alpha)
             params2 = copy.deepcopy(params)
             params2['C'][d, q] = params2['C'][d, q] - eps
             logZ2, grad2 = lvm.objective_function(
-                params2, idxs, alpha=alpha)
+                params2, N_train, alpha=alpha)
 
             dx1_nd = (logZ1 - logZ2) / eps / 2
             print ('C d=%d, q=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -1756,18 +1786,18 @@ def test_gpssm_aep_gaussian():
         params1 = copy.deepcopy(params)
         params1['R'][d] = params1['R'][d] + eps
         logZ1, grad1 = lvm.objective_function(
-            params1, idxs, alpha=alpha)
+            params1, N_train, alpha=alpha)
         params2 = copy.deepcopy(params)
         params2['R'][d] = params2['R'][d] - eps
         logZ2, grad2 = lvm.objective_function(
-            params2, idxs, alpha=alpha)
+            params2, N_train, alpha=alpha)
 
         dx1_nd = (logZ1 - logZ2) / eps / 2
         print ('R d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
             % (d, grad_all['R'][d], dx1_nd, (grad_all['R'][d] - dx1_nd) / dx1_nd))
 
 
-def test_gpssm_aep_tied_gaussian_kink():
+def test_gpssm_aep_gaussian_kink():
 
     def kink_true(x):
         fx = np.zeros(x.shape)
@@ -1810,11 +1840,10 @@ def test_gpssm_aep_tied_gaussian_kink():
     lvm = aep.SGPSSM(y_train, Q, M, lik='Gaussian')
 
     # init hypers, inducing points and q(u) params
-    idxs = np.arange(N_train)
     init_params = lvm.init_hypers(y_train)
     params = init_params.copy()
     logZ, grad_all = lvm.objective_function(
-        params, idxs, alpha=alpha)
+        params, N_train, alpha=alpha)
     pp.pprint(logZ)
     pp.pprint(params)
     # pdb.set_trace()
@@ -1826,12 +1855,12 @@ def test_gpssm_aep_tied_gaussian_kink():
         params1 = copy.deepcopy(params)
         params1['ls'][d] = params1['ls'][d] + eps
         logZ1, grad1 = lvm.objective_function(
-            params1, idxs, alpha=alpha)
+            params1, N_train, alpha=alpha)
 
         params2 = copy.deepcopy(params)
         params2['ls'][d] = params2['ls'][d] - eps
         logZ2, grad2 = lvm.objective_function(
-            params2, idxs, alpha=alpha)
+            params2, N_train, alpha=alpha)
 
         dls_id = (logZ1 - logZ2) / eps / 2
         # print logZ1, logZ2
@@ -1842,11 +1871,11 @@ def test_gpssm_aep_tied_gaussian_kink():
     params1 = copy.deepcopy(params)
     params1['sf'] = params1['sf'] + eps
     logZ1, grad1 = lvm.objective_function(
-        params1, idxs, alpha=alpha)
+        params1, N_train, alpha=alpha)
     params2 = copy.deepcopy(params)
     params2['sf'] = params2['sf'] - eps
     logZ2, grad2 = lvm.objective_function(
-        params2, idxs, alpha=alpha)
+        params2, N_train, alpha=alpha)
 
     dsf_i = (logZ1 - logZ2) / eps / 2
     print ('sf computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -1856,11 +1885,11 @@ def test_gpssm_aep_tied_gaussian_kink():
     params1 = copy.deepcopy(params)
     params1['sn'] = params1['sn'] + eps
     logZ1, grad1 = lvm.objective_function(
-        params1, idxs, alpha=alpha)
+        params1, N_train, alpha=alpha)
     params2 = copy.deepcopy(params)
     params2['sn'] = params2['sn'] - eps
     logZ2, grad2 = lvm.objective_function(
-        params2, idxs, alpha=alpha)
+        params2, N_train, alpha=alpha)
 
     dsn_i = (logZ1 - logZ2) / eps / 2
     print ('sn computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -1874,11 +1903,11 @@ def test_gpssm_aep_tied_gaussian_kink():
             eps1[m, k] = eps
             params1['zu'] = params1['zu'] + eps1
             logZ1, grad1 = lvm.objective_function(
-                params1, idxs, alpha=alpha)
+                params1, N_train, alpha=alpha)
             params2 = copy.deepcopy(params)
             params2['zu'] = params2['zu'] - eps1
             logZ2, grad2 = lvm.objective_function(
-                params2, idxs, alpha=alpha)
+                params2, N_train, alpha=alpha)
 
             dzu_id = (logZ1 - logZ2) / eps / 2
             print ('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -1893,11 +1922,11 @@ def test_gpssm_aep_tied_gaussian_kink():
                 params1 = copy.deepcopy(params)
                 params1[key][n, d] = params1[key][n, d] + eps
                 logZ1, grad1 = lvm.objective_function(
-                    params1, idxs, alpha=alpha)
+                    params1, N_train, alpha=alpha)
                 params2 = copy.deepcopy(params)
                 params2[key][n, d] = params2[key][n, d] - eps
                 logZ2, grad2 = lvm.objective_function(
-                    params2, idxs, alpha=alpha)
+                    params2, N_train, alpha=alpha)
 
                 dx1_nd = (logZ1 - logZ2) / eps / 2
                 print ('%s n=%d, d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -1909,11 +1938,11 @@ def test_gpssm_aep_tied_gaussian_kink():
             params1 = copy.deepcopy(params)
             params1['C'][d, q] = params1['C'][d, q] + eps
             logZ1, grad1 = lvm.objective_function(
-                params1, idxs, alpha=alpha)
+                params1, N_train, alpha=alpha)
             params2 = copy.deepcopy(params)
             params2['C'][d, q] = params2['C'][d, q] - eps
             logZ2, grad2 = lvm.objective_function(
-                params2, idxs, alpha=alpha)
+                params2, N_train, alpha=alpha)
 
             dx1_nd = (logZ1 - logZ2) / eps / 2
             print ('C d=%d, q=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -1924,11 +1953,11 @@ def test_gpssm_aep_tied_gaussian_kink():
         params1 = copy.deepcopy(params)
         params1['R'][d] = params1['R'][d] + eps
         logZ1, grad1 = lvm.objective_function(
-            params1, idxs, alpha=alpha)
+            params1, N_train, alpha=alpha)
         params2 = copy.deepcopy(params)
         params2['R'][d] = params2['R'][d] - eps
         logZ2, grad2 = lvm.objective_function(
-            params2, idxs, alpha=alpha)
+            params2, N_train, alpha=alpha)
 
         dx1_nd = (logZ1 - logZ2) / eps / 2
         print ('R d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
@@ -1946,10 +1975,10 @@ if __name__ == '__main__':
     # test_gpr_aep_gaussian_scipy()
     # test_gpr_aep_probit_scipy()
 
-    # plot_gpr_aep_probit_stochastic()
-    # plot_gpr_aep_gaussian_stochastic()
-    # test_gpr_aep_probit_stochastic()
-    # test_gpr_aep_gaussian_stochastic()
+    plot_gpr_aep_probit_stochastic()
+    plot_gpr_aep_gaussian_stochastic()
+    test_gpr_aep_probit_stochastic()
+    test_gpr_aep_gaussian_stochastic()
 
     # test_dgpr_aep_gaussian()
     # test_dgpr_aep_probit()
@@ -1958,9 +1987,9 @@ if __name__ == '__main__':
 
     plot_dgpr_aep_probit_stochastic()
     plot_dgpr_aep_gaussian_stochastic()
-    # test_dgpr_aep_probit_stochastic()
-    # test_dgpr_aep_gaussian_stochastic()
+    test_dgpr_aep_probit_stochastic()
+    test_dgpr_aep_gaussian_stochastic()
 
     # test_gpssm_aep_gaussian()
     # np.random.seed(42)
-    # test_gpssm_aep_gaussian_kink()
+    test_gpssm_aep_gaussian_kink()

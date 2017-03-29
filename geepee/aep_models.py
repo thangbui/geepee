@@ -16,10 +16,12 @@ pp = pprint.PrettyPrinter(indent=4)
 from utils import *
 from kernels import *
 
-
-# ideally these should be moved to some config file
+# TODO: ideally these should be moved to some config file
 jitter = 1e-5
 gh_degree = 10
+# TODO: do replacement sampling for now since this is faster
+# alternative would be
+# idxs = np.random.permutation(N)[:mb_size]
 
 
 class SGP_Layer(object):
@@ -647,24 +649,20 @@ class AEP_Model(object):
 
         init_params_vec, params_args = flatten_dict(init_params_dict)
 
-        N = self.N
+        if mb_size is None:
+            mb_size = self.N
         try:
             if method.lower() == 'adam':
-                # TODO: do replacement sampling for now since this is faster
-                # alternative would be
-                # idxs = np.random.permutation(N)[:mb_size]
-                idxs = np.random.randint(N, size=mb_size)
                 results = adam(objective_wrapper, init_params_vec,
                                step_size=adam_lr,
                                maxiter=maxiter,
-                               args=(params_args, self, idxs, alpha))
+                               args=(params_args, self, mb_size, alpha))
             else:
-                idxs = np.arange(N)
                 options = {'maxiter': maxiter, 'disp': True, 'gtol': 1e-8}
                 results = minimize(
                     fun=objective_wrapper,
                     x0=init_params_vec,
-                    args=(params_args, self, idxs, alpha),
+                    args=(params_args, self, self.N, alpha),
                     method=method,
                     jac=True,
                     tol=tol,
@@ -716,9 +714,14 @@ class SGPLVM(AEP_Model):
         self.x_post_2 = np.zeros((N, Din))
 
     @profile
-    def objective_function(self, params, idxs, alpha=1.0):
+    def objective_function(self, params, mb_size, alpha=1.0):
         N = self.N
-        yb = self.y_train[idxs, :]
+        if mb_size == N:
+            idxs = np.arange(N)
+            yb = self.y_train
+        else:
+            idxs = np.random.randint(0, N, size=mb_size)
+            yb = self.y_train[idxs, :]
         batch_size = yb.shape[0]
         scale_logZ = - N * 1.0 / batch_size / alpha
         scale_poste = N * 1.0 / alpha - 1.0
@@ -954,10 +957,15 @@ class SGPR(AEP_Model):
             raise NotImplementedError('likelihood not implemented')
 
     @profile
-    def objective_function(self, params, idxs, alpha=1.0):
+    def objective_function(self, params, mb_size, alpha=1.0):
         N = self.N
-        xb = self.x_train[idxs, :]
-        yb = self.y_train[idxs, :]
+        if mb_size >= N:
+            xb = self.x_train
+            yb = self.y_train
+        else:
+            idxs = np.random.randint(0, N, size=mb_size)
+            xb = self.x_train[idxs, :]
+            yb = self.y_train[idxs, :]
         batch_size = yb.shape[0]
         scale_logZ = - N * 1.0 / batch_size / alpha
         scale_poste = N * 1.0 / alpha - 1.0
@@ -1069,10 +1077,15 @@ class SDGPR(AEP_Model):
         else:
             raise NotImplementedError('likelihood not implemented')
 
-    def objective_function(self, params, idxs, alpha=1.0):
+    def objective_function(self, params, mb_size, alpha=1.0):
         N = self.N
-        xb = self.x_train[idxs, :]
-        yb = self.y_train[idxs, :]
+        if mb_size >= N:
+            xb = self.x_train
+            yb = self.y_train
+        else:
+            idxs = np.random.randint(0, N, mb_size)
+            xb = self.x_train[idxs, :]
+            yb = self.y_train[idxs, :]
         batch_size = yb.shape[0]
         scale_logZ = - N * 1.0 / batch_size / alpha
         scale_poste = N * 1.0 / alpha - 1.0
@@ -1355,11 +1368,10 @@ class SGPSSM(AEP_Model):
         ax.legend(loc='lower center')
         plt.show()
 
-    def objective_function(self, params, idxs, alpha=1.0):
+    def objective_function(self, params, mb_size, alpha=1.0):
         # self.plot()
         N = self.N
         # TODO: deal with minibatch here
-        # yb = self.y_train[idxs, :]
         batch_size_dyn = (N-1)
         scale_logZ_dyn = - 1.0 / alpha
         batch_size_emi = N
@@ -1664,10 +1676,15 @@ class SDGPR_H(AEP_Model):
         else:
             raise NotImplementedError('likelihood not implemented')
 
-    def objective_function(self, params, idxs, alpha=1.0):
+    def objective_function(self, params, mb_size, alpha=1.0):
         N = self.N
-        xb = self.x_train[idxs, :]
-        yb = self.y_train[idxs, :]
+        if mb_size >= N:
+            xb = self.x_train
+            yb = self.y_train
+        else:
+            idxs = np.random.randint(0, N, mb_size)
+            xb = self.x_train[idxs, :]
+            yb = self.y_train[idxs, :]
         batch_size = yb.shape[0]
         scale_logZ = - N * 1.0 / batch_size / alpha
         scale_poste = N * 1.0 / alpha - 1.0
@@ -1834,10 +1851,9 @@ class SGPSSM_C(AEP_Model):
         self.x_post_1 = np.zeros((N, Din))
         self.x_post_2 = np.zeros((N, Din))
 
-    def objective_function(self, params, idxs, alpha=1.0):
+    def objective_function(self, params, mb_size, alpha=1.0):
         N = self.N
         # TODO: deal with minibatch here
-        # yb = self.y_train[idxs, :]
         batch_size_dyn = (N-1)
         scale_logZ_dyn = - 1.0 / alpha
         batch_size_emi = N

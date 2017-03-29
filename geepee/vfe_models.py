@@ -36,8 +36,6 @@ class VI_Model(object):
 
         init_params_vec, params_args = flatten_dict(init_params_dict)
 
-        N = self.N
-
         try:
             if method.lower() == 'adam':
                 results = adam(objective_wrapper, init_params_vec,

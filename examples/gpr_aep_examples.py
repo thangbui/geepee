@@ -1,8 +1,8 @@
 print "importing stuff..."
 import numpy as np
 import pdb
-import matplotlib
-matplotlib.use('Agg')
+# import matplotlib
+# matplotlib.use('Agg')
 import matplotlib.pylab as plt
 from scipy import special
 
@@ -46,7 +46,7 @@ def run_regression_1D():
 	print "create model and optimize ..."
 	M = 20
 	model = aep.SGPR(X, Y, M, lik='Gaussian')
-	model.optimise(method='L-BFGS-B', alpha=0.01, maxiter=2000)
+	model.optimise(method='L-BFGS-B', alpha=0.1, maxiter=50000)
 	plot(model)
 	plt.show()
 
@@ -105,7 +105,7 @@ def run_regression_1D_stoc():
 	np.random.seed(42)
 
 	print "create dataset ..."
-	N = 500
+	N = 200
 	X = np.random.rand(N,1)
 	Y = np.sin(12*X) + 0.5*np.cos(25*X) + np.random.randn(N,1)*0.2
 	# plt.plot(X, Y, 'kx', mew=2)
@@ -130,7 +130,7 @@ def run_regression_1D_stoc():
 	print "create model and optimize ..."
 	M = 20
 	model = aep.SGPR(X, Y, M, lik='Gaussian')
-	model.optimise(method='adam', alpha=0.2, maxiter=100000, mb_size=3*M, adam_lr=0.001)
+	model.optimise(method='adam', alpha=0.1, maxiter=100000, mb_size=M, adam_lr=0.001)
 	plot(model)
 	plt.show()
 	plt.savefig('/tmp/aep_gpr_1D_stoc.pdf')
@@ -175,7 +175,7 @@ def run_banana_stoc():
 	Ytrain[np.where(Ytrain==0)[0]] = -1
 	M = 30
 	model = aep.SGPR(Xtrain, Ytrain, M, lik='Probit')
-	model.optimise(method='adam', alpha=0.5, maxiter=100000, mb_size=3*M, adam_lr=0.005)
+	model.optimise(method='adam', alpha=0.5, maxiter=100000, mb_size=M, adam_lr=0.001)
 	plot(model)
 	plt.show()
 	plt.savefig('/tmp/aep_gpc_banana_stoc.pdf')
@@ -318,5 +318,5 @@ if __name__ == '__main__':
 	# run_spiral()
 	# run_boston()
 
-	run_regression_1D_stoc()
+	# run_regression_1D_stoc()
 	run_banana_stoc()
