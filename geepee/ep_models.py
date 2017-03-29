@@ -536,7 +536,8 @@ class SGPR(EP_Model):
     def inference(self, alpha=1.0, no_epochs=10, parallel=False, decay=0.5):
         try:
             for e in range(no_epochs):
-                print 'epoch %d/%d' % (e, no_epochs)
+                if e % 50 == 0:
+                    print 'epoch %d/%d' % (e, no_epochs)
                 if not parallel:
                     for n in range(self.N):
                         yn = self.y_train[n, :].reshape([1, self.Dout])
@@ -650,7 +651,8 @@ class SGPLVM(EP_Model):
     def inference(self, alpha=1.0, no_epochs=10, parallel=False, decay=0):
         try:
             for e in range(no_epochs):
-                print 'epoch %d/%d' % (e, no_epochs)
+                if e % 50 == 0:
+                    print 'epoch %d/%d' % (e, no_epochs)
                 if not parallel:
                     for n in range(self.N):
                         yn = self.y_train[n, :].reshape([1, self.Dout])
@@ -926,7 +928,8 @@ class SGPSSM(EP_Model):
     def inference(self, alpha=1.0, no_epochs=10, parallel=True, decay=0):
         try:
             for e in range(no_epochs):
-                print 'epoch %d/%d' % (e, no_epochs)
+                if e % 50 == 0:
+                    print 'epoch %d/%d' % (e, no_epochs)
                 if parallel:
                     self.inf_parallel(e, alpha, decay)
                 else:

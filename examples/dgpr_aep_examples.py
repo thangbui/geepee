@@ -159,7 +159,8 @@ def run_banana_stoc():
 	M = 30
 	hidden_size = [2]
 	model = aep.SDGPR(Xtrain, Ytrain, M, hidden_size, lik='Probit')
-	model.optimise(method='adam', alpha=1.0, maxiter=100000, mb_size=3*M, adam_lr=0.01)
+	mb_size = int(Xtrain.shape[0]/4)
+	model.optimise(method='adam', alpha=1.0, maxiter=100000, mb_size=mb_size, adam_lr=0.01)
 	plot(model)
 	plt.show()
 	plt.savefig('/tmp/aep_dgpc_banana_stoc.pdf')
@@ -258,9 +259,10 @@ def run_spiral():
 
 
 if __name__ == '__main__':
-	run_regression_1D()
-	run_banana()
+	# run_regression_1D()
+	# run_banana()
 	# run_step_1D()
 	# run_spiral()
-	run_regression_1D_stoc()
+
+	# run_regression_1D_stoc()
 	run_banana_stoc()

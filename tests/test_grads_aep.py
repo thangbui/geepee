@@ -1491,7 +1491,6 @@ def plot_dgpr_aep_gaussian_stochastic():
 
     # generate some datapoints for testing
     N_train = 2000
-    alpha = 0.5
     M = 50
     idxs = np.arange(N_train)
     D = 2
@@ -1503,7 +1502,7 @@ def plot_dgpr_aep_gaussian_stochastic():
 
     # init hypers, inducing points and q(u) params
     params = model.init_hypers(y_train)
-    logZ, grad_all = model.objective_function(params, idxs, alpha=alpha)
+    logZ, grad_all = model.objective_function(params, idxs, alpha=1.0)
     mbs = np.logspace(-2, 0, 10)
     reps = 20
     times = np.zeros(len(mbs))
@@ -1513,18 +1512,20 @@ def plot_dgpr_aep_gaussian_stochastic():
         start_time = time.time()
         for k in range(reps):
             idxs_ik = np.random.permutation(N_train)[:no_points]
-            objs[i, k] = model.objective_function(params, idxs_ik, alpha=alpha)[0]
+            objs[i, k] = model.objective_function(params, idxs_ik, alpha=1.0)[0]
         times[i] = time.time() - start_time
 
     f, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
     ax1.plot(mbs, times, 'x-')
     ax1.set_xlabel("Minibatch proportion")
     ax1.set_ylabel("Time taken")
+    ax1.set_xscale("log", nonposx='clip')
 
     ax2.plot(mbs, objs, 'kx')
     ax2.axhline(logZ, color='b')
     ax2.set_xlabel("Minibatch proportion")
     ax2.set_ylabel("ELBO estimates")
+    ax2.set_xscale("log", nonposx='clip')
     plt.savefig('/tmp/gaussian_stochastic_aep_dgpr.pdf')
 
 
@@ -1532,7 +1533,6 @@ def plot_dgpr_aep_probit_stochastic():
 
     # generate some datapoints for testing
     N_train = 2000
-    alpha = 0.5
     M = 50
     D = 2
     Q = 3
@@ -1544,7 +1544,7 @@ def plot_dgpr_aep_probit_stochastic():
     # init hypers, inducing points and q(u) params
     params = model.init_hypers(y_train)
     idxs = np.arange(N_train)
-    logZ, grad_all = model.objective_function(params, idxs, alpha=alpha)
+    logZ, grad_all = model.objective_function(params, idxs, alpha=1.0)
     mbs = np.logspace(-2, 0, 10)
     reps = 20
     times = np.zeros(len(mbs))
@@ -1554,18 +1554,20 @@ def plot_dgpr_aep_probit_stochastic():
         start_time = time.time()
         for k in range(reps):
             idxs_ik = np.random.permutation(N_train)[:no_points]
-            objs[i, k] = model.objective_function(params, idxs_ik, alpha=alpha)[0]
+            objs[i, k] = model.objective_function(params, idxs_ik, alpha=1.0)[0]
         times[i] = time.time() - start_time
 
     f, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
     ax1.plot(mbs, times, 'x-')
     ax1.set_xlabel("Minibatch proportion")
     ax1.set_ylabel("Time taken")
+    ax1.set_xscale("log", nonposx='clip')
 
     ax2.plot(mbs, objs, 'kx')
     ax2.axhline(logZ, color='b')
     ax2.set_xlabel("Minibatch proportion")
     ax2.set_ylabel("ELBO estimates")
+    ax2.set_xscale("log", nonposx='clip')
     plt.savefig('/tmp/probit_stochastic_aep_dgpr.pdf')
 
 
