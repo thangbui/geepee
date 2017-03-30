@@ -329,6 +329,417 @@ def test_gplvm_aep_probit():
                 % (n, d, grad_all['x2'][n, d], dx2_nd, (grad_all['x2'][n, d]-dx2_nd)/dx2_nd))
 
 
+def test_gplvm_aep_gaussian_stochastic():
+
+    # generate some datapoints for testing
+    N_train = 5
+    alpha = 0.5
+    M = 10
+    D = 2
+    Q = 3
+    mb_size = 3
+    y_train = np.random.randn(N_train, Q)
+    # params  tied
+    lvm = aep.SGPLVM(y_train, D, M, lik='Gaussian')
+
+    # init hypers, inducing points and q(u) params
+    init_params = lvm.init_hypers(y_train)
+
+    params = init_params.copy()
+    np.random.seed(100)
+    logZ, grad_all = lvm.objective_function(
+        params, mb_size, alpha=alpha)
+    pp.pprint(logZ)
+    pp.pprint(params)
+    # pdb.set_trace()
+
+    eps = 1e-5
+    # check grad ls
+    Din_i = lvm.Din
+    for d in range(Din_i):
+        params1 = copy.deepcopy(params)
+        params1['ls'][d] = params1['ls'][d] + eps
+        np.random.seed(100)
+        logZ1, grad1 = lvm.objective_function(
+            params1, mb_size, alpha=alpha)
+
+        params2 = copy.deepcopy(params)
+        params2['ls'][d] = params2['ls'][d] - eps
+        np.random.seed(100)
+        logZ2, grad2 = lvm.objective_function(
+            params2, mb_size, alpha=alpha)
+
+        dls_id = (logZ1 - logZ2) / eps / 2
+        # print logZ1, logZ2
+        print ('ls d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
+            % (d, grad_all['ls'][d], dls_id, (grad_all['ls'][d]-dls_id)/dls_id))
+
+    # check grad sf
+    params1 = copy.deepcopy(params)
+    params1['sf'] = params1['sf'] + eps
+    np.random.seed(100)
+    logZ1, grad1 = lvm.objective_function(
+        params1, mb_size, alpha=alpha)
+    params2 = copy.deepcopy(params)
+    params2['sf'] = params2['sf'] - eps
+    np.random.seed(100)
+    logZ2, grad2 = lvm.objective_function(
+        params2, mb_size, alpha=alpha)
+
+    dsf_i = (logZ1 - logZ2) / eps / 2
+    print ('sf computed=%.5f, numerical=%.5f, diff=%.5f' 
+        % (grad_all['sf'], dsf_i, (grad_all['sf'] - dsf_i) / dsf_i))
+
+    # check grad sn
+    params1 = copy.deepcopy(params)
+    params1['sn'] = params1['sn'] + eps
+    np.random.seed(100)
+    logZ1, grad1 = lvm.objective_function(
+        params1, mb_size, alpha=alpha)
+    params2 = copy.deepcopy(params)
+    params2['sn'] = params2['sn'] - eps
+    np.random.seed(100)
+    logZ2, grad2 = lvm.objective_function(
+        params2, mb_size, alpha=alpha)
+
+    dsn_i = (logZ1 - logZ2) / eps / 2
+    print ('sn computed=%.5f, numerical=%.5f, diff=%.5f' 
+        % (grad_all['sn'], dsn_i, (grad_all['sn'] - dsn_i) / dsn_i))
+
+    # check grad zu
+    Din_i = lvm.Din
+    M_i = lvm.M
+    Dout_i = lvm.Dout
+    for m in range(M_i):
+        for k in range(Din_i):
+            params1 = copy.deepcopy(params)
+            eps1 = 0.0 * params1['zu']
+            eps1[m, k] = eps
+            params1['zu'] = params1['zu'] + eps1
+            np.random.seed(100)
+            logZ1, grad1 = lvm.objective_function(
+                params1, mb_size, alpha=alpha)
+            params2 = copy.deepcopy(params)
+            params2['zu'] = params2['zu'] - eps1
+            np.random.seed(100)
+            logZ2, grad2 = lvm.objective_function(
+                params2, mb_size, alpha=alpha)
+
+            dzu_id = (logZ1 - logZ2) / eps / 2
+            print ('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
+                % (m, k, grad_all['zu'][m, k], dzu_id, (grad_all['zu'][m, k]-dzu_id)/dzu_id))
+
+    # check grad theta_1
+    for d in range(Dout_i):
+        for j in range(M_i * (M_i + 1) / 2):
+            params1 = copy.deepcopy(params)
+            params1['eta1_R'][d][j, ] = params1['eta1_R'][d][j, ] + eps
+            np.random.seed(100)
+            logZ1, grad1 = lvm.objective_function(
+                params1, mb_size, alpha=alpha)
+            params2 = copy.deepcopy(params)
+            params2['eta1_R'][d][j, ] = params2['eta1_R'][d][j, ] - eps
+            np.random.seed(100)
+            logZ2, grad2 = lvm.objective_function(
+                params2, mb_size, alpha=alpha)
+
+            dR_id = (logZ1 - logZ2) / eps / 2
+            print ('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
+                % (d, j, grad_all['eta1_R'][d][j], dR_id, (grad_all['eta1_R'][d][j]-dR_id)/dR_id))
+
+    # check grad theta_2
+    for d in range(Dout_i):
+        for j in range(M_i):
+            params1 = copy.deepcopy(params)
+            params1['eta2'][d][j, ] = params1['eta2'][d][j, ] + eps
+            np.random.seed(100)
+            logZ1, grad1 = lvm.objective_function(
+                params1, mb_size, alpha=alpha)
+            params2 = copy.deepcopy(params)
+            params2['eta2'][d][j, ] = params2['eta2'][d][j, ] - eps
+            np.random.seed(100)
+            logZ2, grad2 = lvm.objective_function(
+                params2, mb_size, alpha=alpha)
+
+            dR_id = (logZ1 - logZ2) / eps / 2
+            print ('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
+                % (d, j, grad_all['eta2'][d][j], dR_id, (grad_all['eta2'][d][j]-dR_id)/dR_id))
+
+    # check grad x1
+    Din = lvm.Din
+    for n in range(N_train):
+        for d in range(Din):
+            params1 = copy.deepcopy(params)
+            params1['x1'][n, d] = params1['x1'][n, d] + eps
+            np.random.seed(100)
+            logZ1, grad1 = lvm.objective_function(
+                params1, mb_size, alpha=alpha)
+            params2 = copy.deepcopy(params)
+            params2['x1'][n, d] = params2['x1'][n, d] - eps
+            np.random.seed(100)
+            logZ2, grad2 = lvm.objective_function(
+                params2, mb_size, alpha=alpha)
+
+            dx1_nd = (logZ1 - logZ2) / eps / 2
+            print ('x1 n=%d, d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
+                % (n, d, grad_all['x1'][n, d], dx1_nd, (grad_all['x1'][n, d] - dx1_nd) / dx1_nd))
+
+    # check grad x1
+    Din = lvm.Din
+    for n in range(N_train):
+        for d in range(Din):
+            params1 = copy.deepcopy(params)
+            params1['x2'][n, d] = params1['x2'][n, d] + eps
+            np.random.seed(100)
+            logZ1, grad1 = lvm.objective_function(
+                params1, mb_size, alpha=alpha)
+            params2 = copy.deepcopy(params)
+            params2['x2'][n, d] = params2['x2'][n, d] - eps
+            np.random.seed(100)
+            logZ2, grad2 = lvm.objective_function(
+                params2, mb_size, alpha=alpha)
+
+            dx2_nd = (logZ1 - logZ2) / eps / 2
+            print ('x2 n=%d, d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
+                % (n, d, grad_all['x2'][n, d], dx2_nd, (grad_all['x2'][n, d] - dx2_nd)/dx2_nd))
+
+
+def test_gplvm_aep_probit_stochastic():
+
+    # generate some datapoints for testing
+    N_train = 5
+    alpha = 0.5
+    M = 3
+    D = 2
+    Q = 3
+    y_train = 2*np.random.randint(0, 2, size=(N_train, Q)) - 1
+    # params  tied
+    lvm = aep.SGPLVM(y_train, D, M, lik='Probit')
+
+    # init hypers, inducing points and q(u) params
+    init_params = lvm.init_hypers(y_train)
+
+    params = init_params.copy()
+    np.random.seed(100)
+    logZ, grad_all = lvm.objective_function(
+        params, mb_size, alpha=alpha)
+    pp.pprint(logZ)
+
+    eps = 1e-5
+    # check grad ls
+    Din_i = lvm.Din
+    for d in range(Din_i):
+        params1 = copy.deepcopy(params)
+        params1['ls'][d] = params1['ls'][d] + eps
+        np.random.seed(100)
+        logZ1, grad1 = lvm.objective_function(
+            params1, mb_size, alpha=alpha)
+
+        params2 = copy.deepcopy(params)
+        params2['ls'][d] = params2['ls'][d] - eps
+        np.random.seed(100)
+        logZ2, grad2 = lvm.objective_function(
+            params2, mb_size, alpha=alpha)
+
+        dls_id = (logZ1 - logZ2) / eps / 2
+        # print logZ1, logZ2
+        print ('ls d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
+            % (d, grad_all['ls'][d], dls_id, (grad_all['ls'][d]-dls_id)/dls_id))
+
+    # check grad sf
+    params1 = copy.deepcopy(params)
+    params1['sf'] = params1['sf'] + eps
+    np.random.seed(100)
+    logZ1, grad1 = lvm.objective_function(
+        params1, mb_size, alpha=alpha)
+    params2 = copy.deepcopy(params)
+    params2['sf'] = params2['sf'] - eps
+    np.random.seed(100)
+    logZ2, grad2 = lvm.objective_function(
+        params2, mb_size, alpha=alpha)
+
+    dsf_i = (logZ1 - logZ2) / eps / 2
+    print ('sf computed=%.5f, numerical=%.5f, diff=%.5f' 
+        % (grad_all['sf'], dsf_i, (grad_all['sf'] - dsf_i) / dsf_i))
+
+    # check grad zu
+    Din_i = lvm.Din
+    M_i = lvm.M
+    Dout_i = lvm.Dout
+    for m in range(M_i):
+        for k in range(Din_i):
+            params1 = copy.deepcopy(params)
+            eps1 = 0.0 * params1['zu']
+            eps1[m, k] = eps
+            params1['zu'] = params1['zu'] + eps1
+            np.random.seed(100)
+            logZ1, grad1 = lvm.objective_function(
+                params1, mb_size, alpha=alpha)
+            params2 = copy.deepcopy(params)
+            params2['zu'] = params2['zu'] - eps1
+            np.random.seed(100)
+            logZ2, grad2 = lvm.objective_function(
+                params2, mb_size, alpha=alpha)
+
+            dzu_id = (logZ1 - logZ2) / eps / 2
+            print ('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
+                % (m, k, grad_all['zu'][m, k], dzu_id, (grad_all['zu'][m, k]-dzu_id)/dzu_id))
+
+    # check grad theta_1
+    for d in range(Dout_i):
+        for j in range(M_i * (M_i + 1) / 2):
+            params1 = copy.deepcopy(params)
+            params1['eta1_R'][d][j, ] = params1['eta1_R'][d][j, ] + eps
+            np.random.seed(100)
+            logZ1, grad1 = lvm.objective_function(
+                params1, mb_size, alpha=alpha)
+            params2 = copy.deepcopy(params)
+            params2['eta1_R'][d][j, ] = params2['eta1_R'][d][j, ] - eps
+            np.random.seed(100)
+            logZ2, grad2 = lvm.objective_function(
+                params2, mb_size, alpha=alpha)
+
+            dR_id = (logZ1 - logZ2) / eps / 2
+            print ('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
+                % (d, j, grad_all['eta1_R'][d][j], dR_id, (grad_all['eta1_R'][d][j]-dR_id)/dR_id))
+
+    # check grad theta_2
+    for d in range(Dout_i):
+        for j in range(M_i):
+            params1 = copy.deepcopy(params)
+            params1['eta2'][d][j, ] = params1['eta2'][d][j, ] + eps
+            np.random.seed(100)
+            logZ1, grad1 = lvm.objective_function(
+                params1, mb_size, alpha=alpha)
+            params2 = copy.deepcopy(params)
+            params2['eta2'][d][j, ] = params2['eta2'][d][j, ] - eps
+            np.random.seed(100)
+            logZ2, grad2 = lvm.objective_function(
+                params2, mb_size, alpha=alpha)
+
+            dR_id = (logZ1 - logZ2) / eps / 2
+            print ('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
+                % (d, j, grad_all['eta2'][d][j], dR_id, (grad_all['eta2'][d][j]-dR_id)/dR_id))
+
+    # check grad x1
+    Din = lvm.Din
+    for n in range(N_train):
+        for d in range(Din):
+            params1 = copy.deepcopy(params)
+            params1['x1'][n, d] = params1['x1'][n, d] + eps
+            np.random.seed(100)
+            logZ1, grad1 = lvm.objective_function(
+                params1, mb_size, alpha=alpha)
+            params2 = copy.deepcopy(params)
+            params2['x1'][n, d] = params2['x1'][n, d] - eps
+            np.random.seed(100)
+            logZ2, grad2 = lvm.objective_function(
+                params2, mb_size, alpha=alpha)
+
+            dx1_nd = (logZ1 - logZ2) / eps / 2
+            print ('x1 n=%d, d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
+                % (n, d, grad_all['x1'][n, d], dx1_nd, (grad_all['x1'][n, d]-dx1_nd)/dx1_nd))
+
+    # check grad x1
+    Din = lvm.Din
+    for n in range(N_train):
+        for d in range(Din):
+            params1 = copy.deepcopy(params)
+            params1['x2'][n, d] = params1['x2'][n, d] + eps
+            np.random.seed(100)
+            logZ1, grad1 = lvm.objective_function(
+                params1, mb_size, alpha=alpha)
+            params2 = copy.deepcopy(params)
+            params2['x2'][n, d] = params2['x2'][n, d] - eps
+            np.random.seed(100)
+            logZ2, grad2 = lvm.objective_function(
+                params2, mb_size, alpha=alpha)
+
+            dx2_nd = (logZ1 - logZ2) / eps / 2
+            print ('x2 n=%d, d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
+                % (n, d, grad_all['x2'][n, d], dx2_nd, (grad_all['x2'][n, d]-dx2_nd)/dx2_nd))
+
+
+def plot_gplvm_aep_gaussian_stochastic():
+
+    # generate some datapoints for testing
+    N_train = 2000
+    alpha = 0.5
+    M = 50
+    D = 2
+    Q = 3
+    y_train = np.random.randn(N_train, Q)
+    # params  tied
+    model = aep.SGPLVM(y_train, D, M, lik='Gaussian')
+
+    # init hypers, inducing points and q(u) params
+    params = model.init_hypers(y_train)
+    logZ, grad_all = model.objective_function(params, N_train, alpha=alpha)
+    mbs = np.logspace(-2, 0, 10)
+    reps = 20
+    times = np.zeros(len(mbs))
+    objs = np.zeros((len(mbs), reps))
+    for i, mb in enumerate(mbs):
+        no_points = int(N_train * mb)
+        start_time = time.time()
+        for k in range(reps):
+            objs[i, k] = model.objective_function(params, no_points, alpha=alpha)[0]
+        times[i] = time.time() - start_time
+
+    f, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
+    ax1.plot(mbs, times, 'x-')
+    ax1.set_xlabel("Minibatch proportion")
+    ax1.set_ylabel("Time taken")
+    ax1.set_xscale("log", nonposx='clip')
+
+    ax2.plot(mbs, objs, 'kx')
+    ax2.axhline(logZ, color='b')
+    ax2.set_xlabel("Minibatch proportion")
+    ax2.set_ylabel("ELBO estimates")
+    ax2.set_xscale("log", nonposx='clip')
+    plt.savefig('/tmp/gaussian_stochastic_aep_gplvm.pdf')
+
+
+def plot_gplvm_aep_probit_stochastic():
+
+    # generate some datapoints for testing
+    N_train = 2000
+    alpha = 0.5
+    M = 50
+    D = 2
+    Q = 3
+    y_train = 2*np.random.randint(0, 2, size=(N_train, Q)) - 1
+    # params  tied
+    model = aep.SGPLVM(y_train, D, M, lik='Probit')
+
+    # init hypers, inducing points and q(u) params
+    params = model.init_hypers(y_train)
+    logZ, grad_all = model.objective_function(params, N_train, alpha=alpha)
+    mbs = np.logspace(-2, 0, 10)
+    reps = 20
+    times = np.zeros(len(mbs))
+    objs = np.zeros((len(mbs), reps))
+    for i, mb in enumerate(mbs):
+        no_points = int(N_train * mb)
+        start_time = time.time()
+        for k in range(reps):
+            objs[i, k] = model.objective_function(params, no_points, alpha=alpha)[0]
+        times[i] = time.time() - start_time
+
+    f, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
+    ax1.plot(mbs, times, 'x-')
+    ax1.set_xlabel("Minibatch proportion")
+    ax1.set_ylabel("Time taken")
+    ax1.set_xscale("log", nonposx='clip')
+
+    ax2.plot(mbs, objs, 'kx')
+    ax2.axhline(logZ, color='b')
+    ax2.set_xlabel("Minibatch proportion")
+    ax2.set_ylabel("ELBO estimates")
+    ax2.set_xscale("log", nonposx='clip')
+    plt.savefig('/tmp/probit_stochastic_aep_gplvm.pdf')
+
+
 def test_gplvm_aep_gaussian_scipy():
     # generate some datapoints for testing
     N_train = 5
@@ -939,11 +1350,13 @@ def plot_gpr_aep_probit_stochastic():
     ax1.plot(mbs, times, 'x-')
     ax1.set_xlabel("Minibatch proportion")
     ax1.set_ylabel("Time taken")
+    ax1.set_xscale("log", nonposx='clip')
 
     ax2.plot(mbs, objs, 'kx')
     ax2.axhline(logZ, color='b')
     ax2.set_xlabel("Minibatch proportion")
     ax2.set_ylabel("ELBO estimates")
+    ax2.set_xscale("log", nonposx='clip')
     plt.savefig('/tmp/probit_stochastic_aep_gpr.pdf')
 
 
@@ -1970,26 +2383,31 @@ if __name__ == '__main__':
     # test_gplvm_aep_gaussian_scipy()
     # test_gplvm_aep_probit_scipy()
 
+    plot_gplvm_aep_probit_stochastic()
+    plot_gplvm_aep_gaussian_stochastic()
+    test_gpr_aep_probit_stochastic()
+    test_gpr_aep_gaussian_stochastic()
+
     # test_gpr_aep_gaussian()
     # test_gpr_aep_probit()
     # test_gpr_aep_gaussian_scipy()
     # test_gpr_aep_probit_scipy()
 
-    plot_gpr_aep_probit_stochastic()
-    plot_gpr_aep_gaussian_stochastic()
-    test_gpr_aep_probit_stochastic()
-    test_gpr_aep_gaussian_stochastic()
+    # plot_gpr_aep_probit_stochastic()
+    # plot_gpr_aep_gaussian_stochastic()
+    # test_gpr_aep_probit_stochastic()
+    # test_gpr_aep_gaussian_stochastic()
 
     # test_dgpr_aep_gaussian()
     # test_dgpr_aep_probit()
     # test_dgpr_aep_gaussian_scipy()
     # test_dgpr_aep_probit_scipy()
 
-    plot_dgpr_aep_probit_stochastic()
-    plot_dgpr_aep_gaussian_stochastic()
-    test_dgpr_aep_probit_stochastic()
-    test_dgpr_aep_gaussian_stochastic()
+    # plot_dgpr_aep_probit_stochastic()
+    # plot_dgpr_aep_gaussian_stochastic()
+    # test_dgpr_aep_probit_stochastic()
+    # test_dgpr_aep_gaussian_stochastic()
 
     # test_gpssm_aep_gaussian()
     # np.random.seed(42)
-    test_gpssm_aep_gaussian_kink()
+    # test_gpssm_aep_gaussian_kink()
