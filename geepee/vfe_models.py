@@ -7,7 +7,7 @@ from utils import *
 from kernels import *
 
 # ideally these should be moved to some config file
-jitter = 1e-6
+jitter = 1e-4
 
 
 class VI_Model(object):
@@ -162,7 +162,7 @@ class SGPR(VI_Model):
 
         return energy, grad_all
 
-    def predict_f(self, inputs, alpha=1.0):
+    def predict_f(self, inputs, alpha=1.0, marginal=True):
         x = self.x_train
         y = self.y_train
         N = self.N
@@ -191,7 +191,12 @@ class SGPR(VI_Model):
         W = np.linalg.solve(Lu.T, np.linalg.solve(Lu.T, W1).T)
         KtuW = np.dot(Kut.T, W)
         mf = np.dot(Kut.T, beta)
-        vf = np.exp(2*self.sf) - np.sum(KtuW*Kut.T, axis=1)
+        if marginal:
+            vf = np.exp(2*self.sf) - np.sum(KtuW*Kut.T, axis=1)
+        else:
+            Ktt = compute_kernel(2*self.ls, 2*self.sf, inputs, inputs)
+            Ktt += np.diag(jitter * np.ones((inputs.shape[0], )))
+            vf = Ktt - np.dot(KtuW, Kut)
         return mf, vf
 
     def sample_f(self, inputs, no_samples=1):
