@@ -24,43 +24,53 @@ class VI_Model(object):
     def get_hypers(self):
         pass
 
+    def update_hypers(self):
+        pass
+
     def optimise(
         self, method='L-BFGS-B', tol=None, reinit_hypers=True, 
-        callback=None, maxiter=1000, alpha=0.5, adam_lr=0.05, **kargs):
+        callback=None, maxfun=100000, maxiter=1000, alpha=0.5, mb_size=None, adam_lr=0.001, **kargs):
         self.updated = False
 
         if reinit_hypers:
-            init_params_dict = self.init_hypers()
+            init_params_dict = self.init_hypers(self.y_train)
         else:
             init_params_dict = self.get_hypers()
 
         init_params_vec, params_args = flatten_dict(init_params_dict)
+        objective_wrapper = ObjectiveWrapper()
 
+        if mb_size is None:
+            mb_size = self.N
         try:
             if method.lower() == 'adam':
                 results = adam(objective_wrapper, init_params_vec,
                                step_size=adam_lr,
                                maxiter=maxiter,
-                               args=(params_args, self, None, alpha))
+                               args=(params_args, self, mb_size, alpha))
+                final_params = results
             else:
-                options = {'maxiter': maxiter, 'disp': True, 'gtol': 1e-8}
+                options = {'maxfun': maxfun, 'maxiter': maxiter, 'disp': True, 'gtol': 1e-8}
                 results = minimize(
                     fun=objective_wrapper,
                     x0=init_params_vec,
-                    args=(params_args, self, None, alpha),
+                    args=(params_args, self, self.N, alpha),
                     method=method,
                     jac=True,
                     tol=tol,
                     callback=callback,
                     options=options)
+                final_params = results.x
 
         except KeyboardInterrupt:
             print 'Caught KeyboardInterrupt ...'
-            results = []
+            final_params = objective_wrapper.previous_x
             # todo: deal with rresults here
 
-        results = self.get_hypers()
-        return results
+        # results = self.get_hypers()
+        final_params = unflatten_dict(final_params, params_args)
+        self.update_hypers(final_params)
+        return final_params
 
     def set_fixed_params(self, params):
         if isinstance(params, (list)):
@@ -91,37 +101,6 @@ class SGPR(VI_Model):
         self.ls = np.zeros([Din, ])
         self.sf = 0
         self.sn = 0
-
-    def objective_function_manual(self, params, alpha=1.0):
-        x = self.x_train
-        y = self.y_train
-        N = self.N
-        Dout = self.Dout
-        M = self.M
-        # update model with new hypers
-        self.update_hypers(params)
-        Kuu_noiseless = compute_kernel(2*self.ls, 2*self.sf, self.zu, self.zu)
-        Kuu = Kuu_noiseless + np.diag(jitter * np.ones((M, )))
-        Lu = np.linalg.cholesky(Kuu)
-        sf2 = np.exp(2*self.sf)
-        sn2 = np.exp(2*self.sn)
-        Kuf = compute_kernel(2*self.ls, 2*self.sf, self.zu, x)
-        Kfu = Kuf.T
-        KuinvKuf = np.linalg.solve(Kuu, Kuf)
-        Qff = np.dot(Kfu, KuinvKuf)
-        Kff_diag = sf2
-        Dff_diag = sf2 - np.diag(Qff)
-        Kyy_bar = Qff + alpha * np.diag(Dff_diag) + sn2*np.eye(N)
-        Ly = np.linalg.cholesky(Kyy_bar)
-        Lyy = np.linalg.solve(Ly, y)
-        term1 = 0.5 * N * np.log(2*np.pi)
-        term2 = np.sum(np.log(np.diag(Ly)))
-        term3 = 0.5 * np.sum(Lyy*Lyy)
-        term4 = 0.5*(1-alpha)/alpha * np.sum(np.log(1 + alpha*Dff_diag/sn2))
-
-        print term3, term2, term1, term4
-
-        return term1 + term2 + term3 + term4
 
     def objective_function(self, params, idxs=None, alpha=1.0):
         x = self.x_train

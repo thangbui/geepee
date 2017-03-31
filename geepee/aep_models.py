@@ -1306,7 +1306,7 @@ class Gauss_Emis():
 
     def output_probabilistic(self, mf, vf):
         my = np.einsum('ab,nb->na', self.C, mf)
-        vy_noiseless = np.einsum('ab,nb,bc->nac', self.C, vf, self.C)
+        vy_noiseless = np.einsum('ab,nb,bc->nac', self.C, vf, self.C.T)
         vy = vy_noiseless + np.diag(self.R)
         return my, vy_noiseless, vy
 
@@ -2019,7 +2019,7 @@ class SGPSSM(AEP_Model):
         for _ in range(100):
             model.resample_model()
         # run EM
-        for _ in range(50):
+        for _ in range(100):
             model.EM_step()
 
         s = model.states_list.pop()    
@@ -2050,9 +2050,9 @@ class SGPSSM(AEP_Model):
             x = np.hstack((x, self.x_control[:self.N-1, :]))
         reg = SGPR(x, y, self.M, 'Gaussian')
         reg.set_fixed_params(['sn', 'sf', 'ls', 'zu'])
-        reg.optimise(method='L-BFGS-B', alpha=0.5, maxiter=100)
+        reg.optimise(method='L-BFGS-B', alpha=0.4, maxiter=150)
         sgp_params = reg.sgp_layer.get_hypers()
-        # sgp_params['ls'] -= np.log(5)
+        sgp_params['ls'] -= np.log(5)
         # sgp_params = self.sgp_layer.init_hypers(post_m)
         # sgp_params['zu'] = post_m[np.random.randint(0, post_m.shape[0], self.M), :]
         # sgp_params['ls'] = np.log(1.0)*np.ones(self.Din)

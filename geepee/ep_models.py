@@ -801,8 +801,9 @@ class Gauss_Emis():
 
     def output_probabilistic(self, mf, vf):
         my = np.einsum('ab,nb->na', self.C, mf)
-        vy = np.einsum('ab,nb,bc->nac', self.C, vf, self.C) + np.diag(self.R)
-        return my, vy
+        vy_noiseless = np.einsum('ab,nb,bc->nac', self.C, vf, self.C.T)
+        vy = vy_noiseless + np.diag(self.R)
+        return my, vy_noiseless, vy
 
 class SGPSSM(EP_Model):
 
@@ -928,7 +929,7 @@ class SGPSSM(EP_Model):
     def inference(self, alpha=1.0, no_epochs=10, parallel=True, decay=0):
         try:
             for e in range(no_epochs):
-                if e % 50 == 0:
+                if e % 1 == 0:
                     print 'epoch %d/%d' % (e, no_epochs)
                 if parallel:
                     self.inf_parallel(e, alpha, decay)
@@ -1061,6 +1062,11 @@ class SGPSSM(EP_Model):
         vx = 1.0 / post_2
         mx = post_1 / post_2
         return mx, vx
+
+    def get_posterior_y(self):
+        mx, vx = self.get_posterior_x()
+        my, vy, vyn = self.emi_layer.output_probabilistic(mx, vx)
+        return my, vy, vyn
 
     def predict_f(self, inputs):
         if not self.updated:
