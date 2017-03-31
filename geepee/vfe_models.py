@@ -33,7 +33,7 @@ class VI_Model(object):
         self.updated = False
 
         if reinit_hypers:
-            init_params_dict = self.init_hypers(self.y_train)
+            init_params_dict = self.init_hypers()
         else:
             init_params_dict = self.get_hypers()
 
