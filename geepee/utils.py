@@ -32,6 +32,23 @@ def PCA_reduce(X, Q):
     W = W[:, :Q]
     return (X - X.mean(0)).dot(W)
 
+class ObjectiveWrapper(object):
+    
+    def __init__(self):
+        self.previous_x = None
+
+    def __call__(self, params, params_args, obj, idxs, alpha):
+        params_dict = unflatten_dict(params, params_args)
+        f, grad_dict = obj.objective_function(
+            params_dict, idxs, alpha=alpha)
+        g, _ = flatten_dict(grad_dict)
+        g_is_fin = np.isfinite(g)
+        if np.all(g_is_fin):
+            self.previous_x = params
+            return f, g
+        else:
+            print("Warning: inf or nan in gradient: replacing with zeros")
+            return f, np.where(g_is_fin, g, 0.)
 
 def objective_wrapper(params, params_args, obj, idxs, alpha):
     params_dict = unflatten_dict(params, params_args)
@@ -79,7 +96,7 @@ def adam(func, init_params, callback=None, maxiter=1000,
     v = np.zeros_like(x)
     for i in range(maxiter):
         f, g = func(x, *args)
-        if i % 100 == 0:
+        if i % 10 == 0:
             print 'iter %d \t obj %.3f' % (i, f)
         if callback: callback(x, i, g)
         m = (1 - b1) * g + b1 * m  # First  moment estimate.

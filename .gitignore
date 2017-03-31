@@ -1,5 +1,8 @@
 # kernprof profiling
-.lprof
+*.py.lprof
+
+# busy files
+*.nfs*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

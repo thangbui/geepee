@@ -163,7 +163,7 @@ def compute_psi2_weave(lls, lsf, xmean, xvar, z):
                  type_converters=weave.converters.blitz)
     return psi2
 
-
+# @profile
 def compute_psi_weave(lls2, lsf2, xmean, xvar, z):
     ls2 = np.exp(lls2)
     sf2 = np.exp(lsf2)

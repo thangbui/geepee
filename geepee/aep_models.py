@@ -113,9 +113,12 @@ class SGP_Layer(object):
         vout = kff + Bkfukuf
         return mout, vout, kfu
 
+    @profile
     def _forward_prop_random_thru_cav_mm(self, mx, vx):
         psi0 = np.exp(2*self.sf)
         psi1, psi2 = compute_psi_weave(2*self.ls, 2*self.sf, mx, vx, self.zu)
+        # psi1 = compute_psi1(2*self.ls, 2*self.sf, mx, vx, self.zu)
+        # psi2 = compute_psi2(2*self.ls, 2*self.sf, mx, vx, self.zu)
         mout = np.einsum('nm,dm->nd', psi1, self.Ahat)
         Bhatpsi2 = np.einsum('dab,nab->nd', self.Bhat_sto, psi2)
         vout = psi0 + Bhatpsi2 - mout**2
@@ -454,6 +457,7 @@ class SGP_Layer(object):
             triu_ind = np.triu_indices(M)
             diag_ind = np.diag_indices(M)
             R[diag_ind] = np.log(R[diag_ind])
+            np.log(R[diag_ind])
             eta1_d = R[triu_ind].reshape((M * (M + 1) / 2,))
             eta2_d = theta2.reshape((M,))
             eta1_R[d, :] = eta1_d
@@ -648,6 +652,7 @@ class AEP_Model(object):
             init_params_dict = self.get_hypers()
 
         init_params_vec, params_args = flatten_dict(init_params_dict)
+        objective_wrapper = ObjectiveWrapper()
 
         if mb_size is None:
             mb_size = self.N
@@ -657,6 +662,7 @@ class AEP_Model(object):
                                step_size=adam_lr,
                                maxiter=maxiter,
                                args=(params_args, self, mb_size, alpha))
+                final_params = results
             else:
                 options = {'maxiter': maxiter, 'disp': True, 'gtol': 1e-8}
                 results = minimize(
@@ -668,13 +674,17 @@ class AEP_Model(object):
                     tol=tol,
                     callback=callback,
                     options=options)
+                final_params = results.x
+
         except KeyboardInterrupt:
             print 'Caught KeyboardInterrupt ...'
-            results = []
+            final_params = objective_wrapper.previous_x
             # todo: deal with rresults here
 
-        results = self.get_hypers()
-        return results
+        # results = self.get_hypers()
+        final_params = unflatten_dict(final_params, params_args)
+        self.update_hypers(final_params, alpha)
+        return final_params
 
     def set_fixed_params(self, params):
         if isinstance(params, (list)):
@@ -1320,54 +1330,7 @@ class SGPSSM(AEP_Model):
         self.x_post_1 = np.zeros((N, Din))
         self.x_post_2 = np.zeros((N, Din))
 
-    def plot(self):
-        def kink_true(x):
-            fx = np.zeros(x.shape)
-            for t in range(x.shape[0]):
-                xt = x[t]
-                if xt < 4:
-                    fx[t] = xt + 1
-                else:
-                    fx[t] = -4*xt + 21
-            return fx
-        N_test = 100
-        x_test = np.linspace(-4, 6, N_test)
-        x_test = np.reshape(x_test, [N_test, 1])
-        self.sgp_layer.update_posterior_for_prediction()
-        zu = self.sgp_layer.zu
-        mu, vu = self.predict_f(zu)
-        mf, vf = self.predict_f(x_test)
-        my, vy = self.predict_y(x_test)
-        # plot function
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
-        ax.plot(x_test[:,0], kink_true(x_test[:,0]), '-', color='k')
-        ax.plot(x_test[:,0], my[:,0], '-', color='r', label='y')
-        ax.fill_between(
-            x_test[:,0], 
-            my[:,0] + 2*np.sqrt(vy[:, 0, 0]), 
-            my[:,0] - 2*np.sqrt(vy[:, 0, 0]), 
-            alpha=0.2, edgecolor='r', facecolor='r')
-        ax.plot(zu, mu, 'ob')
-        ax.plot(x_test[:,0], mf[:,0], '-', color='b', label='f')
-        ax.fill_between(
-            x_test[:,0], 
-            mf[:,0] + 2*np.sqrt(vf[:,0]), 
-            mf[:,0] - 2*np.sqrt(vf[:,0]), 
-            alpha=0.2, edgecolor='b', facecolor='b')
-        ax.plot(
-            self.emi_layer.y[0:self.N-1], 
-            self.emi_layer.y[1:self.N], 
-            'r+', alpha=0.5)
-        mx, vx = self.get_posterior_x()
-        ax.plot(mx[0:self.N-1], mx[1:self.N], 'og', alpha=0.3)
-        ax.set_xlabel(r'$x_{t-1}$')
-        ax.set_ylabel(r'$x_{t}$')
-        # ax.set_ylim(-6, 6)
-        # ax.set_xlim(-7, 8)
-        ax.legend(loc='lower center')
-        plt.show()
-
+    @profile
     def objective_function(self, params, mb_size, alpha=1.0):
         # self.plot()
         N = self.N
@@ -1392,10 +1355,6 @@ class SGPSSM(AEP_Model):
         sgp_grad_hyper, sgp_grad_input = self.sgp_layer.backprop_grads_lvm(
             mprop, vprop, dmprop, dvprop, 
             psi1, psi2, cav_tm1_m, cav_tm1_v, alpha)
-        
-        # plt.figure()
-        # plt.plot(cav_tm1_m, mprop, '+r')
-        # plt.plot(cav_tm1_m, cav_t_m, 'ob')
 
         # deal with the emission factors here
         idxs_up = np.arange(0, self.N)
@@ -1426,9 +1385,6 @@ class SGPSSM(AEP_Model):
         grads_x = {}
         for key in ['x_factor_1', 'x_factor_2']:
             grads_x[key] = grads_x_via_post[key] + grads_x_via_cavity[key] + grads_x_via_logZ[key]
-            # grads_x[key] = grads_x_via_logZ[key]
-            # grads_x[key] = grads_x_via_cavity[key]
-            # grads_x[key] = grads_x_via_post[key]
 
         for key in grads_x.keys():
             grad_all[key] = grads_x[key]
@@ -1440,14 +1396,13 @@ class SGPSSM(AEP_Model):
         phi_cavity_x = self.compute_phi_cavity_x(alpha)
         x_contrib = phi_prior_x + phi_poste_x + phi_cavity_x
         energy = logZ_dyn + logZ_emi + x_contrib + sgp_contrib
-        # energy = phi_cavity_x
-        # energy = phi_poste_x
-        # energy = logZ_dyn + logZ_emi
         for p in self.fixed_params:
             grad_all[p] = np.zeros_like(grad_all[p])
-        # pp.pprint([energy, logZ_dyn, logZ_emi, x_contrib, sgp_contrib])
-        # pp.pprint(self.sgp_layer.get_hypers())
-        # pp.pprint(params)
+
+        # energy /= self.N
+        # for key in grad_all.keys():
+        #     grad_all[key] /= self.N
+        
         return energy, grad_all
 
     def compute_posterior_grad_x(self, alpha):
@@ -1594,9 +1549,9 @@ class SGPSSM(AEP_Model):
         mx = post_1 / post_2
         return mx, vx
 
-    def init_hypers(self, y_train):
+    def init_hypers_old(self, y_train):
         # TODO: alternatitve method for non real-valued data
-        if self.Din == 1 and self.Dout == 1:
+        if self.Din == self.Dout:
             post_m = np.copy(y_train)
             post_v = 0.01 * np.ones_like(post_m)
         else:
@@ -1611,9 +1566,57 @@ class SGPSSM(AEP_Model):
         
         post_2 = 1.0 / post_v
         post_1 = post_2 * post_m
-        ssm_params = {'sn': np.log(0.5)}
+        ssm_params = {'sn': np.log(0.01)}
         ssm_params['x_factor_1'] = post_1/3
         ssm_params['x_factor_2'] = np.log(post_2/3) / 2
+        init_params = dict(sgp_params)
+        init_params.update(emi_params)
+        init_params.update(ssm_params)
+        return init_params
+
+    def init_hypers(self, y_train):
+        # initialise latent variables and emission using a Gaussian LDS
+        print 'init latent variable using LDS...'
+        from pylds.models import DefaultLDS
+        model = DefaultLDS(self.Dout, self.Din, 0)
+        model.add_data(y_train)
+        # Initialize with a few iterations of Gibbs
+        for _ in range(100):
+            model.resample_model()
+        # run EM
+        for _ in range(50):
+            model.EM_step()
+
+        s = model.states_list.pop()    
+        s.info_E_step()
+        post_m = s.smoothed_mus
+        # post_v = np.diagonal(s.smoothed_sigmas, axis1=1, axis2=2)
+        scale = np.std(post_m, axis=0)
+        post_m = (post_m - np.mean(post_m, axis=0)) / scale
+        # post_v = post_v / scale**2
+        post_v = 0.01*np.ones_like(post_m)
+        post_2 = 1.0 / post_v
+        post_1 = post_2 * post_m
+        ssm_params = {'sn': np.log(0.01)}
+        ssm_params['x_factor_1'] = post_1/3
+        ssm_params['x_factor_2'] = np.log(post_2/3) / 2
+        emi_params = self.emi_layer.init_hypers()
+        if isinstance(self.emi_layer, Gauss_Emis):
+            # emi_params['C'] = np.dot(s.C, np.diag(scale))
+            # emi_params['C'] = s.C
+            emi_params['C'] = np.dot(s.C, np.diag(scale))*np.random.randn(self.Dout, self.Din)
+            
+
+        # learnt a GP mapping between hidden states
+        print 'init latent function using GPR...'
+        reg = SGPR(post_m[:self.N-1, :], post_m[1:, :], self.M, 'Gaussian')
+        reg.set_fixed_params(['sn', 'sf', 'ls', 'zu'])
+        reg.optimise(method='L-BFGS-B', alpha=0.5, maxiter=100)
+        sgp_params = reg.sgp_layer.get_hypers()
+        # sgp_params['ls'] -= np.log(5)
+        # sgp_params = self.sgp_layer.init_hypers(post_m)
+        # sgp_params['zu'] = post_m[np.random.randint(0, post_m.shape[0], self.M), :]
+        # sgp_params['ls'] = np.log(1.0)*np.ones(self.Din)
         init_params = dict(sgp_params)
         init_params.update(emi_params)
         init_params.update(ssm_params)
@@ -1923,6 +1926,11 @@ class SGPSSM_C(AEP_Model):
         energy = logZ_dyn + logZ_emi + x_contrib + sgp_contrib
         for p in self.fixed_params:
             grad_all[p] = np.zeros_like(grad_all[p])
+
+        energy /= self.N
+        for key in grad_all.keys():
+            grad_all[key] /= self.N
+
         return energy, grad_all
 
     def compute_posterior_grad_x(self, alpha):

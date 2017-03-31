@@ -1,6 +1,10 @@
+import matplotlib
+matplotlib.use('Agg')
 import scipy as sp
-import pylab as plt
+import matplotlib.pylab as plt
 from scipy.integrate import odeint
+import numpy as np
+
 
 class HodgkinHuxley():
     """Full Hodgkin-Huxley Model implemented in Python"""
@@ -26,7 +30,8 @@ class HodgkinHuxley():
     E_L  = -54.387
     """Leak Nernst reversal potentials, in mV"""
 
-    t = sp.arange(0.0, 450.0, 0.01)
+    # t = sp.arange(0.0, 200.0, 0.1)
+    t = sp.arange(0.0, 100.0, 0.1)
     """ The time to integrate over """
 
     def alpha_m(self, V):
@@ -87,6 +92,19 @@ class HodgkinHuxley():
         """
         return self.g_L * (V - self.E_L)
 
+    # def I_inj(self, t):
+    #     """
+    #     External Current
+
+    #     |  :param t: time
+    #     |  :return: step up to 10 uA/cm^2 at t>100
+    #     |           step down to 0 uA/cm^2 at t>200
+    #     |           step up to 35 uA/cm^2 at t>300
+    #     |           step down to 0 uA/cm^2 at t>400
+    #     """
+    #     return 15*(t>5) - 15*(t>80) + 40*(t>125) - 20*(t>160)
+
+
     def I_inj(self, t):
         """
         External Current
@@ -97,7 +115,19 @@ class HodgkinHuxley():
         |           step up to 35 uA/cm^2 at t>300
         |           step down to 0 uA/cm^2 at t>400
         """
-        return 10*(t>100) - 10*(t>200) + 35*(t>300) - 35*(t>400)
+        return 15*(t>5) - 15*(t>35) + 40*(t>65) - 40*(t>95)
+
+    # def I_inj(self, t):
+    #     """
+    #     External Current
+
+    #     |  :param t: time
+    #     |  :return: step up to 10 uA/cm^2 at t>100
+    #     |           step down to 0 uA/cm^2 at t>200
+    #     |           step up to 35 uA/cm^2 at t>300
+    #     |           step down to 0 uA/cm^2 at t>400
+    #     """
+    #     return 10*(t>100) - 10*(t>200) + 35*(t>300) - 35*(t>400)
 
     @staticmethod
     def dALLdt(X, t, self):
@@ -156,7 +186,16 @@ class HodgkinHuxley():
         plt.plot(self.t, i_inj_values, 'k')
         plt.xlabel('t (ms)')
         plt.ylabel('$I_{inj}$ ($\\mu{A}/cm^2$)')
-        plt.ylim(-1, 40)
+        plt.ylim(-2, 42)
+
+        plt.figure()
+        plt.plot(V, n, 'ok', alpha=0.2)
+        plt.xlabel('V')
+        plt.ylabel('n')
+
+        np.savetxt('hh_data.txt', 
+            np.vstack((V, m, n, h, np.array(i_inj_values))).T,
+            fmt='%.5f')
 
         plt.show()
 
