@@ -53,7 +53,7 @@ model = aep.SGPSSM(y_train, Dlatent, M,
 hypers = model.init_hypers(y_train)
 for key in params.keys():
     hypers[key] = params[key]
-model.update_hypers(hypers, alpha)
+model.update_hypers(hypers)
 model.set_fixed_params(['C', 'R'])
 model.optimise(method='L-BFGS-B', alpha=alpha, maxiter=10000, reinit_hypers=False)
 
