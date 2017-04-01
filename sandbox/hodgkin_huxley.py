@@ -30,8 +30,8 @@ class HodgkinHuxley():
     E_L  = -54.387
     """Leak Nernst reversal potentials, in mV"""
 
-    # t = sp.arange(0.0, 200.0, 0.1)
-    t = sp.arange(0.0, 100.0, 0.1)
+    t = sp.arange(0.0, 200.0, 0.1)
+    # t = sp.arange(0.0, 100.0, 0.1)
     """ The time to integrate over """
 
     def alpha_m(self, V):
@@ -92,19 +92,6 @@ class HodgkinHuxley():
         """
         return self.g_L * (V - self.E_L)
 
-    # def I_inj(self, t):
-    #     """
-    #     External Current
-
-    #     |  :param t: time
-    #     |  :return: step up to 10 uA/cm^2 at t>100
-    #     |           step down to 0 uA/cm^2 at t>200
-    #     |           step up to 35 uA/cm^2 at t>300
-    #     |           step down to 0 uA/cm^2 at t>400
-    #     """
-    #     return 15*(t>5) - 15*(t>80) + 40*(t>125) - 20*(t>160)
-
-
     def I_inj(self, t):
         """
         External Current
@@ -115,7 +102,20 @@ class HodgkinHuxley():
         |           step up to 35 uA/cm^2 at t>300
         |           step down to 0 uA/cm^2 at t>400
         """
-        return 15*(t>5) - 15*(t>35) + 40*(t>65) - 40*(t>95)
+        return 15*(t>5) - 15*(t>80) + 40*(t>115) - 40*(t>160)
+
+
+    # def I_inj(self, t):
+    #     """
+    #     External Current
+
+    #     |  :param t: time
+    #     |  :return: step up to 10 uA/cm^2 at t>100
+    #     |           step down to 0 uA/cm^2 at t>200
+    #     |           step up to 35 uA/cm^2 at t>300
+    #     |           step down to 0 uA/cm^2 at t>400
+    #     """
+    #     return 15*(t>5) - 15*(t>35) + 40*(t>65) - 40*(t>95)
 
     # def I_inj(self, t):
     #     """

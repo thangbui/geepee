@@ -18,7 +18,7 @@ from utils import *
 from kernels import *
 
 # TODO: ideally these should be moved to some config file
-jitter = 1e-5
+jitter = 1e-6
 gh_degree = 10
 # TODO: do replacement sampling for now since this is faster
 # alternative would be
@@ -1346,11 +1346,11 @@ class Gauss_Emis():
 
 
 # with control, in progress, TODO: prediction
-class SGPSSM(AEP_Model):
+class SGPSSM_Linear(AEP_Model):
 
     def __init__(self, y_train, hidden_size, no_pseudo, 
         lik='Gaussian', prior_mean=0, prior_var=1, x_control=None):
-        super(SGPSSM, self).__init__(y_train)
+        super(SGPSSM_Linear, self).__init__(y_train)
         if x_control is not None:
             self.Dcon = Dcon = x_control.shape[1]
             self.x_control = x_control
@@ -1362,7 +1362,7 @@ class SGPSSM(AEP_Model):
         self.Din = Din = hidden_size
         self.M = M = no_pseudo
 
-        self.sgp_layer = SGP_Layer(N-1, Din+Dcon, Din, M)
+        self.dyn_layer = SGP_Layer(N-1, Din+Dcon, Din, M)
         if lik.lower() == 'gaussian':
             self.emi_layer = Gauss_Emis(y_train, Dout, Din)
         elif lik.lower() == 'probit':
@@ -1391,7 +1391,7 @@ class SGPSSM(AEP_Model):
         
         # update model with new hypers
         self.update_hypers(params)
-        self.sgp_layer.compute_cavity(alpha)
+        self.dyn_layer.compute_cavity(alpha)
         cav_m, cav_v, cav_1, cav_2 = self.compute_cavity_x(alpha)
         # deal with the transition/dynamic factors here
         idxs_prev = np.arange(1, self.N)
@@ -1403,11 +1403,11 @@ class SGPSSM(AEP_Model):
             cav_tm1_vc = np.hstack((cav_tm1_v, np.zeros((self.N-1, self.Dcon))))
         else:
             cav_tm1_mc, cav_tm1_vc = cav_tm1_m, cav_tm1_v
-        mprop, vprop, psi1, psi2 = self.sgp_layer.forward_prop_thru_cav(
+        mprop, vprop, psi1, psi2 = self.dyn_layer.forward_prop_thru_cav(
             cav_tm1_mc, cav_tm1_vc)
         logZ_dyn, dmprop, dvprop, dmt, dvt, dsn = self.compute_transition_tilted(
             mprop, vprop, cav_t_m, cav_t_v, alpha, scale_logZ_dyn)
-        sgp_grad_hyper, sgp_grad_input = self.sgp_layer.backprop_grads_lvm(
+        sgp_grad_hyper, sgp_grad_input = self.dyn_layer.backprop_grads_lvm(
             mprop, vprop, dmprop, dvprop, 
             psi1, psi2, cav_tm1_mc, cav_tm1_vc, alpha)
 
@@ -1446,7 +1446,7 @@ class SGPSSM(AEP_Model):
             grad_all[key] = grads_x[key]
 
         # compute objective
-        sgp_contrib = self.sgp_layer.compute_phi(alpha)
+        sgp_contrib = self.dyn_layer.compute_phi(alpha)
         phi_prior_x = self.compute_phi_prior_x()
         phi_poste_x = self.compute_phi_posterior_x(alpha)
         phi_cavity_x = self.compute_phi_cavity_x(alpha)
@@ -1586,14 +1586,14 @@ class SGPSSM(AEP_Model):
     def predict_f(self, inputs):
         # TODO
         if not self.updated:
-            self.sgp_layer.update_posterior_for_prediction()
+            self.dyn_layer.update_posterior_for_prediction()
             self.updated = True
-        mf, vf = self.sgp_layer.forward_prop_thru_post(inputs)
+        mf, vf = self.dyn_layer.forward_prop_thru_post(inputs)
         return mf, vf
 
     def predict_forward(self, T, x_control=None):
         if not self.updated:
-            self.sgp_layer.update_posterior_for_prediction()
+            self.dyn_layer.update_posterior_for_prediction()
             self.updated = True
         mx = np.zeros((T, self.Din))
         vx = np.zeros((T, self.Din))
@@ -1607,7 +1607,7 @@ class SGPSSM(AEP_Model):
             if x_control is not None:
                 mtm1 = np.hstack((mtm1, x_control[[t], :]))
                 vtm1 = np.hstack((vtm1, np.zeros((1, self.Dcon))))
-            mt, vt = self.sgp_layer.forward_prop_thru_post(mtm1, vtm1)
+            mt, vt = self.dyn_layer.forward_prop_thru_post(mtm1, vtm1)
             myt, vyt, vyt_n = self.emi_layer.output_probabilistic(mt, vt)
             mx[t, :], vx[t, :] = mt, vt
             my[t, :], vy_noiseless[t, :, :], vy[t, :, :] = myt, vyt, vyt_n
@@ -1618,9 +1618,9 @@ class SGPSSM(AEP_Model):
     def predict_y(self, inputs):
         # TODO
         if not self.updated:
-            self.sgp_layer.update_posterior_for_prediction()
+            self.dyn_layer.update_posterior_for_prediction()
             self.updated = True
-        mf, vf = self.sgp_layer.forward_prop_thru_post(inputs)
+        mf, vf = self.dyn_layer.forward_prop_thru_post(inputs)
         my, vy = self.emi_layer.output_probabilistic(mf, vf)
         return my, vy
 
@@ -1648,7 +1648,7 @@ class SGPSSM(AEP_Model):
             post_m = (post_m - post_m_mean) / post_m_std
             post_v = 0.01 * np.ones_like(post_m)
 
-        sgp_params = self.sgp_layer.init_hypers()
+        sgp_params = self.dyn_layer.init_hypers()
         emi_params = self.emi_layer.init_hypers()
         
         post_2 = 1.0 / post_v
@@ -1713,7 +1713,7 @@ class SGPSSM(AEP_Model):
         return init_params
 
     def get_hypers(self):
-        sgp_params = self.sgp_layer.get_hypers()
+        sgp_params = self.dyn_layer.get_hypers()
         emi_params = self.emi_layer.get_hypers()
         ssm_params = {}
         ssm_params['x_factor_1'] = self.x_factor_1
@@ -1725,7 +1725,7 @@ class SGPSSM(AEP_Model):
         return params
 
     def update_hypers(self, params):
-        self.sgp_layer.update_hypers(params)
+        self.dyn_layer.update_hypers(params)
         self.emi_layer.update_hypers(params)
         self.sn = params['sn']
         self.x_factor_1 = params['x_factor_1']
@@ -1740,11 +1740,11 @@ class SGPSSM(AEP_Model):
 
 
 # double GP, with control, in progress, TODO: prediction
-class SDGPSSM(AEP_Model):
+class SGPSSM_GP(AEP_Model):
 
     def __init__(self, y_train, hidden_size, no_pseudo, 
         lik='Gaussian', prior_mean=0, prior_var=1, x_control=None):
-        super(SDGPSSM, self).__init__(y_train)
+        super(SGPSSM_GP, self).__init__(y_train)
         if x_control is not None:
             self.Dcon = Dcon = x_control.shape[1]
             self.x_control = x_control
@@ -2003,8 +2003,8 @@ class SDGPSSM(AEP_Model):
         mx = np.zeros((T, self.Din))
         vx = np.zeros((T, self.Din))
         my = np.zeros((T, self.Dout))
-        vy_noiseless = np.zeros((T, self.Dout, self.Dout))
-        vy = np.zeros((T, self.Dout, self.Dout))
+        vy_noiseless = np.zeros((T, self.Dout))
+        vy = np.zeros((T, self.Dout))
         post_m, post_v = self.get_posterior_x()
         mtm1 = post_m[[-1], :]
         vtm1 = post_v[[-1], :]
@@ -2016,7 +2016,7 @@ class SDGPSSM(AEP_Model):
             mft, vft = self.emi_layer.forward_prop_thru_post(mt, vt)
             myt, vyt_n = self.lik_layer.output_probabilistic(mft, vft)
             mx[t, :], vx[t, :] = mt, vt
-            my[t, :], vy_noiseless[t, :, :], vy[t, :, :] = myt, vft, vyt_n
+            my[t, :], vy_noiseless[t, :], vy[t, :] = myt, vft, vyt_n
             mtm1 = mt
             vtm1 = vt
         return mx, vx, my, vy_noiseless, vy
@@ -2068,7 +2068,6 @@ class SDGPSSM(AEP_Model):
         # post_v = np.diagonal(s.smoothed_sigmas, axis1=1, axis2=2)
         scale = np.std(post_m, axis=0)
         post_m = (post_m - np.mean(post_m, axis=0)) / scale
-        # post_v = post_v / scale**2
         post_v = 0.01*np.ones_like(post_m)
         post_2 = 1.0 / post_v
         post_1 = post_2 * post_m
@@ -2083,11 +2082,12 @@ class SDGPSSM(AEP_Model):
         if self.Dcon > 0:
             x = np.hstack((x, self.x_control[:self.N-1, :]))
         reg = SGPR(x, y, self.M, 'Gaussian')
-        # reg.set_fixed_params(['sn', 'sf', 'ls', 'zu'])
-        reg.set_fixed_params(['sn', 'sf'])
-        reg.optimise(method='L-BFGS-B', alpha=0.5, maxiter=1000)
+        reg.set_fixed_params(['sn', 'sf', 'ls', 'zu'])
+        # reg.set_fixed_params(['sn', 'sf'])
+        reg.optimise(method='L-BFGS-B', alpha=0.5, maxiter=500)
         dyn_params = reg.sgp_layer.get_hypers(key_suffix='_dynamic')
         # dyn_params['ls_dynamic'] -= np.log(5)
+        # dyn_params['ls_dynamic'][self.Din:] = np.log(1)
 
         # learn a GP mapping between hidden states and observations
         print 'init emission function using GPR...'
@@ -2095,11 +2095,11 @@ class SDGPSSM(AEP_Model):
         y = self.y_train
         # TODO: deal with different likelihood here
         reg = SGPR(x, y, self.M, 'Gaussian')
-        # reg.set_fixed_params(['sn', 'sf', 'ls', 'zu'])
-        reg.set_fixed_params(['sn', 'sf'])
-        reg.optimise(method='L-BFGS-B', alpha=0.5, maxiter=1000)
+        reg.set_fixed_params(['sn', 'sf', 'ls', 'zu'])
+        # reg.set_fixed_params(['sn', 'sf'])
+        reg.optimise(method='L-BFGS-B', alpha=0.5, maxiter=500)
         emi_params = reg.sgp_layer.get_hypers(key_suffix='_emission')
-        # emi_params['ls_emission'] -= np.log(5) 
+        # emi_params['ls_emission'] -= np.log(5)
         lik_params = self.lik_layer.init_hypers(key_suffix='_emission')       
 
         init_params = dict(dyn_params)
