@@ -5,6 +5,10 @@ import matplotlib.pylab as plt
 from scipy.integrate import odeint
 import numpy as np
 
+from matplotlib.font_manager import FontProperties
+fontP = FontProperties()
+fontP.set_size('small')
+
 
 class HodgkinHuxley():
     """Full Hodgkin-Huxley Model implemented in Python"""
@@ -92,6 +96,18 @@ class HodgkinHuxley():
         """
         return self.g_L * (V - self.E_L)
 
+    # def I_inj(self, t):
+    #     """
+    #     External Current
+
+    #     |  :param t: time
+    #     |  :return: step up to 10 uA/cm^2 at t>100
+    #     |           step down to 0 uA/cm^2 at t>200
+    #     |           step up to 35 uA/cm^2 at t>300
+    #     |           step down to 0 uA/cm^2 at t>400
+    #     """
+    #     return 15*(t>5) - 15*(t>80) + 40*(t>115) - 40*(t>160)
+
     def I_inj(self, t):
         """
         External Current
@@ -102,7 +118,7 @@ class HodgkinHuxley():
         |           step up to 35 uA/cm^2 at t>300
         |           step down to 0 uA/cm^2 at t>400
         """
-        return 15*(t>5) - 15*(t>80) + 40*(t>115) - 40*(t>160)
+        return (t-10)/2*(t>10) - (t-10)/2*(t>70) + (t-110.0)/4*(t>110) - (t-110.0)/4*(t>190)
 
 
     # def I_inj(self, t):
@@ -161,32 +177,35 @@ class HodgkinHuxley():
         il = self.I_L(V)
 
         plt.figure()
-
-        plt.subplot(4,1,1)
+        plt.subplot(3,1,1)
         plt.title('Hodgkin-Huxley Neuron')
         plt.plot(self.t, V, 'k')
         plt.ylabel('V (mV)')
+        plt.xticks([])
 
-        plt.subplot(4,1,2)
-        plt.plot(self.t, ina, 'c', label='$I_{Na}$')
-        plt.plot(self.t, ik, 'y', label='$I_{K}$')
-        plt.plot(self.t, il, 'm', label='$I_{L}$')
-        plt.ylabel('Current')
-        plt.legend()
+        # plt.subplot(4,1,2)
+        # plt.plot(self.t, ina, 'c', label='$I_{Na}$')
+        # plt.plot(self.t, ik, 'y', label='$I_{K}$')
+        # plt.plot(self.t, il, 'm', label='$I_{L}$')
+        # plt.ylabel('Current')
+        # plt.xticks([])
+        # plt.legend(loc='upper center', ncol=3, prop=fontP)
 
-        plt.subplot(4,1,3)
+        plt.subplot(3,1,2)
         plt.plot(self.t, m, 'r', label='m')
         plt.plot(self.t, h, 'g', label='h')
         plt.plot(self.t, n, 'b', label='n')
         plt.ylabel('Gating Value')
-        plt.legend()
+        plt.xticks([])
+        plt.legend(loc='upper center', ncol=3, prop=fontP)
 
-        plt.subplot(4,1,4)
+        plt.subplot(3,1,3)
         i_inj_values = [self.I_inj(t) for t in self.t]
         plt.plot(self.t, i_inj_values, 'k')
         plt.xlabel('t (ms)')
         plt.ylabel('$I_{inj}$ ($\\mu{A}/cm^2$)')
-        plt.ylim(-2, 42)
+        plt.ylim(-2, 42)        
+        plt.savefig('/tmp/hh_data_all.pdf')
 
         plt.figure()
         plt.plot(V, n, 'ok', alpha=0.2)
@@ -198,6 +217,7 @@ class HodgkinHuxley():
             fmt='%.5f')
 
         plt.show()
+        plt.savefig('/tmp/hh_data_V_n.pdf')
 
 if __name__ == '__main__':
     runner = HodgkinHuxley()

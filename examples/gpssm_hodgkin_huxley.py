@@ -247,10 +247,10 @@ def plot_posterior_gp(params_fname, fig_fname, control=False, M=20):
 		
 	plt.savefig(fig_fname)
 
-	if control:
-		plot_model_with_control(model_aep, '', '_gp_with_control')
-	else:
-		plot_model_no_control(model_aep, '', '_gp_no_control')
+	# if control:
+	# 	plot_model_with_control(model_aep, '', '_gp_with_control')
+	# else:
+	# 	plot_model_no_control(model_aep, '', '_gp_no_control')
 
 
 def plot_prediction_gp(params_fname, fig_fname, M=20):
@@ -265,7 +265,8 @@ def plot_prediction_gp(params_fname, fig_fname, M=20):
 	Dobs = y.shape[1]
 	T = y.shape[0]
 	x_control = xc
-	x_control_test = np.flipud(x_control)
+	# x_control_test = np.flipud(x_control)
+	x_control_test = x_control*1.5
 	no_panes = 5
 	model_aep = aep.SGPSSM_GP(y, Dlatent, M, 
 	    lik='Gaussian', prior_mean=0, prior_var=1000, x_control=x_control)
@@ -367,7 +368,7 @@ def model_gp(params_fname, control=False, M=20, alpha=0.5):
 	# optimise
 	# model_aep.set_fixed_params(['sf_emission', 'sf_dynamic'])
 	model_aep.set_fixed_params(['sf_emission', 'sf_dynamic', 'sn', 'sn_emission'])
-	opt_hypers = model_aep.optimise(method='L-BFGS-B', alpha=alpha, maxiter=20000, reinit_hypers=False)
+	opt_hypers = model_aep.optimise(method='L-BFGS-B', alpha=alpha, maxiter=2000, reinit_hypers=False)
 	model_aep.save_model(params_fname)
 
 

@@ -198,11 +198,6 @@ class SGP_Layer(object):
             extra_args[0], extra_args[1], extra_args[2], extra_args[3]
         dmcav, dvcav = grad_cav['mcav'], grad_cav['vcav']
 
-        # fig, axs = plt.subplots(2, 1)
-        # axs[0].errorbar(self.zu[:, 0], self.mu[0, :], fmt='+k', yerr=np.sqrt(np.diag(self.Su[0, :, :])))
-        # axs[1].errorbar(self.zu[:, 0], self.mu[1, :], fmt='+k', yerr=np.sqrt(np.diag(self.Su[1, :, :])))
-
-
         # perform Power-EP update
         munew = muhat + np.einsum('ndab,ndb->nda', Suhat, dmcav)
         inner = np.einsum('nda,ndb->ndab', dmcav, dmcav) - 2*dvcav
@@ -230,7 +225,7 @@ class SGP_Layer(object):
         else:
             # parallel update
             self.t1[n, :, :] = decay * t1_old + (1-decay) * t1_new
-            self.t2[n, :, :] = decay * t2_old + (1-decay) * t2_new
+            self.t2[n, :, :, :] = decay * t2_old + (1-decay) * t2_new
             self.update_posterior()
 
         # axs[0].errorbar(self.zu[:, 0]+0.05, self.mu[0, :], fmt='+r', yerr=np.sqrt(np.diag(self.Su[0, :, :])))
@@ -929,7 +924,7 @@ class SGPSSM(EP_Model):
     def inference(self, alpha=1.0, no_epochs=10, parallel=True, decay=0):
         try:
             for e in range(no_epochs):
-                if e % 1 == 0:
+                if e % 50 == 0:
                     print 'epoch %d/%d' % (e, no_epochs)
                 if parallel:
                     self.inf_parallel(e, alpha, decay)
