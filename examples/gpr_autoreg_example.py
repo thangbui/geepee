@@ -7,6 +7,7 @@ import matplotlib.pylab as plt
 from scipy import special
 
 from .context import vfe, compute_kernel, compute_psi_weave
+jitter = 1e-5
 
 class AutoSGPR(object):
 	def __init__(self, X_train, Y_train, M):
@@ -50,13 +51,13 @@ class AutoSGPR(object):
 					m_X_test_i = np.hstack((X_test, mf[:, :i].reshape((N_test, i))))
 					v_X_test_i = np.hstack((np.zeros_like(X_test), vf[:, :i].reshape((N_test, i))))
 					res = self.forward_prop_random_thru_post_mm(model, m_X_test_i, v_X_test_i, mu, Su)
-					mf[:, i], vf[:, i] = res[0], res[1]
+					mf[:, i], vf[:, i] = res[0][:, 0], res[1][:, 0]
 
 		return mf, vf
 
 	def forward_prop_deterministic_thru_post(self, model, x, mu, Su):
 		Kuu_noiseless = compute_kernel(2*model.ls, 2*model.sf, model.zu, model.zu)
-		Kuu = Kuu_noiseless + np.diag(jitter * np.ones((M, )))
+		Kuu = Kuu_noiseless + np.diag(jitter * np.ones((self.M, )))
 		# TODO: probably not the best way to use inv
 		Kuuinv = np.linalg.inv(Kuu)
 		A = np.dot(Kuuinv, mu)
@@ -64,23 +65,23 @@ class AutoSGPR(object):
 		B_det = np.dot(Kuuinv, np.dot(Su, Kuuinv)) - Kuuinv
 		psi0 = np.exp(2*model.sf)
 		psi1 = compute_kernel(2*model.ls, 2*model.sf, x, model.zu)
-		mout = np.einsum('nm,dm->nd', psi1, A)
-		Bpsi2 = np.einsum('dab,na,nb->nd', B_det, psi1, psi1)
+		mout = np.einsum('nm,md->nd', psi1, A)
+		Bpsi2 = np.einsum('ab,na,nb->n', B_det, psi1, psi1)[:, np.newaxis]
 		vout = psi0 + Bpsi2
 		return mout, vout
 
 	def forward_prop_random_thru_post_mm(self, model, mx, vx, mu, Su):
 		Kuu_noiseless = compute_kernel(2*model.ls, 2*model.sf, model.zu, model.zu)
-		Kuu = Kuu_noiseless + np.diag(jitter * np.ones((M, )))
-		# TODO: probably not the best way to use inv
+		Kuu = Kuu_noiseless + np.diag(jitter * np.ones((self.M, )))
+		# TODO: remove inv
 		Kuuinv = np.linalg.inv(Kuu)
 		A = np.dot(Kuuinv, mu)
 		Smm = Su + np.outer(mu, mu)
 		B_sto = np.dot(Kuuinv, np.dot(Smm, Kuuinv)) - Kuuinv
 		psi0 = np.exp(2.0*model.sf)
 		psi1, psi2 = compute_psi_weave(2*model.ls, 2*model.sf, mx, vx, model.zu)
-		mout = np.einsum('nm,dm->nd', psi1, A)
-		Bpsi2 = np.einsum('dab,nab->nd', B_sto, psi2)
+		mout = np.einsum('nm,md->nd', psi1, A)
+		Bpsi2 = np.einsum('ab,nab->n', B_sto, psi2)[:, np.newaxis]
 		vout = psi0 + Bpsi2 - mout**2
 		return mout, vout
 
@@ -128,7 +129,11 @@ def run_regression_1D():
 
 	def plot(model, alpha, fname):
 		xx = np.linspace(-1.2, 1.2, 200)[:,None]
-		mf, vf = model.predict_f(xx, alpha)
+		if isinstance(model, IndepSGPR):
+			mf, vf = model.predict_f(xx, alpha)
+		else:
+			# mf, vf = model.predict_f(xx, alpha, use_mean_only=False)
+			mf, vf = model.predict_f(xx, alpha, use_mean_only=True)
 
 		colors = ['r', 'b']
 		plt.figure()
@@ -160,20 +165,6 @@ def run_regression_1D():
 	ar_model = AutoSGPR(X, Y, M)
 	ar_model.train(alpha=alpha)
 	plot(ar_model, alpha, '/tmp/reg_autoreg_multioutput.pdf')
-
-
-	# print "create independent output model and optimize ..."
-	# M = N
-	# alpha = 0.5
-	# indep_model = IndepSGPR(X, np.fliplr(Y), M)
-	# indep_model.train(alpha=alpha)
-	# plot(indep_model, alpha, '/tmp/reg_indep_multioutput_1.pdf')
-
-	# print "create correlated output model and optimize ..."
-	# M = N
-	# ar_model = AutoSGPR(X, np.fliplr(Y), M)
-	# ar_model.train(alpha=alpha)
-	# plot(ar_model, alpha, '/tmp/reg_autoreg_multioutput_1.pdf')	
 
 if __name__ == '__main__':
 	run_regression_1D()
