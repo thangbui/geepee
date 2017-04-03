@@ -979,7 +979,7 @@ class SGPLVM(AEP_Model):
         params.update(x_params)
         return params
 
-    def update_hypers(self):
+    def update_hypers(self, params):
         self.sgp_layer.update_hypers(params)
         self.lik_layer.update_hypers(params)
         self.factor_x1 = params['x1']
