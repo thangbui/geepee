@@ -570,8 +570,8 @@ class Gauss_Layer(Lik_Layer):
         dsn *= scale
         return {'sn': dsn}
 
-    def output_probabilistic(self, mf, vf):
-        return mf, vf + np.exp(2.0*self.sn)
+    def output_probabilistic(self, mf, vf, alpha=1.0):
+        return mf, vf + np.exp(2.0*self.sn)/alpha
 
     def init_hypers(self, key_suffix=''):
         self.sn = np.log(0.01)
@@ -2553,7 +2553,6 @@ class SGPSSM_GP(AEP_Model):
         self.x_post_2[0, :] += self.x_prior_2
 
 
-
 # mean parameter parameterisation with control, in progress, TODO: prediction
 class SGPSSM_M(AEP_Model):
 
@@ -2946,7 +2945,7 @@ class SGPSSM_M(AEP_Model):
         self.x_post_2[0, :] += self.x_prior_2
 
 
-# TODO
+# deep GP regression with hidden variables 
 class SDGPR_H(AEP_Model):
 
     def __init__(self, x_train, y_train, no_pseudos, hidden_sizes, lik='Gaussian'):
@@ -2963,6 +2962,7 @@ class SDGPR_H(AEP_Model):
         self.x_train = x_train
 
         self.sgp_layers = []
+        self.lik_layer = []
         for i in range(L):
             Din_i = self.size[i]
             Dout_i = self.size[i+1]
@@ -2970,15 +2970,23 @@ class SDGPR_H(AEP_Model):
             self.sgp_layers.append(SGP_Layer(N, Din_i, Dout_i, M_i))
 
         if lik.lower() == 'gaussian':
-            self.lik_layer = Gauss_Layer(N, Dout)
+            self.lik_layer = Gauss_Layer(N, Dout_i)
         elif lik.lower() == 'probit':
-            self.lik_layer = Probit_Layer(N, Dout)
+            self.lik_layer = Probit_Layer(N, Dout_i)
         else:
             raise NotImplementedError('likelihood not implemented')
+        # natural params for latent variables
+        self.h_factor_1 = []
+        self.h_factor_2 = []
+        for i in range(L-1):
+            Dout_i = self.size[i+1]
+            self.h_factor_1.append(np.zeros((N, Dout_i)))
+            self.h_factor_2.append(np.zeros((N, Dout_i)))
 
     def objective_function(self, params, mb_size, alpha=1.0):
         N = self.N
         if mb_size >= N:
+            idxs = np.arange(N)
             xb = self.x_train
             yb = self.y_train
         else:
@@ -2995,55 +3003,69 @@ class SDGPR_H(AEP_Model):
         self.update_hypers(params)
         for layer in self.sgp_layers:
             layer.compute_cavity(alpha)
-
-        #### propagate x cavity forward
-        mout, vout, psi1, psi2 = [], [], [], []
-        for i in range(0, self.L):
-            layer = self.sgp_layers[i]
-            if i == 0:
-                # first layer
-                m0, v0, kfu0 = layer.forward_prop_thru_cav(xb)
-                mout.append(m0)
-                vout.append(v0)
-                psi1.append(kfu0)
-                psi2.append(None)
-            else:
-                mi, vi, psi1i, psi2i = layer.forward_prop_thru_cav(
-                    mout[i-1], vout[i-1])
-                mout.append(mi)
-                vout.append(vi)
-                psi1.append(psi1i)
-                psi2.append(psi2i)
-
-        # compute logZ and gradients
-        logZ, dm, dv = self.lik_layer.compute_log_Z(
-            mout[-1], vout[-1], yb, alpha)
-        logZ_scale = scale_logZ * logZ
-        dmi = scale_logZ * dm
-        dvi = scale_logZ * dv
-        grad_list = []
-        for i in range(self.L-1, -1, -1):
-            layer = self.sgp_layers[i]
-            if i == 0:
-                grad_hyper = layer.backprop_grads_reg(
-                    mout[i], vout[i], dmi, dvi, psi1[i], xb, alpha)
-            else:
-                grad_hyper, grad_input = layer.backprop_grads_lvm(
-                    mout[i], vout[i], dmi, dvi, psi1[i], psi2[i], 
-                    mout[i-1], vout[i-1], alpha)
-                dmi, dvi = grad_input['mx'], grad_input['vx']
-            grad_list.insert(0, grad_hyper)
-
-        lik_grad_hyper = self.lik_layer.backprop_grads(
-            mout[-1], vout[-1], dm, dv, alpha, scale_logZ)
-        
+        cav_h_1, cav_h_2, cav_h_m, cav_h_v = self.compute_cavity_h(idxs, alpha)
+        dmcav_h = []
+        dvcav_h = []
+        dsn = np.zeros_like(self.sn)
         grad_all = {}
-        for i, grad in enumerate(grad_list):
-            for key in grad.keys():
-                grad_all[key + '_%d'%i] = grad[key]
+        logZ = 0
+        for i in range(self.L-1):
+            layer_i = self.sgp_layers[i]
+            if i == 0:
+                mprop, vprop, kfu = layer_i.forward_prop_thru_cav(xb)
+            else:
+                mprop, vprop, psi1, psi2 = layer_i.forward_prop_thru_cav(
+                    cav_h_m[i-1], cav_h_v[i-1])
+            m_i, v_i = cav_h_m[i], cav_h_v[i]
+            logZ_i, dmprop, dvprop, dmi, dvi, dsni = self.compute_transition_tilted(
+                mprop, vprop, m_i, v_i, alpha, i, scale_logZ)
+            
+            if i == 0:
+                sgp_grad_hyper = layer_i.backprop_grads_reg(
+                    mprop, vprop, dmprop, dvprop, kfu, xb, alpha)
+            else:
+                sgp_grad_hyper, sgp_grad_input = layer_i.backprop_grads_lvm(
+                    mprop, vprop, dmprop, dvprop, 
+                    psi1, psi2, cav_h_m[i-1], cav_h_v[i-1], alpha)
+                dmcav[i-1] += sgp_grad_input['mx']
+                dvcav[i-1] += sgp_grad_input['vx']
 
+            logZ += logZ_i
+            for key in sgp_grad_hyper.keys():
+                grad_all[key+'_%d'%i] = sgp_grad_hyper[key]
+            dmcav_h.append(dmi)
+            dvcav_h.append(dvi)
+            dsn[i] = dsni
+
+        # final layer
+        i = self.L-1
+        layer_i = self.sgp_layers[-1]
+        m_im1, v_im1 = cav_h_m[i-1], cav_h_v[i-1]
+        mprop, vprop, psi1, psi2 = layer_i.forward_prop_thru_cav(m_im1, v_im1)
+        # compute logZ and gradients
+        logZ_lik, dmprop, dvprop = self.lik_layer.compute_log_Z(
+            mprop, vprop, yb, alpha)
+        logZ_scale = scale_logZ * logZ
+        dm_scale = scale_logZ * dm
+        dv_scale = scale_logZ * dv
+        grad_hyper, grad_input = layer_i.backprop_grads_lvm(
+            mprop, vprop, dm_scale, dv_scale, psi1, psi2, 
+            m_im1, v_im1, alpha)
+        dm_im1, dv_im1 = 
+        lik_grad_hyper = self.lik_layer.backprop_grads(
+            mprop, vprop, dm, dv, alpha, scale_logZ)
+
+        logZ += logZ_scale
+        for key in grad_hyper.keys():
+            grad_all[key+'_%d'%i] = grad_hyper[key]
         for key in lik_grad_hyper.keys():
-            grad_all[key] = lik_grad_hyper[key]
+            grad_all[key+'_%d'%i] = lik_grad_hyper[key]
+        grad_all['sn_hidden'] = dsn    
+        dmcav_h[i-1] += grad_input['mx']
+        dvcav_h[i-1] += grad_input['vx']
+
+        # compute grads via posterior and cavity
+        
 
         # compute objective
         sgp_contrib = 0
@@ -3055,6 +3077,36 @@ class SDGPR_H(AEP_Model):
             grad_all[p] = np.zeros_like(grad_all[p])
 
         return energy, grad_all
+
+    def compute_transition_tilted(self, m_prop, v_prop, m_t, v_t, alpha, layer_ind, scale):
+        sn2 = np.exp(2*self.sn[layer_ind])
+        v_sum = v_t + v_prop + sn2 / alpha
+        m_diff = m_t - m_prop
+        exp_term = -0.5 * m_diff**2 / v_sum
+        const_term = -0.5 * np.log(2*np.pi*v_sum)
+        alpha_term = 0.5 * (1-alpha) * np.log(2*np.pi*sn2) - 0.5*np.log(alpha)
+        logZ = exp_term + const_term + alpha_term
+        logZ = np.sum(logZ)
+
+        dvt = -0.5 / v_sum + 0.5 * m_diff**2 / v_sum**2
+        dvprop = -0.5 / v_sum + 0.5 * m_diff**2 / v_sum**2
+        dmt = -m_diff / v_sum
+        dmprop = m_diff / v_sum
+
+        dv_sum = np.sum(dvt)
+        dsn = dv_sum*2*sn2/alpha + m_prop.shape[0]*self.Din*(1-alpha)
+        return scale*logZ, scale*dmprop, scale*dvprop, scale*dmt, scale*dvt, scale*dsn
+
+    def compute_cavity_h(self, idxs, alpha):
+        cav_h_1, cav_h_2, cav_h_m, cav_h_v = []
+        for i in range(self.L-1):
+            cav_h_1_i = self.h_factor_1[idxs, :]*(2-alpha)
+            cav_h_2_i = self.h_factor_2[idxs, :]*(2-alpha)
+            cav_h_1.append(cav_h_1_i)
+            cav_h_2.append(cav_h_2_i)
+            cav_h_m.append(cav_h_1_i/cav_h_2_i)
+            cav_h_v.append(1/cav_h_2_i)
+        return cav_h_1, cav_h_2, cav_h_m, cav_h_v
 
     def predict_f(self, inputs):
         if not self.updated:
@@ -3097,11 +3149,9 @@ class SDGPR_H(AEP_Model):
                     self.x_train, 
                     key_suffix='_%d'%i)
             else:
-                sgp_params = self.sgp_layers[i].init_hypers(
-                    key_suffix='_%d'%i)
+                sgp_params = self.sgp_layers[i].init_hypers(key_suffix='_%d'%i)
             init_params.update(sgp_params)
-
-        lik_params = self.lik_layer.init_hypers()
+        lik_params = self.lik_layer.init_hypers(key_suffix='_%d'%i)
         init_params.update(lik_params)
         return init_params
 
@@ -3115,6 +3165,6 @@ class SDGPR_H(AEP_Model):
         return params
 
     def update_hypers(self, params):
-        for i, layer in enumerate(self.sgp_layers):
-            layer.update_hypers(params, key_suffix='_%d'%i)
+        for i in range(self.L):
+            self.sgp_layers[i].update_hypers(params, key_suffix='_%d'%i)
         self.lik_layer.update_hypers(params)
