@@ -3054,29 +3054,77 @@ class SDGPR_H(AEP_Model):
         dm_im1, dv_im1 = 
         lik_grad_hyper = self.lik_layer.backprop_grads(
             mprop, vprop, dm, dv, alpha, scale_logZ)
-
         logZ += logZ_scale
+        dmcav_h[i-1] += grad_input['mx']
+        dvcav_h[i-1] += grad_input['vx']
+        # compute grads via posterior and cavity
+        grads_h = self.compute_grads_hidden(dmcav_h, dvcav_h, alpha)
+
         for key in grad_hyper.keys():
             grad_all[key+'_%d'%i] = grad_hyper[key]
         for key in lik_grad_hyper.keys():
             grad_all[key+'_%d'%i] = lik_grad_hyper[key]
-        grad_all['sn_hidden'] = dsn    
-        dmcav_h[i-1] += grad_input['mx']
-        dvcav_h[i-1] += grad_input['vx']
-
-        # compute grads via posterior and cavity
-        
+        for key in grads_h.keys():
+            grad_all[key] = grads_h[key]    
+        grad_all['sn_hidden'] = dsn
 
         # compute objective
         sgp_contrib = 0
         for layer in self.sgp_layers:
             sgp_contrib += layer.compute_phi(alpha)
-        energy = logZ_scale + sgp_contrib
+        phi_poste_h = self.compute_phi_posterior_h(alpha)
+        phi_cavity_h = self.compute_phi_cavity_h(alpha)
+        energy = logZ + sgp_contrib + phi_poste_h + phi_cavity_h
 
         for p in self.fixed_params:
             grad_all[p] = np.zeros_like(grad_all[p])
 
         return energy, grad_all
+
+    def compute_grads_hidden(self, dmcav_logZ, dvcav_logZ, alpha):
+        grads = {}
+        for i in range(self.L-1):
+            post_1 = self.h_factor_1[i]*2
+            post_2 = self.h_factor_2[i]*2
+            d1_post = 2*(post_1 / post_2)
+            d2_post = - post_1**2 / post_2**2 - 1 / post_2
+            scale_post = - (1.0 - 1.0/alpha)
+
+            cav_1 = self.h_factor_1[i]*(2-alpha)
+            cav_2 = self.h_factor_2[i]*(2-alpha)
+            d1_cav = (2-alpha)*(cav_1 / cav_2)
+            d2_cav = (2-alpha)*(- 0.5 * cav_1**2 / cav_2**2 - 0.5 / cav_2)
+            scale_cav = -1.0/alpha
+
+            d1_logZ = dmcav_logZ[i] / cav_2
+            d2_logZ = - dmcav_logZ[i] * cav_1 / cav_2**2 - dvcav_logZ[i] / cav_2**2
+            
+            d1 = d1_logZ + scale_cav * d1_cav + scale_post * d1_post
+            d2 = d2_logZ + scale_cav * d2_cav + scale_post * d2_post
+
+            grads{'h_factor_1_%d'%i} = d1
+            grads{'h_factor_2_%d'%i} = 2*d2*self.h_factor_2[i]
+        return grads
+
+    def compute_phi_cavity_h(self, alpha):
+        scale = -1.0 / alpha
+        phi_cav = 0
+        for i in range(self.L-1):
+            cav_1 = self.h_factor_1[i]*(2-alpha)
+            cav_2 = self.h_factor_2[i]*(2-alpha)
+            phi_cav_i = 0.5 * (cav_1**2 / cav_2 - np.log(cav_2))
+            phi_cav += scale * np.sum(phi_cav_i)
+        return phi_cav
+
+    def compute_phi_posterior_h(self, alpha):
+        scale = - (1.0 - 1.0 / alpha)
+        phi_post = 0
+        for i in range(self.L-1):
+            post_1 = self.h_factor_1[i]*2
+            post_2 = self.h_factor_2[i]*2
+            phi_post_i = 0.5 * (post_1**2 / post_2 - np.log(post_2))
+            phi_post += scale * np.sum(phi_post_i)
+        return phi_post
 
     def compute_transition_tilted(self, m_prop, v_prop, m_t, v_t, alpha, layer_ind, scale):
         sn2 = np.exp(2*self.sn[layer_ind])
@@ -3100,8 +3148,8 @@ class SDGPR_H(AEP_Model):
     def compute_cavity_h(self, idxs, alpha):
         cav_h_1, cav_h_2, cav_h_m, cav_h_v = []
         for i in range(self.L-1):
-            cav_h_1_i = self.h_factor_1[idxs, :]*(2-alpha)
-            cav_h_2_i = self.h_factor_2[idxs, :]*(2-alpha)
+            cav_h_1_i = self.h_factor_1[i][idxs, :]*(2-alpha)
+            cav_h_2_i = self.h_factor_2[i][idxs, :]*(2-alpha)
             cav_h_1.append(cav_h_1_i)
             cav_h_2.append(cav_h_2_i)
             cav_h_m.append(cav_h_1_i/cav_h_2_i)
