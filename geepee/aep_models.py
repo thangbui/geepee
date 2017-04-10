@@ -2949,7 +2949,7 @@ class SGPSSM_M(AEP_Model):
 class SDGPR_H(AEP_Model):
 
     def __init__(self, x_train, y_train, no_pseudos, hidden_sizes, lik='Gaussian'):
-        super(SDGPR, self).__init__(y_train)
+        super(SDGPR_H, self).__init__(y_train)
         self.N = N = y_train.shape[0]
         self.Dout = Dout = y_train.shape[1]
         self.Din = Din = x_train.shape[1]
@@ -3027,8 +3027,8 @@ class SDGPR_H(AEP_Model):
                 sgp_grad_hyper, sgp_grad_input = layer_i.backprop_grads_lvm(
                     mprop, vprop, dmprop, dvprop, 
                     psi1, psi2, cav_h_m[i-1], cav_h_v[i-1], alpha)
-                dmcav[i-1] += sgp_grad_input['mx']
-                dvcav[i-1] += sgp_grad_input['vx']
+                dmcav_h[i-1] += sgp_grad_input['mx']
+                dvcav_h[i-1] += sgp_grad_input['vx']
 
             logZ += logZ_i
             for key in sgp_grad_hyper.keys():
@@ -3045,15 +3045,14 @@ class SDGPR_H(AEP_Model):
         # compute logZ and gradients
         logZ_lik, dmprop, dvprop = self.lik_layer.compute_log_Z(
             mprop, vprop, yb, alpha)
-        logZ_scale = scale_logZ * logZ
-        dm_scale = scale_logZ * dm
-        dv_scale = scale_logZ * dv
+        logZ_scale = scale_logZ * logZ_lik
+        dm_scale = scale_logZ * dmprop
+        dv_scale = scale_logZ * dvprop
         grad_hyper, grad_input = layer_i.backprop_grads_lvm(
             mprop, vprop, dm_scale, dv_scale, psi1, psi2, 
             m_im1, v_im1, alpha)
-        dm_im1, dv_im1 = 
         lik_grad_hyper = self.lik_layer.backprop_grads(
-            mprop, vprop, dm, dv, alpha, scale_logZ)
+            mprop, vprop, dmprop, dvprop, alpha, scale_logZ)
         logZ += logZ_scale
         dmcav_h[i-1] += grad_input['mx']
         dvcav_h[i-1] += grad_input['vx']
@@ -3063,7 +3062,7 @@ class SDGPR_H(AEP_Model):
         for key in grad_hyper.keys():
             grad_all[key+'_%d'%i] = grad_hyper[key]
         for key in lik_grad_hyper.keys():
-            grad_all[key+'_%d'%i] = lik_grad_hyper[key]
+            grad_all[key] = lik_grad_hyper[key]
         for key in grads_h.keys():
             grad_all[key] = grads_h[key]    
         grad_all['sn_hidden'] = dsn
@@ -3090,28 +3089,29 @@ class SDGPR_H(AEP_Model):
             d2_post = - post_1**2 / post_2**2 - 1 / post_2
             scale_post = - (1.0 - 1.0/alpha)
 
-            cav_1 = self.h_factor_1[i]*(2-alpha)
-            cav_2 = self.h_factor_2[i]*(2-alpha)
+            cav_1 = self.h_factor_1[i]*(2.0-alpha)
+            cav_2 = self.h_factor_2[i]*(2.0-alpha)
             d1_cav = (2-alpha)*(cav_1 / cav_2)
             d2_cav = (2-alpha)*(- 0.5 * cav_1**2 / cav_2**2 - 0.5 / cav_2)
             scale_cav = -1.0/alpha
 
-            d1_logZ = dmcav_logZ[i] / cav_2
-            d2_logZ = - dmcav_logZ[i] * cav_1 / cav_2**2 - dvcav_logZ[i] / cav_2**2
+            d1_logZ = (2-alpha) * (dmcav_logZ[i] / cav_2)
+            d2_logZ = (2-alpha) * (- dmcav_logZ[i] * cav_1 / cav_2**2 
+                - dvcav_logZ[i] / cav_2**2)
             
             d1 = d1_logZ + scale_cav * d1_cav + scale_post * d1_post
             d2 = d2_logZ + scale_cav * d2_cav + scale_post * d2_post
 
-            grads{'h_factor_1_%d'%i} = d1
-            grads{'h_factor_2_%d'%i} = 2*d2*self.h_factor_2[i]
+            grads['h_factor_1_%d'%i] = d1
+            grads['h_factor_2_%d'%i] = 2*d2*self.h_factor_2[i]
         return grads
 
     def compute_phi_cavity_h(self, alpha):
-        scale = -1.0 / alpha
+        scale = - 1.0 / alpha
         phi_cav = 0
         for i in range(self.L-1):
-            cav_1 = self.h_factor_1[i]*(2-alpha)
-            cav_2 = self.h_factor_2[i]*(2-alpha)
+            cav_1 = self.h_factor_1[i]*(2.0-alpha)
+            cav_2 = self.h_factor_2[i]*(2.0-alpha)
             phi_cav_i = 0.5 * (cav_1**2 / cav_2 - np.log(cav_2))
             phi_cav += scale * np.sum(phi_cav_i)
         return phi_cav
@@ -3120,13 +3120,14 @@ class SDGPR_H(AEP_Model):
         scale = - (1.0 - 1.0 / alpha)
         phi_post = 0
         for i in range(self.L-1):
-            post_1 = self.h_factor_1[i]*2
-            post_2 = self.h_factor_2[i]*2
+            post_1 = self.h_factor_1[i]*2.0
+            post_2 = self.h_factor_2[i]*2.0
             phi_post_i = 0.5 * (post_1**2 / post_2 - np.log(post_2))
             phi_post += scale * np.sum(phi_post_i)
         return phi_post
 
-    def compute_transition_tilted(self, m_prop, v_prop, m_t, v_t, alpha, layer_ind, scale):
+    def compute_transition_tilted(self, m_prop, v_prop, m_t, v_t, alpha,
+        layer_ind, scale):
         sn2 = np.exp(2*self.sn[layer_ind])
         v_sum = v_t + v_prop + sn2 / alpha
         m_diff = m_t - m_prop
@@ -3142,18 +3143,18 @@ class SDGPR_H(AEP_Model):
         dmprop = m_diff / v_sum
 
         dv_sum = np.sum(dvt)
-        dsn = dv_sum*2*sn2/alpha + m_prop.shape[0]*self.Din*(1-alpha)
+        dsn = dv_sum*2*sn2/alpha + m_prop.shape[0]*self.size[layer_ind+1]*(1-alpha)
         return scale*logZ, scale*dmprop, scale*dvprop, scale*dmt, scale*dvt, scale*dsn
 
     def compute_cavity_h(self, idxs, alpha):
-        cav_h_1, cav_h_2, cav_h_m, cav_h_v = []
+        cav_h_1, cav_h_2, cav_h_m, cav_h_v = [], [], [], []
         for i in range(self.L-1):
-            cav_h_1_i = self.h_factor_1[i][idxs, :]*(2-alpha)
-            cav_h_2_i = self.h_factor_2[i][idxs, :]*(2-alpha)
+            cav_h_1_i = self.h_factor_1[i][idxs, :]*(2.0-alpha)
+            cav_h_2_i = self.h_factor_2[i][idxs, :]*(2.0-alpha)
             cav_h_1.append(cav_h_1_i)
             cav_h_2.append(cav_h_2_i)
             cav_h_m.append(cav_h_1_i/cav_h_2_i)
-            cav_h_v.append(1/cav_h_2_i)
+            cav_h_v.append(1.0/cav_h_2_i)
         return cav_h_1, cav_h_2, cav_h_m, cav_h_v
 
     def predict_f(self, inputs):
@@ -3199,8 +3200,12 @@ class SDGPR_H(AEP_Model):
             else:
                 sgp_params = self.sgp_layers[i].init_hypers(key_suffix='_%d'%i)
             init_params.update(sgp_params)
-        lik_params = self.lik_layer.init_hypers(key_suffix='_%d'%i)
+        lik_params = self.lik_layer.init_hypers()
         init_params.update(lik_params)
+        init_params['sn_hidden'] = np.log(0.001)*np.ones(self.L-1)
+        for i in range(self.L-1):
+            init_params['h_factor_1_%d'%i] = np.zeros((self.N, self.size[i+1]))
+            init_params['h_factor_2_%d'%i] = np.log(0.01)*np.ones((self.N, self.size[i+1]))
         return init_params
 
     def get_hypers(self):
@@ -3210,9 +3215,17 @@ class SDGPR_H(AEP_Model):
             params.update(sgp_params)
         lik_params = self.lik_layer.get_hypers()
         params.update(lik_params)
+        params['sn_hidden'] = self.sn
+        for i in range(self.L-1):
+            params['h_factor_1_%d'%i] = self.h_factor_1[i]
+            params['h_factor_2_%d'%i] = np.log(self.h_factor_2[i])/2
         return params
 
     def update_hypers(self, params):
         for i in range(self.L):
             self.sgp_layers[i].update_hypers(params, key_suffix='_%d'%i)
         self.lik_layer.update_hypers(params)
+        self.sn = params['sn_hidden']
+        for i in range(self.L-1):
+            self.h_factor_1[i] = params['h_factor_1_%d'%i]
+            self.h_factor_2[i]  = np.exp(2*params['h_factor_2_%d'%i])
