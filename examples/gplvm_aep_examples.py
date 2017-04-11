@@ -14,7 +14,7 @@ import geepee.aep_models as aep
 
 np.random.seed(42)
 
-def run_cluster():
+def run_cluster_MM():
 	import GPy
 	# create dataset
 	print "creating dataset..."
@@ -38,16 +38,9 @@ def run_cluster():
 	print "inference ..."
 	M = 30
 	D = 5
+	alpha = 1.0
 	lvm = aep.SGPLVM(Y, D, M, lik='Gaussian')
-
-	lvm.optimise(method='L-BFGS-B', alpha=0.1)
-	# lvm.optimise(method='CG', alpha=0.2)
-	# lvm.optimise(method='adam', adam_lr=0.05, alpha=0.2)
-
-	# plt.figure()
-	# mx, vx = lvm.get_posterior_x()
-	# plt.scatter(mx[:, 0], mx[:, 1], c=labels)
-	# plt.show()
+	lvm.optimise(method='L-BFGS-B', alpha=alpha, maxiter=2000)
 
 	ls = np.exp(lvm.sgp_layer.ls)
 	print ls
@@ -59,21 +52,44 @@ def run_cluster():
 	plt.plot(zu[:, inds[0]], zu[:, inds[1]], 'ko')
 	plt.show()
 
-	# X = np.random.normal(0, 1, (N, 5))
-	# A = np.random.multivariate_normal(np.zeros(N), k1.K(X), 10).T
-	# B = np.random.multivariate_normal(np.zeros(N), k2.K(X), 10).T
-	# C = np.random.multivariate_normal(np.zeros(N), k3.K(X), 10).T
-	# Y_test = np.vstack((A,B,C))
-	# labels_test = np.hstack((np.zeros(A.shape[0]), np.ones(B.shape[0]), np.ones(C.shape[0])*2))
 
-	# for i in range(Y_test.shape[0]):
-	# 	Y_i = Y_test[i, :]
-	# 	D = Y_i.shape[0]
-	# 	missing_idx_i = np.random.choice(D, np.round(D/2), replace=False)
-	# 	y_missing = Y_i.copy()
-	# 	y_missing[missing_idx_i] = 0
-	# 	my_i, vy_i = lvm.impute_missing(y_missing, missing_idx_i, alpha=0.5, no_iters=10)
-	# 	pdb.set_trace()
+def run_cluster_MC():
+	import GPy
+	# create dataset
+	print "creating dataset..."
+	N = 100
+	k1 = GPy.kern.RBF(5, variance=1, lengthscale=1. /
+	                  np.random.dirichlet(np.r_[10, 10, 10, 0.1, 0.1]), ARD=True)
+	k2 = GPy.kern.RBF(5, variance=1, lengthscale=1. /
+	                  np.random.dirichlet(np.r_[10, 0.1, 10, 0.1, 10]), ARD=True)
+	k3 = GPy.kern.RBF(5, variance=1, lengthscale=1. /
+	                  np.random.dirichlet(np.r_[0.1, 0.1, 10, 10, 10]), ARD=True)
+	X = np.random.normal(0, 1, (N, 5))
+	A = np.random.multivariate_normal(np.zeros(N), k1.K(X), 10).T
+	B = np.random.multivariate_normal(np.zeros(N), k2.K(X), 10).T
+	C = np.random.multivariate_normal(np.zeros(N), k3.K(X), 10).T
+
+	Y = np.vstack((A, B, C))
+	labels = np.hstack((np.zeros(A.shape[0]), np.ones(
+	    B.shape[0]), np.ones(C.shape[0]) * 2))
+
+	# inference
+	print "inference ..."
+	M = 30
+	D = 5
+	alpha = 1.0
+	lvm = aep.SGPLVM(Y, D, M, lik='Gaussian')
+	lvm.optimise(method='adam', adam_lr=0.05, maxiter=2000, alpha=alpha, prop_mode=aep.PROP_MC)
+
+	ls = np.exp(lvm.sgp_layer.ls)
+	print ls
+	inds = np.argsort(ls)
+	plt.figure()
+	mx, vx = lvm.get_posterior_x()
+	plt.scatter(mx[:, inds[0]], mx[:, inds[1]], c=labels)
+	zu = lvm.sgp_layer.zu
+	plt.plot(zu[:, inds[0]], zu[:, inds[1]], 'ko')
+	plt.show()
 
 
 def run_mnist():
@@ -392,7 +408,8 @@ def run_frey():
 	plt.show()
 
 if __name__ == '__main__':
-	run_cluster()
+	run_cluster_MM()
+	# run_cluster_MC()
 	# run_semicircle()
 	# run_pinwheel()
 	# run_xor()

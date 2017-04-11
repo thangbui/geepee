@@ -47,14 +47,14 @@ class VI_Model(object):
                 results = adam(objective_wrapper, init_params_vec,
                                step_size=adam_lr,
                                maxiter=maxiter,
-                               args=(params_args, self, mb_size, alpha))
+                               args=(params_args, self, mb_size, alpha, None))
                 final_params = results
             else:
                 options = {'maxfun': maxfun, 'maxiter': maxiter, 'disp': True, 'gtol': 1e-8}
                 results = minimize(
                     fun=objective_wrapper,
                     x0=init_params_vec,
-                    args=(params_args, self, self.N, alpha),
+                    args=(params_args, self, self.N, alpha, None),
                     method=method,
                     jac=True,
                     tol=tol,
@@ -102,7 +102,7 @@ class SGPR(VI_Model):
         self.sf = 0
         self.sn = 0
 
-    def objective_function(self, params, idxs=None, alpha=1.0):
+    def objective_function(self, params, idxs=None, alpha=1.0, prop_mode=None):
         x = self.x_train
         y = self.y_train
         N = self.N
