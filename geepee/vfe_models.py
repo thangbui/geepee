@@ -1,3 +1,8 @@
+"""Summary
+
+Attributes:
+    jitter (float): Description
+"""
 import numpy as np
 from scipy.optimize import minimize
 import pdb
@@ -11,26 +16,74 @@ jitter = 1e-4
 
 
 class VI_Model(object):
+    """Summary
+
+    Attributes:
+        fixed_params (list): Description
+        N (TYPE): Description
+        updated (bool): Description
+        y_train (TYPE): Description
+    """
 
     def __init__(self, y_train):
+        """Summary
+
+        Args:
+            y_train (TYPE): Description
+        """
         self.y_train = y_train
         self.N = y_train.shape[0]
         self.fixed_params = []
         self.updated = False
 
     def init_hypers(self, x_train=None):
+        """Summary
+
+        Args:
+            x_train (None, optional): Description
+
+        Returns:
+            TYPE: Description
+        """
         pass
 
     def get_hypers(self):
+        """Summary
+
+        Returns:
+            TYPE: Description
+        """
         pass
 
     def update_hypers(self):
+        """Summary
+
+        Returns:
+            TYPE: Description
+        """
         pass
 
     def optimise(
             self, method='L-BFGS-B', tol=None, reinit_hypers=True,
             callback=None, maxfun=100000, maxiter=1000, alpha=0.5,
             mb_size=None, adam_lr=0.001, **kargs):
+        """Summary
+
+        Args:
+            method (str, optional): Description
+            tol (None, optional): Description
+            reinit_hypers (bool, optional): Description
+            callback (None, optional): Description
+            maxfun (int, optional): Description
+            maxiter (int, optional): Description
+            alpha (float, optional): Description
+            mb_size (None, optional): Description
+            adam_lr (float, optional): Description
+            **kargs: Description
+
+        Returns:
+            TYPE: Description
+        """
         self.updated = False
 
         if reinit_hypers:
@@ -75,6 +128,14 @@ class VI_Model(object):
         return final_params
 
     def set_fixed_params(self, params):
+        """Summary
+
+        Args:
+            params (TYPE): Description
+
+        Returns:
+            TYPE: Description
+        """
         if isinstance(params, (list)):
             for p in params:
                 if p not in self.fixed_params:
@@ -84,10 +145,29 @@ class VI_Model(object):
 
 
 class SGPR(VI_Model):
+    """Summary
+
+    Attributes:
+        Din (TYPE): Description
+        Dout (TYPE): Description
+        ls (TYPE): Description
+        M (TYPE): Description
+        N (TYPE): Description
+        sf (int): Description
+        sn (int): Description
+        updated (bool): Description
+        x_train (TYPE): Description
+        zu (TYPE): Description
+    """
 
     def __init__(self, x_train, y_train, no_pseudo):
         '''
         This only works with real-valued (Gaussian) regression
+
+        Args:
+            x_train (TYPE): Description
+            y_train (TYPE): Description
+            no_pseudo (TYPE): Description
 
         '''
 
@@ -105,6 +185,17 @@ class SGPR(VI_Model):
         self.sn = 0
 
     def objective_function(self, params, idxs=None, alpha=1.0, prop_mode=None):
+        """Summary
+
+        Args:
+            params (TYPE): Description
+            idxs (None, optional): Description
+            alpha (float, optional): Description
+            prop_mode (None, optional): Description
+
+        Returns:
+            TYPE: Description
+        """
         x = self.x_train
         y = self.y_train
         N = self.N
@@ -168,6 +259,16 @@ class SGPR(VI_Model):
         return energy, grad_all
 
     def predict_f(self, inputs, alpha=1.0, marginal=True):
+        """Summary
+
+        Args:
+            inputs (TYPE): Description
+            alpha (float, optional): Description
+            marginal (bool, optional): Description
+
+        Returns:
+            TYPE: Description
+        """
         x = self.x_train
         y = self.y_train
         N = self.N
@@ -207,6 +308,15 @@ class SGPR(VI_Model):
         return mf, vf
 
     def sample_f(self, inputs, no_samples=1):
+        """Summary
+
+        Args:
+            inputs (TYPE): Description
+            no_samples (int, optional): Description
+
+        Returns:
+            TYPE: Description
+        """
         if not self.updated:
             self.sgp_layer.update_posterior_for_prediction()
             self.updated = True
@@ -218,6 +328,14 @@ class SGPR(VI_Model):
         return fs
 
     def predict_y(self, inputs):
+        """Summary
+
+        Args:
+            inputs (TYPE): Description
+
+        Returns:
+            TYPE: Description
+        """
         if not self.updated:
             self.sgp_layer.update_posterior_for_prediction()
             self.updated = True
@@ -226,6 +344,11 @@ class SGPR(VI_Model):
         return my, vy
 
     def init_hypers(self):
+        """Summary
+
+        Returns:
+            TYPE: Description
+        """
         N = self.N
         M = self.M
         Din = self.Din
@@ -258,6 +381,11 @@ class SGPR(VI_Model):
         return params
 
     def get_hypers(self):
+        """Summary
+
+        Returns:
+            TYPE: Description
+        """
         params = {}
         M = self.M
         Din = self.Din
@@ -269,6 +397,14 @@ class SGPR(VI_Model):
         return params
 
     def update_hypers(self, params):
+        """Summary
+
+        Args:
+            params (TYPE): Description
+
+        Returns:
+            TYPE: Description
+        """
         self.ls = params['ls']
         self.sf = params['sf']
         self.zu = params['zu']
