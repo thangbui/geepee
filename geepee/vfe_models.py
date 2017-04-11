@@ -28,8 +28,9 @@ class VI_Model(object):
         pass
 
     def optimise(
-        self, method='L-BFGS-B', tol=None, reinit_hypers=True, 
-        callback=None, maxfun=100000, maxiter=1000, alpha=0.5, mb_size=None, adam_lr=0.001, **kargs):
+            self, method='L-BFGS-B', tol=None, reinit_hypers=True,
+            callback=None, maxfun=100000, maxiter=1000, alpha=0.5,
+            mb_size=None, adam_lr=0.001, **kargs):
         self.updated = False
 
         if reinit_hypers:
@@ -50,7 +51,8 @@ class VI_Model(object):
                                args=(params_args, self, mb_size, alpha, None))
                 final_params = results
             else:
-                options = {'maxfun': maxfun, 'maxiter': maxiter, 'disp': True, 'gtol': 1e-8}
+                options = {'maxfun': maxfun, 'maxiter': maxiter,
+                           'disp': True, 'gtol': 1e-8}
                 results = minimize(
                     fun=objective_wrapper,
                     x0=init_params_vec,
@@ -110,51 +112,54 @@ class SGPR(VI_Model):
         M = self.M
         # update model with new hypers
         self.update_hypers(params)
-        sf2 = np.exp(2*self.sf)
-        sn2 = np.exp(2*self.sn)
+        sf2 = np.exp(2 * self.sf)
+        sn2 = np.exp(2 * self.sn)
 
         # compute the approximate log marginal likelihood
-        Kuu_noiseless = compute_kernel(2*self.ls, 2*self.sf, self.zu, self.zu)
+        Kuu_noiseless = compute_kernel(
+            2 * self.ls, 2 * self.sf, self.zu, self.zu)
         Kuu = Kuu_noiseless + np.diag(jitter * np.ones((M, )))
         Lu = np.linalg.cholesky(Kuu)
-        Kuf = compute_kernel(2*self.ls, 2*self.sf, self.zu, x)
+        Kuf = compute_kernel(2 * self.ls, 2 * self.sf, self.zu, x)
         V = np.linalg.solve(Lu, Kuf)
-        r = sf2 - np.sum(V*V, axis=0)
-        G = alpha*r + sn2
+        r = sf2 - np.sum(V * V, axis=0)
+        G = alpha * r + sn2
         iG = 1.0 / G
-        A = np.eye(M) + np.dot(V*iG, V.T)
+        A = np.eye(M) + np.dot(V * iG, V.T)
         La = np.linalg.cholesky(A)
         B = np.linalg.solve(La, V)
         iGy = iG[:, None] * y
         z_tmp = np.dot(B.T, np.dot(B, iGy)) * iG[:, None]
         z = iGy - z_tmp
-        term1 = 0.5 * np.sum(z*y)
+        term1 = 0.5 * np.sum(z * y)
         term2 = Dout * np.sum(np.log(np.diag(La)))
         term3 = 0.5 * Dout * np.sum(np.log(G))
-        term4 = 0.5 * N * Dout * np.log(2*np.pi)
-        c4 = 0.5 * Dout * (1-alpha) / alpha
-        term5 = c4 * np.sum(np.log(1 + alpha*r/sn2))
+        term4 = 0.5 * N * Dout * np.log(2 * np.pi)
+        c4 = 0.5 * Dout * (1 - alpha) / alpha
+        term5 = c4 * np.sum(np.log(1 + alpha * r / sn2))
         energy = term1 + term2 + term3 + term4 + term5
         # print term1, term2 + term3, term4, term5
 
         zus = self.zu / np.exp(self.ls)
         xs = x / np.exp(self.ls)
         R = np.linalg.solve(Lu.T, V)
-        RiG = R*iG
-        RdQ = -np.dot(np.dot(R, z), z.T) + RiG - np.dot(np.dot(RiG, B.T), B)*iG;
-        dG = z**2 + (-iG + iG**2 * np.sum(B*B, axis=0)) [:, None]
-        tmp = alpha*dG - (1-alpha)/(1+alpha*r[:, None]/sn2)/sn2
-        RdQ2 = RdQ + R*tmp.T
-        KW = Kuf*RdQ2
-        KWR = Kuu_noiseless*(np.dot(RdQ2, R.T))
-        P = (np.dot(KW, xs) - np.dot(KWR, zus) 
-            + (np.sum(KWR, axis=1) - np.sum(KW, axis=1))[:, None]*zus)
+        RiG = R * iG
+        RdQ = -np.dot(np.dot(R, z), z.T) + RiG - \
+            np.dot(np.dot(RiG, B.T), B) * iG
+        dG = z**2 + (-iG + iG**2 * np.sum(B * B, axis=0))[:, None]
+        tmp = alpha * dG - (1 - alpha) / (1 + alpha * r[:, None] / sn2) / sn2
+        RdQ2 = RdQ + R * tmp.T
+        KW = Kuf * RdQ2
+        KWR = Kuu_noiseless * (np.dot(RdQ2, R.T))
+        P = (np.dot(KW, xs) - np.dot(KWR, zus)
+             + (np.sum(KWR, axis=1) - np.sum(KW, axis=1))[:, None] * zus)
         dzu = P / np.exp(self.ls)
-        dls = (-np.sum(P*zus, axis=0) 
-            - np.sum((np.dot(KW.T, zus) - np.sum(KW, axis=0)[:, None]*xs)*xs, axis=0))
-        dsn = -np.sum(dG)*sn2 - (1-alpha)*np.sum(r/(1+alpha*r/sn2))/sn2;
-        dsf = (np.sum(Kuf*RdQ) - alpha*np.sum(r[:, None]*dG) 
-            + (1-alpha)*np.sum(r/(1+alpha*r/sn2))/sn2)
+        dls = (-np.sum(P * zus, axis=0)
+               - np.sum((np.dot(KW.T, zus) - np.sum(KW, axis=0)[:, None] * xs) * xs, axis=0))
+        dsn = -np.sum(dG) * sn2 - (1 - alpha) * \
+            np.sum(r / (1 + alpha * r / sn2)) / sn2
+        dsf = (np.sum(Kuf * RdQ) - alpha * np.sum(r[:, None] * dG)
+               + (1 - alpha) * np.sum(r / (1 + alpha * r / sn2)) / sn2)
 
         grad_all = {'zu': dzu, 'ls': dls, 'sn': dsn, 'sf': dsf}
         for p in self.fixed_params:
@@ -168,33 +173,35 @@ class SGPR(VI_Model):
         N = self.N
         Dout = self.Dout
         M = self.M
-        sf2 = np.exp(2*self.sf)
-        sn2 = np.exp(2*self.sn)
+        sf2 = np.exp(2 * self.sf)
+        sn2 = np.exp(2 * self.sn)
 
         # compute the approximate log marginal likelihood
-        Kuu_noiseless = compute_kernel(2*self.ls, 2*self.sf, self.zu, self.zu)
+        Kuu_noiseless = compute_kernel(
+            2 * self.ls, 2 * self.sf, self.zu, self.zu)
         Kuu = Kuu_noiseless + np.diag(jitter * np.ones((M, )))
         Lu = np.linalg.cholesky(Kuu)
-        Kuf = compute_kernel(2*self.ls, 2*self.sf, self.zu, x)
-        Kut = compute_kernel(2*self.ls, 2*self.sf, self.zu, inputs)
+        Kuf = compute_kernel(2 * self.ls, 2 * self.sf, self.zu, x)
+        Kut = compute_kernel(2 * self.ls, 2 * self.sf, self.zu, inputs)
         V = np.linalg.solve(Lu, Kuf)
-        r = sf2 - np.sum(V*V, axis=0)
-        G = alpha*r + sn2
+        r = sf2 - np.sum(V * V, axis=0)
+        G = alpha * r + sn2
         iG = 1.0 / G
-        A = np.eye(M) + np.dot(V*iG, V.T)
+        A = np.eye(M) + np.dot(V * iG, V.T)
         La = np.linalg.cholesky(A)
         B = np.linalg.solve(La, V)
-        yhat = y*iG[:, None]
+        yhat = y * iG[:, None]
         yhatB = np.dot(yhat.T, B.T)
         beta = np.linalg.solve(Lu.T, np.linalg.solve(La.T, yhatB.T))
-        W1 = np.eye(M) - np.linalg.solve(La.T, np.linalg.solve(La, np.eye(M))).T
+        W1 = np.eye(M) - np.linalg.solve(La.T,
+                                         np.linalg.solve(La, np.eye(M))).T
         W = np.linalg.solve(Lu.T, np.linalg.solve(Lu.T, W1).T)
         KtuW = np.dot(Kut.T, W)
         mf = np.dot(Kut.T, beta)
         if marginal:
-            vf = np.exp(2*self.sf) - np.sum(KtuW*Kut.T, axis=1)
+            vf = np.exp(2 * self.sf) - np.sum(KtuW * Kut.T, axis=1)
         else:
-            Ktt = compute_kernel(2*self.ls, 2*self.sf, inputs, inputs)
+            Ktt = compute_kernel(2 * self.ls, 2 * self.sf, inputs, inputs)
             Ktt += np.diag(jitter * np.ones((inputs.shape[0], )))
             vf = Ktt - np.dot(KtuW, Kut)
         return mf, vf
@@ -209,7 +216,7 @@ class SGPR(VI_Model):
         for k in range(K):
             fs[:, :, k] = self.sgp_layer.sample(inputs)
         return fs
-        
+
     def predict_y(self, inputs):
         if not self.updated:
             self.sgp_layer.update_posterior_for_prediction()
@@ -240,7 +247,7 @@ class SGPR(VI_Model):
         ls = np.zeros((Din, ))
         d2imed = np.median(x_dist[triu_ind])
         for i in range(Din):
-            ls[i] = 2*np.log(d2imed  + 1e-16)
+            ls[i] = 2 * np.log(d2imed + 1e-16)
         sf = np.log(np.array([0.5]))
 
         params = dict()

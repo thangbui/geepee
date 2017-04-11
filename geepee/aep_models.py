@@ -30,6 +30,7 @@ MC_NO_SAMPLES = 5
 # alternative would be
 # idxs = np.random.permutation(N)[:mb_size]
 
+
 class SGP_Layer(object):
 
     def __init__(self, no_train, input_size, output_size, no_pseudo):
@@ -82,7 +83,7 @@ class SGP_Layer(object):
     def compute_phi_posterior(self):
         (sign, logdet) = np.linalg.slogdet(self.Su)
         phi_posterior = 0.5 * np.sum(logdet)
-        phi_posterior += 0.5 * np.sum(self.mu*np.linalg.solve(
+        phi_posterior += 0.5 * np.sum(self.mu * np.linalg.solve(
             self.Su, self.mu))
         return phi_posterior
 
@@ -90,7 +91,7 @@ class SGP_Layer(object):
         logZ_posterior = 0
         (sign, logdet) = np.linalg.slogdet(self.Suhat)
         phi_cavity = 0.5 * np.sum(logdet)
-        phi_cavity += 0.5 * np.sum(self.muhat*np.linalg.solve(
+        phi_cavity += 0.5 * np.sum(self.muhat * np.linalg.solve(
             self.Suhat, self.muhat))
         return phi_cavity
 
@@ -102,7 +103,7 @@ class SGP_Layer(object):
         phi_prior = self.compute_phi_prior()
         phi_post = self.compute_phi_posterior()
         phi_cav = self.compute_phi_cavity()
-        phi = scale_prior*phi_prior + scale_post*phi_post + scale_cav*phi_cav
+        phi = scale_prior * phi_prior + scale_post * phi_post + scale_cav * phi_cav
         return phi
 
     def forward_prop_thru_cav(self, mx, vx=None, mode=PROP_MM):
@@ -119,8 +120,8 @@ class SGP_Layer(object):
                 raise NotImplementedError('unknown propagation mode')
 
     def _forward_prop_deterministic_thru_cav(self, x):
-        kff = np.exp(2*self.sf)
-        kfu = compute_kernel(2*self.ls, 2*self.sf, x, self.zu)
+        kff = np.exp(2 * self.sf)
+        kfu = compute_kernel(2 * self.ls, 2 * self.sf, x, self.zu)
         mout = np.einsum('nm,dm->nd', kfu, self.Ahat)
         Bkfukuf = np.einsum('dab,na,nb->nd', self.Bhat_det, kfu, kfu)
         vout = kff + Bkfukuf
@@ -130,9 +131,10 @@ class SGP_Layer(object):
         batch_size = mx.shape[0]
         eps = np.random.randn(MC_NO_SAMPLES, batch_size, self.Din)
         x = eps * np.sqrt(vx) + mx
-        x_stk = np.reshape(x, [MC_NO_SAMPLES*batch_size, self.Din])
-        e_stk = np.reshape(eps, [MC_NO_SAMPLES*batch_size, self.Din])
-        m_stk, v_stk, kfu_stk = self._forward_prop_deterministic_thru_cav(x_stk)
+        x_stk = np.reshape(x, [MC_NO_SAMPLES * batch_size, self.Din])
+        e_stk = np.reshape(eps, [MC_NO_SAMPLES * batch_size, self.Din])
+        m_stk, v_stk, kfu_stk = self._forward_prop_deterministic_thru_cav(
+            x_stk)
         mout = m_stk.reshape([MC_NO_SAMPLES, batch_size, self.Dout])
         vout = v_stk.reshape([MC_NO_SAMPLES, batch_size, self.Dout])
         kfu = kfu_stk.reshape([MC_NO_SAMPLES, batch_size, self.M])
@@ -140,8 +142,9 @@ class SGP_Layer(object):
 
     @profile
     def _forward_prop_random_thru_cav_mm(self, mx, vx):
-        psi0 = np.exp(2*self.sf)
-        psi1, psi2 = compute_psi_weave(2*self.ls, 2*self.sf, mx, vx, self.zu)
+        psi0 = np.exp(2 * self.sf)
+        psi1, psi2 = compute_psi_weave(
+            2 * self.ls, 2 * self.sf, mx, vx, self.zu)
         mout = np.einsum('nm,dm->nd', psi1, self.Ahat)
         Bhatpsi2 = np.einsum('dab,nab->nd', self.Bhat_sto, psi2)
         vout = psi0 + Bhatpsi2 - mout**2
@@ -161,16 +164,17 @@ class SGP_Layer(object):
                 raise NotImplementedError('unknown propagation mode')
 
     def _forward_prop_deterministic_thru_post(self, x):
-        psi0 = np.exp(2*self.sf)
-        psi1 = compute_kernel(2*self.ls, 2*self.sf, x, self.zu)
+        psi0 = np.exp(2 * self.sf)
+        psi1 = compute_kernel(2 * self.ls, 2 * self.sf, x, self.zu)
         mout = np.einsum('nm,dm->nd', psi1, self.A)
         Bpsi2 = np.einsum('dab,na,nb->nd', self.B_det, psi1, psi1)
         vout = psi0 + Bpsi2
         return mout, vout
 
     def _forward_prop_random_thru_post_mm(self, mx, vx):
-        psi0 = np.exp(2.0*self.sf)
-        psi1, psi2 = compute_psi_weave(2*self.ls, 2*self.sf, mx, vx, self.zu)
+        psi0 = np.exp(2.0 * self.sf)
+        psi1, psi2 = compute_psi_weave(
+            2 * self.ls, 2 * self.sf, mx, vx, self.zu)
         mout = np.einsum('nm,dm->nd', psi1, self.A)
         Bpsi2 = np.einsum('dab,nab->nd', self.B_sto, psi2)
         vout = psi0 + Bpsi2 - mout**2
@@ -181,7 +185,7 @@ class SGP_Layer(object):
         N = self.N
         M = self.M
         ls = np.exp(self.ls)
-        sf2 = np.exp(2*self.sf)
+        sf2 = np.exp(2 * self.sf)
         triu_ind = np.triu_indices(M)
         diag_ind = np.diag_indices(M)
         mu = self.mu
@@ -231,10 +235,11 @@ class SGP_Layer(object):
         Minner = scale_poste * np.sum(Spmm, axis=0) + scale_cav * \
             np.sum(Spmmhat, axis=0) - 2.0 * dKuuinv
 
-        dtheta1 = -0.5*scale_poste*Spmm - 0.5*scale_cav*beta*Spmmhat + dtheta1
-        dtheta2 = scale_poste*mu + scale_cav*beta*muhat + dtheta2
+        dtheta1 = -0.5 * scale_poste * Spmm - 0.5 * scale_cav * beta * Spmmhat + dtheta1
+        dtheta2 = scale_poste * mu + scale_cav * beta * muhat + dtheta2
         dtheta1T = np.transpose(dtheta1, [0, 2, 1])
-        dtheta1_R = np.einsum('dab,dbc->dac', self.theta_1_R, dtheta1+dtheta1T)
+        dtheta1_R = np.einsum(
+            'dab,dbc->dac', self.theta_1_R, dtheta1 + dtheta1T)
 
         deta1_R = np.zeros([self.Dout, M * (M + 1) / 2])
         deta2 = dtheta2
@@ -247,18 +252,18 @@ class SGP_Layer(object):
             deta1_R[d, :] = dtheta1_R_d.reshape(
                 (dtheta1_R_d.shape[0], ))
 
-        M_all = 0.5 * (scale_prior*self.Dout*Kuuinv +
+        M_all = 0.5 * (scale_prior * self.Dout * Kuuinv +
                        np.dot(Kuuinv, np.dot(Minner, Kuuinv)))
         dhyp = d_trace_MKzz_dhypers(
-            2*self.ls, 2*self.sf, self.zu, M_all, self.Kuu)
+            2 * self.ls, 2 * self.sf, self.zu, M_all, self.Kuu)
 
         dzu += dhyp[2]
-        dls += 2*dhyp[1]
-        dsf += 2*dhyp[0]
+        dls += 2 * dhyp[1]
+        dsf += 2 * dhyp[0]
 
         grad_hyper = {
-            'sf': dsf, 'ls': dls, 'zu': dzu, 
-            'eta1_R': deta1_R, 'eta2': deta2} 
+            'sf': dsf, 'ls': dls, 'zu': dzu,
+            'eta1_R': deta1_R, 'eta2': deta2}
         grad_input = {'mx': dmx, 'vx': dvx}
 
         return grad_hyper, grad_input
@@ -268,7 +273,7 @@ class SGP_Layer(object):
         N = self.N
         M = self.M
         ls = np.exp(self.ls)
-        sf2 = np.exp(2*self.sf)
+        sf2 = np.exp(2 * self.sf)
         triu_ind = np.triu_indices(M)
         diag_ind = np.diag_indices(M)
         mu = self.mu
@@ -287,10 +292,10 @@ class SGP_Layer(object):
         scale_poste = N * 1.0 / alpha - 1.0
         scale_cav = - N * 1.0 / alpha
         scale_prior = 1
-        
+
         # compute grads wrt kfu
         dkfu_m = np.einsum('nd,dm->nm', dm, self.Ahat)
-        dkfu_v = 2*np.einsum('nd,dab,na->nb', dv, self.Bhat_det, kfu)
+        dkfu_v = 2 * np.einsum('nd,dab,na->nb', dv, self.Bhat_det, kfu)
         dkfu = dkfu_m + dkfu_v
         dsf2, dls, dzu, dx = compute_kfu_derivatives(
             dkfu, kfu, ls, sf2, x, self.zu, grad_x=True)
@@ -301,17 +306,19 @@ class SGP_Layer(object):
 
         # compute grads wrt theta1 and theta2
         SKuuinvKuf = np.einsum('dab,nb->nda', Suhat, kfuKuuinv)
-        dSinv_via_v = - np.einsum('nda,nd,ndb->dab', SKuuinvKuf, dv, SKuuinvKuf)
+        dSinv_via_v = - np.einsum('nda,nd,ndb->dab',
+                                  SKuuinvKuf, dv, SKuuinvKuf)
         dSinv_via_m = - np.einsum('nda,nd,db->dab', SKuuinvKuf, dm, muhat)
         dSinv = dSinv_via_m + dSinv_via_v
         dSinvM = np.einsum('nda,nd->da', SKuuinvKuf, dm)
         dtheta1 = beta * dSinv
         dtheta2 = beta * dSinvM
 
-        dtheta1 = -0.5*scale_poste*Spmm - 0.5*scale_cav*beta*Spmmhat + dtheta1
-        dtheta2 = scale_poste*mu + scale_cav*beta*muhat + dtheta2
+        dtheta1 = -0.5 * scale_poste * Spmm - 0.5 * scale_cav * beta * Spmmhat + dtheta1
+        dtheta2 = scale_poste * mu + scale_cav * beta * muhat + dtheta2
         dtheta1T = np.transpose(dtheta1, [0, 2, 1])
-        dtheta1_R = np.einsum('dab,dbc->dac', self.theta_1_R, dtheta1+dtheta1T)
+        dtheta1_R = np.einsum(
+            'dab,dbc->dac', self.theta_1_R, dtheta1 + dtheta1T)
 
         deta1_R = np.zeros([self.Dout, M * (M + 1) / 2])
         deta2 = dtheta2
@@ -329,33 +336,33 @@ class SGP_Layer(object):
         dKuuinv_m = np.einsum('da,db->ab', dAhat, muhat)
         KuuinvSmmd = np.einsum('ab,dbc->dac', Kuuinv, Suhat)
         dBhat = np.einsum('nd,na,nb->dab', dv, kfu, kfu)
-        dKuuinv_v_1 = 2*np.einsum('dab,dac->bc', KuuinvSmmd, dBhat) \
+        dKuuinv_v_1 = 2 * np.einsum('dab,dac->bc', KuuinvSmmd, dBhat) \
             - np.sum(dBhat, axis=0)
         dKuuinv_v_2 = np.sum(dSinv, axis=0)
         dKuuinv = dKuuinv_m + dKuuinv_v_1 + dKuuinv_v_2
-        
+
         Minner = scale_poste * np.sum(Spmm, axis=0) + scale_cav * \
             np.sum(Spmmhat, axis=0) - 2.0 * dKuuinv
-        M_all = 0.5 * (scale_prior*self.Dout*Kuuinv +
+        M_all = 0.5 * (scale_prior * self.Dout * Kuuinv +
                        np.dot(Kuuinv, np.dot(Minner, Kuuinv)))
         dhyp = d_trace_MKzz_dhypers(
-            2*self.ls, 2*self.sf, self.zu, M_all, self.Kuu)
+            2 * self.ls, 2 * self.sf, self.zu, M_all, self.Kuu)
 
         dzu += dhyp[2]
-        dls += 2*dhyp[1]
-        dsf += 2*dhyp[0]
+        dls += 2 * dhyp[1]
+        dsf += 2 * dhyp[0]
 
         grad_hyper = {
-            'sf': dsf, 'ls': dls, 'zu': dzu, 
-            'eta1_R': deta1_R, 'eta2': deta2 
-            }
+            'sf': dsf, 'ls': dls, 'zu': dzu,
+            'eta1_R': deta1_R, 'eta2': deta2
+        }
 
         return grad_hyper, dx
 
     def backprop_grads_reparam(self, dx, m, v, eps):
         dx = dx.reshape(eps.shape)
         dm = np.sum(dx, axis=0)
-        dv = np.sum(dx*eps, axis=0) / (2*np.sqrt(v))
+        dv = np.sum(dx * eps, axis=0) / (2 * np.sqrt(v))
         return {'mx': dm, 'vx': dv}
 
     @profile
@@ -363,7 +370,7 @@ class SGP_Layer(object):
         N = self.N
         M = self.M
         ls = np.exp(self.ls)
-        sf2 = np.exp(2*self.sf)
+        sf2 = np.exp(2 * self.sf)
         triu_ind = np.triu_indices(M)
         diag_ind = np.diag_indices(M)
         mu = self.mu
@@ -383,7 +390,7 @@ class SGP_Layer(object):
 
         # compute grads wrt kfu
         dkfu_m = np.einsum('nd,dm->nm', dm, self.Ahat)
-        dkfu_v = 2*np.einsum('nd,dab,na->nb', dv, self.Bhat_det, kfu)
+        dkfu_v = 2 * np.einsum('nd,dab,na->nb', dv, self.Bhat_det, kfu)
         dkfu = dkfu_m + dkfu_v
         dsf2, dls, dzu = compute_kfu_derivatives(
             dkfu, kfu, ls, sf2, x, self.zu)
@@ -394,17 +401,19 @@ class SGP_Layer(object):
 
         # compute grads wrt theta1 and theta2
         SKuuinvKuf = np.einsum('dab,nb->nda', Suhat, kfuKuuinv)
-        dSinv_via_v = - np.einsum('nda,nd,ndb->dab', SKuuinvKuf, dv, SKuuinvKuf)
+        dSinv_via_v = - np.einsum('nda,nd,ndb->dab',
+                                  SKuuinvKuf, dv, SKuuinvKuf)
         dSinv_via_m = - np.einsum('nda,nd,db->dab', SKuuinvKuf, dm, muhat)
         dSinv = dSinv_via_m + dSinv_via_v
         dSinvM = np.einsum('nda,nd->da', SKuuinvKuf, dm)
         dtheta1 = beta * dSinv
         dtheta2 = beta * dSinvM
 
-        dtheta1 = -0.5*scale_poste*Spmm - 0.5*scale_cav*beta*Spmmhat + dtheta1
-        dtheta2 = scale_poste*mu + scale_cav*beta*muhat + dtheta2
+        dtheta1 = -0.5 * scale_poste * Spmm - 0.5 * scale_cav * beta * Spmmhat + dtheta1
+        dtheta2 = scale_poste * mu + scale_cav * beta * muhat + dtheta2
         dtheta1T = np.transpose(dtheta1, [0, 2, 1])
-        dtheta1_R = np.einsum('dab,dbc->dac', self.theta_1_R, dtheta1+dtheta1T)
+        dtheta1_R = np.einsum(
+            'dab,dbc->dac', self.theta_1_R, dtheta1 + dtheta1T)
 
         deta1_R = np.zeros([self.Dout, M * (M + 1) / 2])
         deta2 = dtheta2
@@ -422,26 +431,26 @@ class SGP_Layer(object):
         dKuuinv_m = np.einsum('da,db->ab', dAhat, muhat)
         KuuinvSmmd = np.einsum('ab,dbc->dac', Kuuinv, Suhat)
         dBhat = np.einsum('nd,na,nb->dab', dv, kfu, kfu)
-        dKuuinv_v_1 = 2*np.einsum('dab,dac->bc', KuuinvSmmd, dBhat) \
+        dKuuinv_v_1 = 2 * np.einsum('dab,dac->bc', KuuinvSmmd, dBhat) \
             - np.sum(dBhat, axis=0)
         dKuuinv_v_2 = np.sum(dSinv, axis=0)
         dKuuinv = dKuuinv_m + dKuuinv_v_1 + dKuuinv_v_2
-        
+
         Minner = scale_poste * np.sum(Spmm, axis=0) + scale_cav * \
             np.sum(Spmmhat, axis=0) - 2.0 * dKuuinv
-        M_all = 0.5 * (scale_prior*self.Dout*Kuuinv +
+        M_all = 0.5 * (scale_prior * self.Dout * Kuuinv +
                        np.dot(Kuuinv, np.dot(Minner, Kuuinv)))
         dhyp = d_trace_MKzz_dhypers(
-            2*self.ls, 2*self.sf, self.zu, M_all, self.Kuu)
+            2 * self.ls, 2 * self.sf, self.zu, M_all, self.Kuu)
 
         dzu += dhyp[2]
-        dls += 2*dhyp[1]
-        dsf += 2*dhyp[0]
+        dls += 2 * dhyp[1]
+        dsf += 2 * dhyp[0]
 
         grad_hyper = {
-            'sf': dsf, 'ls': dls, 'zu': dzu, 
-            'eta1_R': deta1_R, 'eta2': deta2 
-            }
+            'sf': dsf, 'ls': dls, 'zu': dzu,
+            'eta1_R': deta1_R, 'eta2': deta2
+        }
 
         return grad_hyper
 
@@ -452,9 +461,9 @@ class SGP_Layer(object):
         epsilon = np.random.randn(self.Dout, self.M)
         u_sample = mu + np.einsum('dab,db->da', Lu, epsilon)
 
-        kff = compute_kernel(2*self.ls, 2*self.sf, x, x) 
+        kff = compute_kernel(2 * self.ls, 2 * self.sf, x, x)
         kff += np.diag(JITTER * np.ones(x.shape[0]))
-        kfu = compute_kernel(2*self.ls, 2*self.sf, x, self.zu)
+        kfu = compute_kernel(2 * self.ls, 2 * self.sf, x, self.zu)
         qfu = np.dot(kfu, self.Kuuinv)
         mf = np.einsum('nm,dm->nd', qfu, u_sample)
         vf = kff - np.dot(qfu, kfu.T)
@@ -481,19 +490,19 @@ class SGP_Layer(object):
         Dout = self.Dout
         Kuu = self.Kuu
         Kuuinv = self.Kuuinv
-        self.Suhatinv = Kuuinv + beta*self.theta_1
+        self.Suhatinv = Kuuinv + beta * self.theta_1
         self.Suhat = np.linalg.inv(self.Suhatinv)
-        self.muhat = np.einsum('dab,db->da', self.Suhat, beta*self.theta_2)
+        self.muhat = np.einsum('dab,db->da', self.Suhat, beta * self.theta_2)
         self.Ahat = np.einsum('ab,db->da', Kuuinv, self.muhat)
         Smm = self.Suhat + np.einsum('da,db->dab', self.muhat, self.muhat)
         self.Splusmmhat = Smm
         self.Bhat_sto = - Kuuinv + np.einsum(
             'ab,dbc->dac',
-            Kuuinv, 
+            Kuuinv,
             np.einsum('dab,bc->dac', Smm, Kuuinv))
         self.Bhat_det = - Kuuinv + np.einsum(
             'ab,dbc->dac',
-            Kuuinv, 
+            Kuuinv,
             np.einsum('dab,bc->dac', self.Suhat, Kuuinv))
 
     def update_posterior(self):
@@ -558,7 +567,7 @@ class SGP_Layer(object):
             ls = np.zeros((Din, ))
             d2imed = np.median(x_dist[triu_ind])
             for i in range(Din):
-                ls[i] = np.log(d2imed/2  + 1e-16)
+                ls[i] = np.log(d2imed / 2 + 1e-16)
             sf = np.log(np.array([0.5]))
 
         Kuu = compute_kernel(2 * ls, 2 * sf, zu, zu)
@@ -648,6 +657,7 @@ class SGP_Layer(object):
 
 
 class Lik_Layer(object):
+
     def __init__(self, N, D):
         self.N = N
         self.D = D
@@ -669,11 +679,11 @@ class Lik_Layer(object):
 
 
 class Gauss_Layer(Lik_Layer):
-    
+
     def __init__(self, N, D):
         super(Gauss_Layer, self).__init__(N, D)
         self.sn = 0
-    
+
     def compute_log_Z(self, mout, vout, y, alpha=1.0):
         # real valued data, gaussian lik
         if mout.ndim == 2:
@@ -682,7 +692,7 @@ class Gauss_Layer(Lik_Layer):
             logZ = np.sum(-0.5 * (np.log(2 * np.pi * vout) +
                                   (y - mout)**2 / vout))
             logZ += y.shape[0] * self.D * (0.5 * np.log(2 * np.pi * sn2 / alpha)
-                                - 0.5 * alpha * np.log(2 * np.pi * sn2))
+                                           - 0.5 * alpha * np.log(2 * np.pi * sn2))
             dlogZ_dm = (y - mout) / vout
             dlogZ_dv = -0.5 / vout + 0.5 * (y - mout)**2 / vout**2
 
@@ -690,11 +700,12 @@ class Gauss_Layer(Lik_Layer):
         elif mout.ndim == 3:
             sn2 = np.exp(2.0 * self.sn)
             vout += sn2 / alpha
-            logZ = -0.5 * (np.log(2*np.pi*vout) + (y-mout)**2 / vout)
-            logZ += (0.5*np.log(2*np.pi*sn2/alpha) - 0.5*alpha*np.log(2*np.pi*sn2))
-            
+            logZ = -0.5 * (np.log(2 * np.pi * vout) + (y - mout)**2 / vout)
+            logZ += (0.5 * np.log(2 * np.pi * sn2 / alpha) -
+                     0.5 * alpha * np.log(2 * np.pi * sn2))
+
             logZ_max = np.max(logZ, axis=0)
-            exp_term = np.exp(logZ-logZ_max)
+            exp_term = np.exp(logZ - logZ_max)
             sumexp = np.sum(exp_term, axis=0)
             logZ_lse = logZ_max + np.log(sumexp)
             logZ_lse -= np.log(mout.shape[0])
@@ -704,43 +715,44 @@ class Gauss_Layer(Lik_Layer):
             dlogZ_dv = dlogZ * (-0.5 / vout + 0.5 * (y - mout)**2 / vout**2)
             return logZ, dlogZ_dm, dlogZ_dv
         else:
-            raise RuntimeError('invalid ndim, ndim=%d'%mout.ndim)
+            raise RuntimeError('invalid ndim, ndim=%d' % mout.ndim)
 
     def backprop_grads(self, mout, vout, dmout, dvout, alpha=1.0, scale=1.0):
         sn2 = np.exp(2.0 * self.sn)
         dv_sum = np.sum(dvout)
         if mout.ndim == 2:
-            dim_prod = mout.shape[0]*self.D
+            dim_prod = mout.shape[0] * self.D
         elif mout.ndim == 3:
-            dim_prod = mout.shape[1]*self.D
+            dim_prod = mout.shape[1] * self.D
         else:
-            raise RuntimeError('invalid ndim, ndim=%d'%mout.ndim)
-        dsn = dv_sum*2*sn2/alpha + dim_prod*(1-alpha)
+            raise RuntimeError('invalid ndim, ndim=%d' % mout.ndim)
+        dsn = dv_sum * 2 * sn2 / alpha + dim_prod * (1 - alpha)
         dsn *= scale
         return {'sn': dsn}
 
     def output_probabilistic(self, mf, vf, alpha=1.0):
-        return mf, vf + np.exp(2.0*self.sn)/alpha
+        return mf, vf + np.exp(2.0 * self.sn) / alpha
 
     def init_hypers(self, key_suffix=''):
         self.sn = np.log(0.01)
-        return {'sn'+key_suffix: self.sn}
+        return {'sn' + key_suffix: self.sn}
 
     def get_hypers(self, key_suffix=''):
-        return {'sn'+key_suffix: self.sn}    
+        return {'sn' + key_suffix: self.sn}
 
     def update_hypers(self, params, key_suffix=''):
-        self.sn = params['sn'+key_suffix]
+        self.sn = params['sn' + key_suffix]
 
 
 class Probit_Layer(Lik_Layer):
 
     __gh_points = None
+
     def _gh_points(self, T=20):
         if self.__gh_points is None:
             self.__gh_points = np.polynomial.hermite.hermgauss(T)
         return self.__gh_points
-    
+
     def compute_log_Z(self, mout, vout, y, alpha=1.0):
         # binary data probit likelihood
         if alpha == 1.0:
@@ -761,17 +773,19 @@ class Probit_Layer(Lik_Layer):
             gh_x = gh_x[:, np.newaxis, np.newaxis]
             gh_w = gh_w[:, np.newaxis, np.newaxis]
 
-            ts = gh_x * np.sqrt(2*vout[np.newaxis, :, :]) + mout[np.newaxis, :, :]
+            ts = gh_x * \
+                np.sqrt(2 * vout[np.newaxis, :, :]) + mout[np.newaxis, :, :]
             eps = 1e-8
-            pdfs = 0.5 * (1 + special.erf(y*ts / np.sqrt(2))) + eps
+            pdfs = 0.5 * (1 + special.erf(y * ts / np.sqrt(2))) + eps
             Ztilted = np.sum(pdfs**alpha * gh_w, axis=0) / np.sqrt(np.pi)
             logZ = np.sum(np.log(Ztilted))
-            
-            a = pdfs**(alpha-1.0)*np.exp(-ts**2/2)
+
+            a = pdfs**(alpha - 1.0) * np.exp(-ts**2 / 2)
             dZdm = np.sum(gh_w * a, axis=0) * y * alpha / np.pi / np.sqrt(2)
             dlogZ_dm = dZdm / Ztilted + eps
 
-            dZdv = np.sum(gh_w * (a*gh_x), axis=0) * y * alpha / np.pi / np.sqrt(2) / np.sqrt(2*vout)
+            dZdv = np.sum(gh_w * (a * gh_x), axis=0) * y * \
+                alpha / np.pi / np.sqrt(2) / np.sqrt(2 * vout)
             dlogZ_dv = dZdv / Ztilted + eps
 
         return logZ, dlogZ_dm, dlogZ_dv
@@ -795,9 +809,9 @@ class AEP_Model(object):
         pass
 
     def optimise(
-        self, method='L-BFGS-B', tol=None, reinit_hypers=True, 
-        callback=None, maxfun=100000, maxiter=1000, alpha=0.5, 
-        mb_size=None, adam_lr=0.001, prop_mode=PROP_MM, **kargs):
+            self, method='L-BFGS-B', tol=None, reinit_hypers=True,
+            callback=None, maxfun=100000, maxiter=1000, alpha=0.5,
+            mb_size=None, adam_lr=0.001, prop_mode=PROP_MM, **kargs):
         self.updated = False
 
         if reinit_hypers:
@@ -811,13 +825,15 @@ class AEP_Model(object):
             mb_size = self.N
         try:
             if method.lower() == 'adam':
-                results = adam(objective_wrapper, init_params_vec,
-                               step_size=adam_lr,
-                               maxiter=maxiter,
-                               args=(params_args, self, mb_size, alpha, prop_mode))
+                results = adam(
+                    objective_wrapper, init_params_vec,
+                    step_size=adam_lr,
+                    maxiter=maxiter,
+                    args=(params_args, self, mb_size, alpha, prop_mode))
                 final_params = results
             else:
-                options = {'maxfun': maxfun, 'maxiter': maxiter, 'disp': True, 'gtol': 1e-8}
+                options = {'maxfun': maxfun, 'maxiter': maxiter,
+                           'disp': True, 'gtol': 1e-8}
                 results = minimize(
                     fun=objective_wrapper,
                     x0=init_params_vec,
@@ -858,8 +874,8 @@ class AEP_Model(object):
 
 class SGPLVM(AEP_Model):
 
-    def __init__(self, y_train, hidden_size, no_pseudo, 
-        lik='Gaussian', prior_mean=0, prior_var=1):
+    def __init__(self, y_train, hidden_size, no_pseudo,
+                 lik='Gaussian', prior_mean=0, prior_var=1):
         super(SGPLVM, self).__init__(y_train)
         self.N = N = y_train.shape[0]
         self.Dout = Dout = y_train.shape[1]
@@ -898,7 +914,7 @@ class SGPLVM(AEP_Model):
         scale_poste = N * 1.0 / alpha - 1.0
         scale_cav = - N * 1.0 / alpha
         scale_prior = 1
-        
+
         # update model with new hypers
         self.update_hypers(params)
         self.sgp_layer.compute_cavity(alpha)
@@ -916,7 +932,8 @@ class SGPLVM(AEP_Model):
         # prop_mode = PROP_MC
         if prop_mode == PROP_MM:
             # propagate x cavity forward
-            mout, vout, psi1, psi2 = self.sgp_layer.forward_prop_thru_cav(mx, vx)
+            mout, vout, psi1, psi2 = self.sgp_layer.forward_prop_thru_cav(
+                mx, vx)
             # compute logZ and gradients
             logZ, dm, dv = self.lik_layer.compute_log_Z(mout, vout, yb, alpha)
             logZ_scale = scale_logZ * logZ
@@ -930,7 +947,8 @@ class SGPLVM(AEP_Model):
             # propagate x cavity forward
             res, res_s = self.sgp_layer.forward_prop_thru_cav(mx, vx, PROP_MC)
             m, v, kfu, x, eps = res[0], res[1], res[2], res[3], res[4]
-            m_s, v_s, kfu_s, x_s, eps_s = res_s[0], res_s[1], res_s[2], res_s[3], res_s[4]
+            m_s, v_s, kfu_s, x_s, eps_s = res_s[
+                0], res_s[1], res_s[2], res_s[3], res_s[4]
             # compute logZ and gradients
             logZ, dm, dv = self.lik_layer.compute_log_Z(m, v, yb, alpha)
             logZ_scale = scale_logZ * logZ
@@ -938,12 +956,13 @@ class SGPLVM(AEP_Model):
             dv_scale = scale_logZ * dv
             sgp_grad_hyper, dx = self.sgp_layer.backprop_grads_lvm_mc(
                 m_s, v_s, dm_scale, dv_scale, kfu_s, x_s, alpha)
-            sgp_grad_input = self.sgp_layer.backprop_grads_reparam(dx, mx, vx, eps)
+            sgp_grad_input = self.sgp_layer.backprop_grads_reparam(
+                dx, mx, vx, eps)
             lik_grad_hyper = self.lik_layer.backprop_grads(
                 m, v, dm, dv, alpha, scale_logZ)
         else:
             raise NotImplementedError('propagation mode not implemented')
-        
+
         grad_all = {}
         for key in sgp_grad_hyper.keys():
             grad_all[key] = sgp_grad_hyper[key]
@@ -952,12 +971,14 @@ class SGPLVM(AEP_Model):
             grad_all[key] = lik_grad_hyper[key]
 
         # compute grad wrt x params
-        dcav_dt11 = (1.0-alpha) * cav_t1 / cav_t2
-        dcav_dt12 = (1.0-alpha) * (-0.5*cav_t1**2/cav_t2**2 - 0.5/cav_t2)
+        dcav_dt11 = (1.0 - alpha) * cav_t1 / cav_t2
+        dcav_dt12 = (1.0 - alpha) * (-0.5 * cav_t1 **
+                                     2 / cav_t2**2 - 0.5 / cav_t2)
         dmx = sgp_grad_input['mx']
         dvx = sgp_grad_input['vx']
-        dlogZ_dt11 = (1.0-alpha) * dmx/cav_t2
-        dlogZ_dt12 = (1.0-alpha) * (-dmx*cav_t1/cav_t2**2 - dvx/cav_t2**2)
+        dlogZ_dt11 = (1.0 - alpha) * dmx / cav_t2
+        dlogZ_dt12 = (1.0 - alpha) * (-dmx * cav_t1 /
+                                      cav_t2**2 - dvx / cav_t2**2)
 
         post_t1 = t01 + t11
         post_t2 = t02 + t12
@@ -978,8 +999,8 @@ class SGPLVM(AEP_Model):
         phi_poste_x = self.compute_phi_posterior_x(idxs)
         phi_cavity_x = self.compute_phi_cavity_x(idxs, alpha)
         x_contrib = scale_x * (
-            phi_prior_x - 1.0/alpha*phi_cavity_x 
-            - (1.0 - 1.0/alpha)*phi_poste_x)
+            phi_prior_x - 1.0 / alpha * phi_cavity_x
+            - (1.0 - 1.0 / alpha) * phi_poste_x)
 
         energy = logZ_scale + x_contrib + sgp_contrib
 
@@ -1064,7 +1085,7 @@ class SGPLVM(AEP_Model):
                 self.sgp_layer.compute_logZ_and_gradients_imputation(
                     cav_m, cav_v,
                     y, missing_mask, alpha=alpha)
-            
+
             # compute new posterior
             new_m = cav_m + cav_v * dlogZ_dmx
             new_v = cav_v - cav_v**2 * (dlogZ_dmx**2 - 2 * dlogZ_dvx)
@@ -1188,11 +1209,11 @@ class SGPR(AEP_Model):
         scale_poste = N * 1.0 / alpha - 1.0
         scale_cav = - N * 1.0 / alpha
         scale_prior = 1
-        
+
         # update model with new hypers
         self.update_hypers(params)
         self.sgp_layer.compute_cavity(alpha)
-        
+
         # propagate x cavity forward
         mout, vout, kfu = self.sgp_layer.forward_prop_thru_cav(xb)
         # compute logZ and gradients
@@ -1204,7 +1225,7 @@ class SGPR(AEP_Model):
             mout, vout, dm_scale, dv_scale, kfu, xb, alpha)
         lik_grad_hyper = self.lik_layer.backprop_grads(
             mout, vout, dm, dv, alpha, scale_logZ)
-        
+
         grad_all = {}
         for key in sgp_grad_hyper.keys():
             grad_all[key] = sgp_grad_hyper[key]
@@ -1238,7 +1259,7 @@ class SGPR(AEP_Model):
         for k in range(K):
             fs[:, :, k] = self.sgp_layer.sample(inputs)
         return fs
-        
+
     def predict_y(self, inputs):
         if not self.updated:
             self.sgp_layer.update_posterior_for_prediction()
@@ -1284,7 +1305,7 @@ class SDGPR(AEP_Model):
         self.sgp_layers = []
         for i in range(L):
             Din_i = self.size[i]
-            Dout_i = self.size[i+1]
+            Dout_i = self.size[i + 1]
             M_i = self.Ms[i]
             self.sgp_layers.append(SGP_Layer(N, Din_i, Dout_i, M_i))
 
@@ -1309,13 +1330,13 @@ class SDGPR(AEP_Model):
         scale_poste = N * 1.0 / alpha - 1.0
         scale_cav = - N * 1.0 / alpha
         scale_prior = 1
-        
+
         # update model with new hypers
         self.update_hypers(params)
         for layer in self.sgp_layers:
             layer.compute_cavity(alpha)
 
-        #### propagate x cavity forward
+        # propagate x cavity forward
         mout, vout, psi1, psi2 = [], [], [], []
         for i in range(0, self.L):
             layer = self.sgp_layers[i]
@@ -1328,7 +1349,7 @@ class SDGPR(AEP_Model):
                 psi2.append(None)
             else:
                 mi, vi, psi1i, psi2i = layer.forward_prop_thru_cav(
-                    mout[i-1], vout[i-1])
+                    mout[i - 1], vout[i - 1])
                 mout.append(mi)
                 vout.append(vi)
                 psi1.append(psi1i)
@@ -1341,25 +1362,25 @@ class SDGPR(AEP_Model):
         dmi = scale_logZ * dm
         dvi = scale_logZ * dv
         grad_list = []
-        for i in range(self.L-1, -1, -1):
+        for i in range(self.L - 1, -1, -1):
             layer = self.sgp_layers[i]
             if i == 0:
                 grad_hyper = layer.backprop_grads_reg(
                     mout[i], vout[i], dmi, dvi, psi1[i], xb, alpha)
             else:
                 grad_hyper, grad_input = layer.backprop_grads_lvm_mm(
-                    mout[i], vout[i], dmi, dvi, psi1[i], psi2[i], 
-                    mout[i-1], vout[i-1], alpha)
+                    mout[i], vout[i], dmi, dvi, psi1[i], psi2[i],
+                    mout[i - 1], vout[i - 1], alpha)
                 dmi, dvi = grad_input['mx'], grad_input['vx']
             grad_list.insert(0, grad_hyper)
 
         lik_grad_hyper = self.lik_layer.backprop_grads(
             mout[-1], vout[-1], dm, dv, alpha, scale_logZ)
-        
+
         grad_all = {}
         for i, grad in enumerate(grad_list):
             for key in grad.keys():
-                grad_all[key + '_%d'%i] = grad[key]
+                grad_all[key + '_%d' % i] = grad[key]
 
         for key in lik_grad_hyper.keys():
             grad_all[key] = lik_grad_hyper[key]
@@ -1413,11 +1434,11 @@ class SDGPR(AEP_Model):
         for i in range(self.L):
             if i == 0:
                 sgp_params = self.sgp_layers[i].init_hypers(
-                    self.x_train, 
-                    key_suffix='_%d'%i)
+                    self.x_train,
+                    key_suffix='_%d' % i)
             else:
                 sgp_params = self.sgp_layers[i].init_hypers(
-                    key_suffix='_%d'%i)
+                    key_suffix='_%d' % i)
             init_params.update(sgp_params)
 
         lik_params = self.lik_layer.init_hypers()
@@ -1427,7 +1448,7 @@ class SDGPR(AEP_Model):
     def get_hypers(self):
         params = dict()
         for i in range(self.L):
-            sgp_params = self.sgp_layers[i].get_hypers(key_suffix='_%d'%i)
+            sgp_params = self.sgp_layers[i].get_hypers(key_suffix='_%d' % i)
             params.update(sgp_params)
         lik_params = self.lik_layer.get_hypers()
         params.update(lik_params)
@@ -1435,7 +1456,7 @@ class SDGPR(AEP_Model):
 
     def update_hypers(self, params):
         for i, layer in enumerate(self.sgp_layers):
-            layer.update_hypers(params, key_suffix='_%d'%i)
+            layer.update_hypers(params, key_suffix='_%d' % i)
         self.lik_layer.update_hypers(params)
 
 
@@ -1451,11 +1472,11 @@ class Gauss_Emis():
 
     def update_hypers(self, params):
         self.C = params['C']
-        self.R = np.exp(2*params['R'])
+        self.R = np.exp(2 * params['R'])
 
     def init_hypers(self):
         params = {}
-        params['C'] = np.ones((self.Dout, self.Din)) / (self.Dout*self.Din)
+        params['C'] = np.ones((self.Dout, self.Din)) / (self.Dout * self.Din)
         params['R'] = np.log(0.01) * np.ones(self.Dout)
         return params
 
@@ -1483,42 +1504,43 @@ class Gauss_Emis():
         R = self.R
         N = self.N
         Dout = self.Dout
-        Vy = np.diag(R/alpha) + np.einsum('da,na,ab->ndb', C, vx, C.T)
+        Vy = np.diag(R / alpha) + np.einsum('da,na,ab->ndb', C, vx, C.T)
         Ly = np.linalg.cholesky(Vy)
         Ydiff = self.y - np.einsum('da,na->nd', C, mx)
 
         VinvY = np.linalg.solve(Vy, Ydiff)
         quad_term = -0.5 * np.sum(Ydiff * VinvY)
         Vlogdet_term = - np.sum(np.log(np.diagonal(Ly, axis1=1, axis2=2)))
-        Rlogdet_term = 0.5 * N * (1-alpha) * np.sum(np.log(R))
-        const_term = - N * Dout * (0.5*alpha*np.log(2*np.pi) + np.log(alpha))
+        Rlogdet_term = 0.5 * N * (1 - alpha) * np.sum(np.log(R))
+        const_term = - N * Dout * \
+            (0.5 * alpha * np.log(2 * np.pi) + np.log(alpha))
         logZ = const_term + Rlogdet_term + Vlogdet_term + quad_term
 
         Vyinv = np.linalg.inv(Vy)
-        dR = (-0.5 * np.sum(np.diagonal(Vyinv, axis1=1, axis2=2), axis=0) 
-            + 0.5 * np.sum(VinvY**2, axis=0)) / alpha
-        dR += 0.5 * N * (1-alpha) / R
-        dR *= 2*R
+        dR = (-0.5 * np.sum(np.diagonal(Vyinv, axis1=1, axis2=2), axis=0)
+              + 0.5 * np.sum(VinvY**2, axis=0)) / alpha
+        dR += 0.5 * N * (1 - alpha) / R
+        dR *= 2 * R
 
         dSigma = -0.5 * Vyinv + 0.5 * np.einsum('na,nb->nab', VinvY, VinvY)
         dmu = VinvY
-        dC1 = np.einsum('na,nb->ab', dmu, mx) 
-        dC2 = 2*np.einsum('nc,bc,nab->ac', vx, C, dSigma)
+        dC1 = np.einsum('na,nb->ab', dmu, mx)
+        dC2 = 2 * np.einsum('nc,bc,nab->ac', vx, C, dSigma)
         dC = dC1 + dC2
 
         dmx = np.einsum('na,ab->nb', dmu, C)
         dvx = np.einsum('nab,da,db->nd', dSigma, C.T, C.T)
 
-        emi_grads = {'C': dC*scale, 'R': dR*scale}
-        input_grads = {'mx': dmx*scale, 'vx': dvx*scale}
-        return logZ*scale, input_grads, emi_grads
+        emi_grads = {'C': dC * scale, 'R': dR * scale}
+        input_grads = {'mx': dmx * scale, 'vx': dvx * scale}
+        return logZ * scale, input_grads, emi_grads
 
 
 # with control, in progress, TODO: prediction
 class SGPSSM_Linear(AEP_Model):
 
-    def __init__(self, y_train, hidden_size, no_pseudo, 
-        lik='Gaussian', prior_mean=0, prior_var=1, x_control=None):
+    def __init__(self, y_train, hidden_size, no_pseudo,
+                 lik='Gaussian', prior_mean=0, prior_var=1, x_control=None):
         super(SGPSSM_Linear, self).__init__(y_train)
         if x_control is not None:
             self.Dcon = Dcon = x_control.shape[1]
@@ -1531,7 +1553,7 @@ class SGPSSM_Linear(AEP_Model):
         self.Din = Din = hidden_size
         self.M = M = no_pseudo
 
-        self.dyn_layer = SGP_Layer(N-1, Din+Dcon, Din, M)
+        self.dyn_layer = SGP_Layer(N - 1, Din + Dcon, Din, M)
         if lik.lower() == 'gaussian':
             self.emi_layer = Gauss_Emis(y_train, Dout, Din)
         elif lik.lower() == 'probit':
@@ -1553,11 +1575,11 @@ class SGPSSM_Linear(AEP_Model):
         # self.plot()
         N = self.N
         # TODO: deal with minibatch here
-        batch_size_dyn = (N-1)
+        batch_size_dyn = (N - 1)
         scale_logZ_dyn = - 1.0 / alpha
         batch_size_emi = N
         scale_logZ_emi = - 1.0 / alpha
-        
+
         # update model with new hypers
         self.update_hypers(params)
         self.dyn_layer.compute_cavity(alpha)
@@ -1565,11 +1587,12 @@ class SGPSSM_Linear(AEP_Model):
         # deal with the transition/dynamic factors here
         idxs_prev = np.arange(1, self.N)
         cav_t_m, cav_t_v = cav_m[idxs_prev, :], cav_v[idxs_prev, :]
-        idxs_next = np.arange(0, self.N-1)
+        idxs_next = np.arange(0, self.N - 1)
         cav_tm1_m, cav_tm1_v = cav_m[idxs_next, :], cav_v[idxs_next, :]
         if self.Dcon > 0:
             cav_tm1_mc = np.hstack((cav_tm1_m, self.x_control[idxs_next, :]))
-            cav_tm1_vc = np.hstack((cav_tm1_v, np.zeros((self.N-1, self.Dcon))))
+            cav_tm1_vc = np.hstack(
+                (cav_tm1_v, np.zeros((self.N - 1, self.Dcon))))
         else:
             cav_tm1_mc, cav_tm1_vc = cav_tm1_m, cav_tm1_v
         mprop, vprop, psi1, psi2 = self.dyn_layer.forward_prop_thru_cav(
@@ -1577,7 +1600,7 @@ class SGPSSM_Linear(AEP_Model):
         logZ_dyn, dmprop, dvprop, dmt, dvt, dsn = self.compute_transition_tilted(
             mprop, vprop, cav_t_m, cav_t_v, alpha, scale_logZ_dyn)
         sgp_grad_hyper, sgp_grad_input = self.dyn_layer.backprop_grads_lvm_mm(
-            mprop, vprop, dmprop, dvprop, 
+            mprop, vprop, dmprop, dvprop,
             psi1, psi2, cav_tm1_mc, cav_tm1_vc, alpha)
 
         # deal with the emission factors here
@@ -1597,7 +1620,7 @@ class SGPSSM_Linear(AEP_Model):
         dmcav_prev, dvcav_prev = dmt, dvt
         dmcav_next = sgp_grad_input['mx'][:, :self.Din]
         dvcav_next = sgp_grad_input['vx'][:, :self.Din]
-        
+
         # compute posterior
         grads_x_via_post = self.compute_posterior_grad_x(alpha)
         grads_x_via_cavity = self.compute_cavity_grad_x(
@@ -1609,7 +1632,8 @@ class SGPSSM_Linear(AEP_Model):
 
         grads_x = {}
         for key in ['x_factor_1', 'x_factor_2']:
-            grads_x[key] = grads_x_via_post[key] + grads_x_via_cavity[key] + grads_x_via_logZ[key]
+            grads_x[key] = grads_x_via_post[key] + \
+                grads_x_via_cavity[key] + grads_x_via_logZ[key]
 
         for key in grads_x.keys():
             grad_all[key] = grads_x[key]
@@ -1627,7 +1651,7 @@ class SGPSSM_Linear(AEP_Model):
         # energy /= self.N
         # for key in grad_all.keys():
         #     grad_all[key] /= self.N
-        
+
         return energy, grad_all
 
     def compute_posterior_grad_x(self, alpha):
@@ -1636,20 +1660,20 @@ class SGPSSM_Linear(AEP_Model):
         dpost_1 = post_1 / post_2
         dpost_2 = - 0.5 * post_1**2 / post_2**2 - 0.5 / post_2
         scale_x_post = - (1.0 - 1.0 / alpha) * np.ones((self.N, 1))
-        scale_x_post[0:self.N-1] = scale_x_post[0:self.N-1] + 1.0/alpha
-        scale_x_post[1:self.N] = scale_x_post[1:self.N] + 1.0/alpha
+        scale_x_post[0:self.N - 1] = scale_x_post[0:self.N - 1] + 1.0 / alpha
+        scale_x_post[1:self.N] = scale_x_post[1:self.N] + 1.0 / alpha
         grads_x_1 = scale_x_post * dpost_1
         grads_x_2 = scale_x_post * dpost_2
         grads = {}
-        grads['x_factor_1'] = 3.0*grads_x_1
-        grads['x_factor_2'] = 6.0*grads_x_2*self.x_factor_2
-        grads['x_factor_1'][[0, -1], :] = 2.0*grads_x_1[[0, -1], :]
+        grads['x_factor_1'] = 3.0 * grads_x_1
+        grads['x_factor_2'] = 6.0 * grads_x_2 * self.x_factor_2
+        grads['x_factor_1'][[0, -1], :] = 2.0 * grads_x_1[[0, -1], :]
         grads['x_factor_2'][[0, -1], :] = (
-            4.0*grads_x_2[[0, -1], :] * self.x_factor_2[[0, -1], :])
+            4.0 * grads_x_2[[0, -1], :] * self.x_factor_2[[0, -1], :])
         return grads
 
-    def compute_logZ_grad_x(self, alpha, cav_1, cav_2, dmcav_up, dvcav_up, 
-        dmcav_prev, dvcav_prev, dmcav_next, dvcav_next):
+    def compute_logZ_grad_x(self, alpha, cav_1, cav_2, dmcav_up, dvcav_up,
+                            dmcav_prev, dvcav_prev, dmcav_next, dvcav_next):
 
         grads_up_1 = dmcav_up / cav_2
         grads_up_2 = - dmcav_up * cav_1 / cav_2**2 - dvcav_up / cav_2**2
@@ -1658,19 +1682,19 @@ class SGPSSM_Linear(AEP_Model):
 
         idxs = np.arange(1, self.N)
         grads_prev_1 = dmcav_prev / cav_2[idxs, :]
-        grads_prev_2 = (- dmcav_prev * cav_1[idxs, :] / cav_2[idxs, :]**2 
-            - dvcav_prev / cav_2[idxs, :]**2)
+        grads_prev_2 = (- dmcav_prev * cav_1[idxs, :] / cav_2[idxs, :]**2
+                        - dvcav_prev / cav_2[idxs, :]**2)
         grads_x_1[idxs, :] += grads_prev_1
         grads_x_2[idxs, :] += grads_prev_2
 
-        idxs = np.arange(0, self.N-1)
+        idxs = np.arange(0, self.N - 1)
         grads_next_1 = dmcav_next / cav_2[idxs, :]
-        grads_next_2 = (- dmcav_next * cav_1[idxs, :] / cav_2[idxs, :]**2 
-            - dvcav_next / cav_2[idxs, :]**2)
+        grads_next_2 = (- dmcav_next * cav_1[idxs, :] / cav_2[idxs, :]**2
+                        - dvcav_next / cav_2[idxs, :]**2)
         grads_x_1[idxs, :] += grads_next_1
         grads_x_2[idxs, :] += grads_next_2
 
-        scale_x_cav = (3.0 - alpha)*np.ones((self.N, 1))
+        scale_x_cav = (3.0 - alpha) * np.ones((self.N, 1))
         scale_x_cav[0] = 2.0 - alpha
         scale_x_cav[-1] = 2.0 - alpha
         grad_1 = grads_x_1 * scale_x_cav
@@ -1681,16 +1705,16 @@ class SGPSSM_Linear(AEP_Model):
         return grads
 
     def compute_cavity_grad_x(self, alpha, cav_1, cav_2):
-        scale = -1.0/alpha
+        scale = -1.0 / alpha
         dcav_1 = cav_1 / cav_2
         dcav_2 = - 0.5 * cav_1**2 / cav_2**2 - 0.5 / cav_2
         scale_x_cav = scale * np.ones((self.N, 1))
-        scale_x_cav[0:self.N-1] = scale_x_cav[0:self.N-1] + scale
+        scale_x_cav[0:self.N - 1] = scale_x_cav[0:self.N - 1] + scale
         scale_x_cav[1:self.N] = scale_x_cav[1:self.N] + scale
         grads_x_1 = scale_x_cav * dcav_1
         grads_x_2 = scale_x_cav * dcav_2
 
-        scale_x_cav = (3.0 - alpha)*np.ones((self.N, 1))
+        scale_x_cav = (3.0 - alpha) * np.ones((self.N, 1))
         scale_x_cav[0] = 2.0 - alpha
         scale_x_cav[-1] = 2.0 - alpha
         grad_1 = grads_x_1 * scale_x_cav
@@ -1701,12 +1725,13 @@ class SGPSSM_Linear(AEP_Model):
         return grads
 
     def compute_transition_tilted(self, m_prop, v_prop, m_t, v_t, alpha, scale):
-        sn2 = np.exp(2*self.sn)
+        sn2 = np.exp(2 * self.sn)
         v_sum = v_t + v_prop + sn2 / alpha
         m_diff = m_t - m_prop
         exp_term = -0.5 * m_diff**2 / v_sum
-        const_term = -0.5 * np.log(2*np.pi*v_sum)
-        alpha_term = 0.5 * (1-alpha) * np.log(2*np.pi*sn2) - 0.5*np.log(alpha)
+        const_term = -0.5 * np.log(2 * np.pi * v_sum)
+        alpha_term = 0.5 * (1 - alpha) * np.log(2 *
+                                                np.pi * sn2) - 0.5 * np.log(alpha)
         logZ = exp_term + const_term + alpha_term
         logZ = np.sum(logZ)
 
@@ -1716,13 +1741,14 @@ class SGPSSM_Linear(AEP_Model):
         dmprop = m_diff / v_sum
 
         dv_sum = np.sum(dvt)
-        dsn = dv_sum*2*sn2/alpha + m_prop.shape[0]*self.Din*(1-alpha)
-        return scale*logZ, scale*dmprop, scale*dvprop, scale*dmt, scale*dvt, scale*dsn
+        dsn = dv_sum * 2 * sn2 / alpha + \
+            m_prop.shape[0] * self.Din * (1 - alpha)
+        return scale * logZ, scale * dmprop, scale * dvprop, scale * dmt, scale * dvt, scale * dsn
 
     def compute_cavity_x(self, alpha):
-        cav_1 = self.x_post_1 - alpha*self.x_factor_1
-        cav_2 = self.x_post_2 - alpha*self.x_factor_2
-        return cav_1/(cav_2+1e-16), 1.0/(cav_2+1e-16), cav_1, cav_2
+        cav_1 = self.x_post_1 - alpha * self.x_factor_1
+        cav_2 = self.x_post_2 - alpha * self.x_factor_2
+        return cav_1 / (cav_2 + 1e-16), 1.0 / (cav_2 + 1e-16), cav_1, cav_2
 
     def compute_phi_prior_x(self):
         t1 = self.x_prior_1
@@ -1736,18 +1762,18 @@ class SGPSSM_Linear(AEP_Model):
         post_2 = self.x_post_2
         phi_post = 0.5 * (post_1**2 / post_2 - np.log(post_2))
         scale_x_post = - (1.0 - 1.0 / alpha) * np.ones((self.N, 1))
-        scale_x_post[0:self.N-1] = scale_x_post[0:self.N-1] + 1/alpha
-        scale_x_post[1:self.N] = scale_x_post[1:self.N] + 1/alpha
+        scale_x_post[0:self.N - 1] = scale_x_post[0:self.N - 1] + 1 / alpha
+        scale_x_post[1:self.N] = scale_x_post[1:self.N] + 1 / alpha
         return np.sum(scale_x_post * phi_post)
 
     def compute_phi_cavity_x(self, alpha):
-        scale = -1.0/alpha
-        cav_1 = self.x_post_1 - alpha*self.x_factor_1
-        cav_2 = self.x_post_2 - alpha*self.x_factor_2
+        scale = -1.0 / alpha
+        cav_1 = self.x_post_1 - alpha * self.x_factor_1
+        cav_2 = self.x_post_2 - alpha * self.x_factor_2
         phi_cav = 0.5 * (cav_1**2 / cav_2 - np.log(cav_2))
 
         scale_x_cav = scale * np.ones((self.N, 1))
-        scale_x_cav[0:self.N-1] = scale_x_cav[0:self.N-1] + scale
+        scale_x_cav[0:self.N - 1] = scale_x_cav[0:self.N - 1] + scale
         scale_x_cav[1:self.N] = scale_x_cav[1:self.N] + scale
         phi_cav_sum = np.sum(scale_x_cav * phi_cav)
         return phi_cav_sum
@@ -1819,12 +1845,12 @@ class SGPSSM_Linear(AEP_Model):
 
         sgp_params = self.dyn_layer.init_hypers()
         emi_params = self.emi_layer.init_hypers()
-        
+
         post_2 = 1.0 / post_v
         post_1 = post_2 * post_m
         ssm_params = {'sn': np.log(0.01)}
-        ssm_params['x_factor_1'] = post_1/3
-        ssm_params['x_factor_2'] = np.log(post_2/3) / 2
+        ssm_params['x_factor_1'] = post_1 / 3
+        ssm_params['x_factor_2'] = np.log(post_2 / 3) / 2
         init_params = dict(sgp_params)
         init_params.update(emi_params)
         init_params.update(ssm_params)
@@ -1843,31 +1869,31 @@ class SGPSSM_Linear(AEP_Model):
         for _ in range(100):
             model.EM_step()
 
-        s = model.states_list.pop()    
+        s = model.states_list.pop()
         s.info_E_step()
         post_m = s.smoothed_mus
         # post_v = np.diagonal(s.smoothed_sigmas, axis1=1, axis2=2)
         scale = np.std(post_m, axis=0)
         post_m = (post_m - np.mean(post_m, axis=0)) / scale
         # post_v = post_v / scale**2
-        post_v = 0.01*np.ones_like(post_m)
+        post_v = 0.01 * np.ones_like(post_m)
         post_2 = 1.0 / post_v
         post_1 = post_2 * post_m
         ssm_params = {'sn': np.log(0.01)}
-        ssm_params['x_factor_1'] = post_1/3
-        ssm_params['x_factor_2'] = np.log(post_2/3) / 2
+        ssm_params['x_factor_1'] = post_1 / 3
+        ssm_params['x_factor_2'] = np.log(post_2 / 3) / 2
         emi_params = self.emi_layer.init_hypers()
         if isinstance(self.emi_layer, Gauss_Emis):
             emi_params['C'] = np.dot(s.C, np.diag(scale))
             # emi_params['C'] = s.C
             # emi_params['C'] = np.dot(s.C, np.diag(scale))*np.random.randn(self.Dout, self.Din)
-            
+
         # learnt a GP mapping between hidden states
         print 'init latent function using GPR...'
-        x = post_m[:self.N-1, :]
+        x = post_m[:self.N - 1, :]
         y = post_m[1:, :]
         if self.Dcon > 0:
-            x = np.hstack((x, self.x_control[:self.N-1, :]))
+            x = np.hstack((x, self.x_control[:self.N - 1, :]))
         reg = SGPR(x, y, self.M, 'Gaussian')
         reg.set_fixed_params(['sn', 'sf', 'ls', 'zu'])
         reg.optimise(method='L-BFGS-B', alpha=0.5, maxiter=200)
@@ -1898,12 +1924,12 @@ class SGPSSM_Linear(AEP_Model):
         self.emi_layer.update_hypers(params)
         self.sn = params['sn']
         self.x_factor_1 = params['x_factor_1']
-        self.x_factor_2 = np.exp(2*params['x_factor_2'])
+        self.x_factor_2 = np.exp(2 * params['x_factor_2'])
 
-        self.x_post_1 = 3*self.x_factor_1
-        self.x_post_2 = 3*self.x_factor_2
-        self.x_post_1[[0, -1], :] = 2*self.x_factor_1[[0, -1], :]
-        self.x_post_2[[0, -1], :] = 2*self.x_factor_2[[0, -1], :]
+        self.x_post_1 = 3 * self.x_factor_1
+        self.x_post_2 = 3 * self.x_factor_2
+        self.x_post_1[[0, -1], :] = 2 * self.x_factor_1[[0, -1], :]
+        self.x_post_2[[0, -1], :] = 2 * self.x_factor_2[[0, -1], :]
         self.x_post_1[0, :] += self.x_prior_1
         self.x_post_2[0, :] += self.x_prior_2
 
@@ -1911,8 +1937,8 @@ class SGPSSM_Linear(AEP_Model):
 # double GP, with control, in progress, TODO: prediction
 class SGPSSM_GP_working(AEP_Model):
 
-    def __init__(self, y_train, hidden_size, no_pseudo, 
-        lik='Gaussian', prior_mean=0, prior_var=1, x_control=None):
+    def __init__(self, y_train, hidden_size, no_pseudo,
+                 lik='Gaussian', prior_mean=0, prior_var=1, x_control=None):
         super(SGPSSM_GP, self).__init__(y_train)
         if x_control is not None:
             self.Dcon = Dcon = x_control.shape[1]
@@ -1925,7 +1951,7 @@ class SGPSSM_GP_working(AEP_Model):
         self.Din = Din = hidden_size
         self.M = M = no_pseudo
 
-        self.dyn_layer = SGP_Layer(N-1, Din+Dcon, Din, M)
+        self.dyn_layer = SGP_Layer(N - 1, Din + Dcon, Din, M)
         self.emi_layer = SGP_Layer(N, Din, Dout, M)
         if lik.lower() == 'gaussian':
             self.lik_layer = Gauss_Layer(N, Dout)
@@ -1947,11 +1973,11 @@ class SGPSSM_GP_working(AEP_Model):
     def objective_function(self, params, mb_size, alpha=1.0, prop_mode=PROP_MM):
         N = self.N
         # TODO: deal with minibatch here
-        batch_size_dyn = (N-1)
+        batch_size_dyn = (N - 1)
         scale_logZ_dyn = - 1.0 / alpha
         batch_size_emi = N
         scale_logZ_emi = - 1.0 / alpha
-        
+
         # update model with new hypers
         self.update_hypers(params)
         self.dyn_layer.compute_cavity(alpha)
@@ -1960,11 +1986,12 @@ class SGPSSM_GP_working(AEP_Model):
         # deal with the transition/dynamic factors here
         idxs_prev = np.arange(1, self.N)
         cav_t_m, cav_t_v = cav_m[idxs_prev, :], cav_v[idxs_prev, :]
-        idxs_next = np.arange(0, self.N-1)
+        idxs_next = np.arange(0, self.N - 1)
         cav_tm1_m, cav_tm1_v = cav_m[idxs_next, :], cav_v[idxs_next, :]
         if self.Dcon > 0:
             cav_tm1_mc = np.hstack((cav_tm1_m, self.x_control[idxs_next, :]))
-            cav_tm1_vc = np.hstack((cav_tm1_v, np.zeros((self.N-1, self.Dcon))))
+            cav_tm1_vc = np.hstack(
+                (cav_tm1_v, np.zeros((self.N - 1, self.Dcon))))
         else:
             cav_tm1_mc, cav_tm1_vc = cav_tm1_m, cav_tm1_v
         mprop, vprop, psi1, psi2 = self.dyn_layer.forward_prop_thru_cav(
@@ -1972,14 +1999,16 @@ class SGPSSM_GP_working(AEP_Model):
         logZ_dyn, dmprop, dvprop, dmt, dvt, dsn = self.compute_transition_tilted(
             mprop, vprop, cav_t_m, cav_t_v, alpha, scale_logZ_dyn)
         sgp_grad_hyper, sgp_grad_input = self.dyn_layer.backprop_grads_lvm_mm(
-            mprop, vprop, dmprop, dvprop, 
+            mprop, vprop, dmprop, dvprop,
             psi1, psi2, cav_tm1_mc, cav_tm1_vc, alpha)
 
         # deal with the emission factors here
         idxs_up = np.arange(0, self.N)
         cav_up_m, cav_up_v = cav_m[idxs_up, :], cav_v[idxs_up, :]
-        mout, vout, psi1, psi2 = self.emi_layer.forward_prop_thru_cav(cav_up_m, cav_up_v)
-        logZ_emi, dm, dv = self.lik_layer.compute_log_Z(mout, vout, self.y_train, alpha)
+        mout, vout, psi1, psi2 = self.emi_layer.forward_prop_thru_cav(
+            cav_up_m, cav_up_v)
+        logZ_emi, dm, dv = self.lik_layer.compute_log_Z(
+            mout, vout, self.y_train, alpha)
         logZ_emi = scale_logZ_emi * logZ_emi
         dm_scale = scale_logZ_emi * dm
         dv_scale = scale_logZ_emi * dv
@@ -1991,17 +2020,17 @@ class SGPSSM_GP_working(AEP_Model):
         # collect emission and GP hyperparameters
         grad_all = {'sn': dsn}
         for key in sgp_grad_hyper.keys():
-            grad_all[key+'_dynamic'] = sgp_grad_hyper[key]
+            grad_all[key + '_dynamic'] = sgp_grad_hyper[key]
         for key in emi_grad_hyper.keys():
-            grad_all[key+'_emission'] = emi_grad_hyper[key]
+            grad_all[key + '_emission'] = emi_grad_hyper[key]
         for key in lik_grad_hyper.keys():
-            grad_all[key+'_emission'] = lik_grad_hyper[key]
+            grad_all[key + '_emission'] = lik_grad_hyper[key]
 
         dmcav_up, dvcav_up = emi_grad_input['mx'], emi_grad_input['vx']
         dmcav_prev, dvcav_prev = dmt, dvt
         dmcav_next = sgp_grad_input['mx'][:, :self.Din]
         dvcav_next = sgp_grad_input['vx'][:, :self.Din]
-        
+
         # compute posterior
         grads_x_via_post = self.compute_posterior_grad_x(alpha)
         grads_x_via_cavity = self.compute_cavity_grad_x(
@@ -2013,7 +2042,8 @@ class SGPSSM_GP_working(AEP_Model):
 
         grads_x = {}
         for key in ['x_factor_1', 'x_factor_2']:
-            grads_x[key] = grads_x_via_post[key] + grads_x_via_cavity[key] + grads_x_via_logZ[key]
+            grads_x[key] = grads_x_via_post[key] + \
+                grads_x_via_cavity[key] + grads_x_via_logZ[key]
 
         for key in grads_x.keys():
             grad_all[key] = grads_x[key]
@@ -2032,7 +2062,7 @@ class SGPSSM_GP_working(AEP_Model):
         # energy /= self.N
         # for key in grad_all.keys():
         #     grad_all[key] /= self.N
-        
+
         return energy, grad_all
 
     def compute_posterior_grad_x(self, alpha):
@@ -2041,20 +2071,20 @@ class SGPSSM_GP_working(AEP_Model):
         dpost_1 = post_1 / post_2
         dpost_2 = - 0.5 * post_1**2 / post_2**2 - 0.5 / post_2
         scale_x_post = - (1.0 - 1.0 / alpha) * np.ones((self.N, 1))
-        scale_x_post[0:self.N-1] = scale_x_post[0:self.N-1] + 1.0/alpha
-        scale_x_post[1:self.N] = scale_x_post[1:self.N] + 1.0/alpha
+        scale_x_post[0:self.N - 1] = scale_x_post[0:self.N - 1] + 1.0 / alpha
+        scale_x_post[1:self.N] = scale_x_post[1:self.N] + 1.0 / alpha
         grads_x_1 = scale_x_post * dpost_1
         grads_x_2 = scale_x_post * dpost_2
         grads = {}
-        grads['x_factor_1'] = 3.0*grads_x_1
-        grads['x_factor_2'] = 6.0*grads_x_2*self.x_factor_2
-        grads['x_factor_1'][[0, -1], :] = 2.0*grads_x_1[[0, -1], :]
+        grads['x_factor_1'] = 3.0 * grads_x_1
+        grads['x_factor_2'] = 6.0 * grads_x_2 * self.x_factor_2
+        grads['x_factor_1'][[0, -1], :] = 2.0 * grads_x_1[[0, -1], :]
         grads['x_factor_2'][[0, -1], :] = (
-            4.0*grads_x_2[[0, -1], :] * self.x_factor_2[[0, -1], :])
+            4.0 * grads_x_2[[0, -1], :] * self.x_factor_2[[0, -1], :])
         return grads
 
-    def compute_logZ_grad_x(self, alpha, cav_1, cav_2, dmcav_up, dvcav_up, 
-        dmcav_prev, dvcav_prev, dmcav_next, dvcav_next):
+    def compute_logZ_grad_x(self, alpha, cav_1, cav_2, dmcav_up, dvcav_up,
+                            dmcav_prev, dvcav_prev, dmcav_next, dvcav_next):
 
         grads_up_1 = dmcav_up / cav_2
         grads_up_2 = - dmcav_up * cav_1 / cav_2**2 - dvcav_up / cav_2**2
@@ -2063,19 +2093,19 @@ class SGPSSM_GP_working(AEP_Model):
 
         idxs = np.arange(1, self.N)
         grads_prev_1 = dmcav_prev / cav_2[idxs, :]
-        grads_prev_2 = (- dmcav_prev * cav_1[idxs, :] / cav_2[idxs, :]**2 
-            - dvcav_prev / cav_2[idxs, :]**2)
+        grads_prev_2 = (- dmcav_prev * cav_1[idxs, :] / cav_2[idxs, :]**2
+                        - dvcav_prev / cav_2[idxs, :]**2)
         grads_x_1[idxs, :] += grads_prev_1
         grads_x_2[idxs, :] += grads_prev_2
 
-        idxs = np.arange(0, self.N-1)
+        idxs = np.arange(0, self.N - 1)
         grads_next_1 = dmcav_next / cav_2[idxs, :]
-        grads_next_2 = (- dmcav_next * cav_1[idxs, :] / cav_2[idxs, :]**2 
-            - dvcav_next / cav_2[idxs, :]**2)
+        grads_next_2 = (- dmcav_next * cav_1[idxs, :] / cav_2[idxs, :]**2
+                        - dvcav_next / cav_2[idxs, :]**2)
         grads_x_1[idxs, :] += grads_next_1
         grads_x_2[idxs, :] += grads_next_2
 
-        scale_x_cav = (3.0 - alpha)*np.ones((self.N, 1))
+        scale_x_cav = (3.0 - alpha) * np.ones((self.N, 1))
         scale_x_cav[0] = 2.0 - alpha
         scale_x_cav[-1] = 2.0 - alpha
         grad_1 = grads_x_1 * scale_x_cav
@@ -2086,16 +2116,16 @@ class SGPSSM_GP_working(AEP_Model):
         return grads
 
     def compute_cavity_grad_x(self, alpha, cav_1, cav_2):
-        scale = -1.0/alpha
+        scale = -1.0 / alpha
         dcav_1 = cav_1 / cav_2
         dcav_2 = - 0.5 * cav_1**2 / cav_2**2 - 0.5 / cav_2
         scale_x_cav = scale * np.ones((self.N, 1))
-        scale_x_cav[0:self.N-1] = scale_x_cav[0:self.N-1] + scale
+        scale_x_cav[0:self.N - 1] = scale_x_cav[0:self.N - 1] + scale
         scale_x_cav[1:self.N] = scale_x_cav[1:self.N] + scale
         grads_x_1 = scale_x_cav * dcav_1
         grads_x_2 = scale_x_cav * dcav_2
 
-        scale_x_cav = (3.0 - alpha)*np.ones((self.N, 1))
+        scale_x_cav = (3.0 - alpha) * np.ones((self.N, 1))
         scale_x_cav[0] = 2.0 - alpha
         scale_x_cav[-1] = 2.0 - alpha
         grad_1 = grads_x_1 * scale_x_cav
@@ -2106,12 +2136,13 @@ class SGPSSM_GP_working(AEP_Model):
         return grads
 
     def compute_transition_tilted(self, m_prop, v_prop, m_t, v_t, alpha, scale):
-        sn2 = np.exp(2*self.sn)
+        sn2 = np.exp(2 * self.sn)
         v_sum = v_t + v_prop + sn2 / alpha
         m_diff = m_t - m_prop
         exp_term = -0.5 * m_diff**2 / v_sum
-        const_term = -0.5 * np.log(2*np.pi*v_sum)
-        alpha_term = 0.5 * (1-alpha) * np.log(2*np.pi*sn2) - 0.5*np.log(alpha)
+        const_term = -0.5 * np.log(2 * np.pi * v_sum)
+        alpha_term = 0.5 * (1 - alpha) * np.log(2 *
+                                                np.pi * sn2) - 0.5 * np.log(alpha)
         logZ = exp_term + const_term + alpha_term
         logZ = np.sum(logZ)
 
@@ -2121,13 +2152,14 @@ class SGPSSM_GP_working(AEP_Model):
         dmprop = m_diff / v_sum
 
         dv_sum = np.sum(dvt)
-        dsn = dv_sum*2*sn2/alpha + m_prop.shape[0]*self.Din*(1-alpha)
-        return scale*logZ, scale*dmprop, scale*dvprop, scale*dmt, scale*dvt, scale*dsn
+        dsn = dv_sum * 2 * sn2 / alpha + \
+            m_prop.shape[0] * self.Din * (1 - alpha)
+        return scale * logZ, scale * dmprop, scale * dvprop, scale * dmt, scale * dvt, scale * dsn
 
     def compute_cavity_x(self, alpha):
-        cav_1 = self.x_post_1 - alpha*self.x_factor_1
-        cav_2 = self.x_post_2 - alpha*self.x_factor_2
-        return cav_1/(cav_2+1e-16), 1.0/(cav_2+1e-16), cav_1, cav_2
+        cav_1 = self.x_post_1 - alpha * self.x_factor_1
+        cav_2 = self.x_post_2 - alpha * self.x_factor_2
+        return cav_1 / (cav_2 + 1e-16), 1.0 / (cav_2 + 1e-16), cav_1, cav_2
 
     def compute_phi_prior_x(self):
         t1 = self.x_prior_1
@@ -2141,18 +2173,18 @@ class SGPSSM_GP_working(AEP_Model):
         post_2 = self.x_post_2
         phi_post = 0.5 * (post_1**2 / post_2 - np.log(post_2))
         scale_x_post = - (1.0 - 1.0 / alpha) * np.ones((self.N, 1))
-        scale_x_post[0:self.N-1] = scale_x_post[0:self.N-1] + 1/alpha
-        scale_x_post[1:self.N] = scale_x_post[1:self.N] + 1/alpha
+        scale_x_post[0:self.N - 1] = scale_x_post[0:self.N - 1] + 1 / alpha
+        scale_x_post[1:self.N] = scale_x_post[1:self.N] + 1 / alpha
         return np.sum(scale_x_post * phi_post)
 
     def compute_phi_cavity_x(self, alpha):
-        scale = -1.0/alpha
-        cav_1 = self.x_post_1 - alpha*self.x_factor_1
-        cav_2 = self.x_post_2 - alpha*self.x_factor_2
+        scale = -1.0 / alpha
+        cav_1 = self.x_post_1 - alpha * self.x_factor_1
+        cav_2 = self.x_post_2 - alpha * self.x_factor_2
         phi_cav = 0.5 * (cav_1**2 / cav_2 - np.log(cav_2))
 
         scale_x_cav = scale * np.ones((self.N, 1))
-        scale_x_cav[0:self.N-1] = scale_x_cav[0:self.N-1] + scale
+        scale_x_cav[0:self.N - 1] = scale_x_cav[0:self.N - 1] + scale
         scale_x_cav[1:self.N] = scale_x_cav[1:self.N] + scale
         phi_cav_sum = np.sum(scale_x_cav * phi_cav)
         return phi_cav_sum
@@ -2231,25 +2263,25 @@ class SGPSSM_GP_working(AEP_Model):
         for _ in range(100):
             model.EM_step()
 
-        s = model.states_list.pop()    
+        s = model.states_list.pop()
         s.info_E_step()
         post_m = s.smoothed_mus
         # post_v = np.diagonal(s.smoothed_sigmas, axis1=1, axis2=2)
         scale = np.std(post_m, axis=0)
         post_m = (post_m - np.mean(post_m, axis=0)) / scale
-        post_v = 0.01*np.ones_like(post_m)
+        post_v = 0.01 * np.ones_like(post_m)
         post_2 = 1.0 / post_v
         post_1 = post_2 * post_m
         ssm_params = {'sn': np.log(0.01)}
-        ssm_params['x_factor_1'] = post_1/3
-        ssm_params['x_factor_2'] = np.log(post_2/3) / 2
-            
+        ssm_params['x_factor_1'] = post_1 / 3
+        ssm_params['x_factor_2'] = np.log(post_2 / 3) / 2
+
         # learn a GP mapping between hidden states
         print 'init latent function using GPR...'
-        x = post_m[:self.N-1, :]
+        x = post_m[:self.N - 1, :]
         y = post_m[1:, :]
         if self.Dcon > 0:
-            x = np.hstack((x, self.x_control[:self.N-1, :]))
+            x = np.hstack((x, self.x_control[:self.N - 1, :]))
         reg = SGPR(x, y, self.M, 'Gaussian')
         reg.set_fixed_params(['sn', 'sf', 'ls', 'zu'])
         # reg.set_fixed_params(['sn', 'sf'])
@@ -2269,7 +2301,7 @@ class SGPSSM_GP_working(AEP_Model):
         reg.optimise(method='L-BFGS-B', alpha=0.5, maxiter=500)
         emi_params = reg.sgp_layer.get_hypers(key_suffix='_emission')
         # emi_params['ls_emission'] -= np.log(5)
-        lik_params = self.lik_layer.init_hypers(key_suffix='_emission')       
+        lik_params = self.lik_layer.init_hypers(key_suffix='_emission')
 
         init_params = dict(dyn_params)
         init_params.update(emi_params)
@@ -2297,12 +2329,12 @@ class SGPSSM_GP_working(AEP_Model):
         self.lik_layer.update_hypers(params, key_suffix='_emission')
         self.sn = params['sn']
         self.x_factor_1 = params['x_factor_1']
-        self.x_factor_2 = np.exp(2*params['x_factor_2'])
+        self.x_factor_2 = np.exp(2 * params['x_factor_2'])
 
-        self.x_post_1 = 3*self.x_factor_1
-        self.x_post_2 = 3*self.x_factor_2
-        self.x_post_1[[0, -1], :] = 2*self.x_factor_1[[0, -1], :]
-        self.x_post_2[[0, -1], :] = 2*self.x_factor_2[[0, -1], :]
+        self.x_post_1 = 3 * self.x_factor_1
+        self.x_post_2 = 3 * self.x_factor_2
+        self.x_post_1[[0, -1], :] = 2 * self.x_factor_1[[0, -1], :]
+        self.x_post_2[[0, -1], :] = 2 * self.x_factor_2[[0, -1], :]
         self.x_post_1[0, :] += self.x_prior_1
         self.x_post_2[0, :] += self.x_prior_2
 
@@ -2310,8 +2342,8 @@ class SGPSSM_GP_working(AEP_Model):
 # double GP, with control connecting to emission, in progress, TODO: prediction
 class SGPSSM_GP(AEP_Model):
 
-    def __init__(self, y_train, hidden_size, no_pseudo, 
-        lik='Gaussian', prior_mean=0, prior_var=1, x_control=None):
+    def __init__(self, y_train, hidden_size, no_pseudo,
+                 lik='Gaussian', prior_mean=0, prior_var=1, x_control=None):
         super(SGPSSM_GP, self).__init__(y_train)
         if x_control is not None:
             self.Dcon = Dcon = x_control.shape[1]
@@ -2324,8 +2356,8 @@ class SGPSSM_GP(AEP_Model):
         self.Din = Din = hidden_size
         self.M = M = no_pseudo
 
-        self.dyn_layer = SGP_Layer(N-1, Din+Dcon, Din, M)
-        self.emi_layer = SGP_Layer(N, Din+Dcon, Dout, M)
+        self.dyn_layer = SGP_Layer(N - 1, Din + Dcon, Din, M)
+        self.emi_layer = SGP_Layer(N, Din + Dcon, Dout, M)
         if lik.lower() == 'gaussian':
             self.lik_layer = Gauss_Layer(N, Dout)
         elif lik.lower() == 'probit':
@@ -2346,11 +2378,11 @@ class SGPSSM_GP(AEP_Model):
     def objective_function(self, params, mb_size, alpha=1.0, prop_mode=PROP_MM):
         N = self.N
         # TODO: deal with minibatch here
-        batch_size_dyn = (N-1)
+        batch_size_dyn = (N - 1)
         scale_logZ_dyn = - 1.0 / alpha
         batch_size_emi = N
         scale_logZ_emi = - 1.0 / alpha
-        
+
         # update model with new hypers
         self.update_hypers(params)
         self.dyn_layer.compute_cavity(alpha)
@@ -2359,11 +2391,12 @@ class SGPSSM_GP(AEP_Model):
         # deal with the transition/dynamic factors here
         idxs_prev = np.arange(1, self.N)
         cav_t_m, cav_t_v = cav_m[idxs_prev, :], cav_v[idxs_prev, :]
-        idxs_next = np.arange(0, self.N-1)
+        idxs_next = np.arange(0, self.N - 1)
         cav_tm1_m, cav_tm1_v = cav_m[idxs_next, :], cav_v[idxs_next, :]
         if self.Dcon > 0:
             cav_tm1_mc = np.hstack((cav_tm1_m, self.x_control[idxs_next, :]))
-            cav_tm1_vc = np.hstack((cav_tm1_v, np.zeros((self.N-1, self.Dcon))))
+            cav_tm1_vc = np.hstack(
+                (cav_tm1_v, np.zeros((self.N - 1, self.Dcon))))
         else:
             cav_tm1_mc, cav_tm1_vc = cav_tm1_m, cav_tm1_v
         mprop, vprop, psi1, psi2 = self.dyn_layer.forward_prop_thru_cav(
@@ -2371,7 +2404,7 @@ class SGPSSM_GP(AEP_Model):
         logZ_dyn, dmprop, dvprop, dmt, dvt, dsn = self.compute_transition_tilted(
             mprop, vprop, cav_t_m, cav_t_v, alpha, scale_logZ_dyn)
         sgp_grad_hyper, sgp_grad_input = self.dyn_layer.backprop_grads_lvm_mm(
-            mprop, vprop, dmprop, dvprop, 
+            mprop, vprop, dmprop, dvprop,
             psi1, psi2, cav_tm1_mc, cav_tm1_vc, alpha)
 
         # deal with the emission factors here
@@ -2382,8 +2415,10 @@ class SGPSSM_GP(AEP_Model):
             cav_up_vc = np.hstack((cav_up_v, np.zeros((self.N, self.Dcon))))
         else:
             cav_up_mc, cav_up_vc = cav_up_m, cav_up_v
-        mout, vout, psi1, psi2 = self.emi_layer.forward_prop_thru_cav(cav_up_mc, cav_up_vc)
-        logZ_emi, dm, dv = self.lik_layer.compute_log_Z(mout, vout, self.y_train, alpha)
+        mout, vout, psi1, psi2 = self.emi_layer.forward_prop_thru_cav(
+            cav_up_mc, cav_up_vc)
+        logZ_emi, dm, dv = self.lik_layer.compute_log_Z(
+            mout, vout, self.y_train, alpha)
         logZ_emi = scale_logZ_emi * logZ_emi
         dm_scale = scale_logZ_emi * dm
         dv_scale = scale_logZ_emi * dv
@@ -2395,18 +2430,18 @@ class SGPSSM_GP(AEP_Model):
         # collect emission and GP hyperparameters
         grad_all = {'sn': dsn}
         for key in sgp_grad_hyper.keys():
-            grad_all[key+'_dynamic'] = sgp_grad_hyper[key]
+            grad_all[key + '_dynamic'] = sgp_grad_hyper[key]
         for key in emi_grad_hyper.keys():
-            grad_all[key+'_emission'] = emi_grad_hyper[key]
+            grad_all[key + '_emission'] = emi_grad_hyper[key]
         for key in lik_grad_hyper.keys():
-            grad_all[key+'_emission'] = lik_grad_hyper[key]
+            grad_all[key + '_emission'] = lik_grad_hyper[key]
 
         dmcav_up = emi_grad_input['mx'][:, :self.Din]
         dvcav_up = emi_grad_input['vx'][:, :self.Din]
         dmcav_prev, dvcav_prev = dmt, dvt
         dmcav_next = sgp_grad_input['mx'][:, :self.Din]
         dvcav_next = sgp_grad_input['vx'][:, :self.Din]
-        
+
         # compute posterior
         grads_x_via_post = self.compute_posterior_grad_x(alpha)
         grads_x_via_cavity = self.compute_cavity_grad_x(
@@ -2418,7 +2453,8 @@ class SGPSSM_GP(AEP_Model):
 
         grads_x = {}
         for key in ['x_factor_1', 'x_factor_2']:
-            grads_x[key] = grads_x_via_post[key] + grads_x_via_cavity[key] + grads_x_via_logZ[key]
+            grads_x[key] = grads_x_via_post[key] + \
+                grads_x_via_cavity[key] + grads_x_via_logZ[key]
 
         for key in grads_x.keys():
             grad_all[key] = grads_x[key]
@@ -2437,7 +2473,7 @@ class SGPSSM_GP(AEP_Model):
         # energy /= self.N
         # for key in grad_all.keys():
         #     grad_all[key] /= self.N
-        
+
         return energy, grad_all
 
     def compute_posterior_grad_x(self, alpha):
@@ -2446,20 +2482,20 @@ class SGPSSM_GP(AEP_Model):
         dpost_1 = post_1 / post_2
         dpost_2 = - 0.5 * post_1**2 / post_2**2 - 0.5 / post_2
         scale_x_post = - (1.0 - 1.0 / alpha) * np.ones((self.N, 1))
-        scale_x_post[0:self.N-1] = scale_x_post[0:self.N-1] + 1.0/alpha
-        scale_x_post[1:self.N] = scale_x_post[1:self.N] + 1.0/alpha
+        scale_x_post[0:self.N - 1] = scale_x_post[0:self.N - 1] + 1.0 / alpha
+        scale_x_post[1:self.N] = scale_x_post[1:self.N] + 1.0 / alpha
         grads_x_1 = scale_x_post * dpost_1
         grads_x_2 = scale_x_post * dpost_2
         grads = {}
-        grads['x_factor_1'] = 3.0*grads_x_1
-        grads['x_factor_2'] = 6.0*grads_x_2*self.x_factor_2
-        grads['x_factor_1'][[0, -1], :] = 2.0*grads_x_1[[0, -1], :]
+        grads['x_factor_1'] = 3.0 * grads_x_1
+        grads['x_factor_2'] = 6.0 * grads_x_2 * self.x_factor_2
+        grads['x_factor_1'][[0, -1], :] = 2.0 * grads_x_1[[0, -1], :]
         grads['x_factor_2'][[0, -1], :] = (
-            4.0*grads_x_2[[0, -1], :] * self.x_factor_2[[0, -1], :])
+            4.0 * grads_x_2[[0, -1], :] * self.x_factor_2[[0, -1], :])
         return grads
 
-    def compute_logZ_grad_x(self, alpha, cav_1, cav_2, dmcav_up, dvcav_up, 
-        dmcav_prev, dvcav_prev, dmcav_next, dvcav_next):
+    def compute_logZ_grad_x(self, alpha, cav_1, cav_2, dmcav_up, dvcav_up,
+                            dmcav_prev, dvcav_prev, dmcav_next, dvcav_next):
 
         grads_up_1 = dmcav_up / cav_2
         grads_up_2 = - dmcav_up * cav_1 / cav_2**2 - dvcav_up / cav_2**2
@@ -2468,19 +2504,19 @@ class SGPSSM_GP(AEP_Model):
 
         idxs = np.arange(1, self.N)
         grads_prev_1 = dmcav_prev / cav_2[idxs, :]
-        grads_prev_2 = (- dmcav_prev * cav_1[idxs, :] / cav_2[idxs, :]**2 
-            - dvcav_prev / cav_2[idxs, :]**2)
+        grads_prev_2 = (- dmcav_prev * cav_1[idxs, :] / cav_2[idxs, :]**2
+                        - dvcav_prev / cav_2[idxs, :]**2)
         grads_x_1[idxs, :] += grads_prev_1
         grads_x_2[idxs, :] += grads_prev_2
 
-        idxs = np.arange(0, self.N-1)
+        idxs = np.arange(0, self.N - 1)
         grads_next_1 = dmcav_next / cav_2[idxs, :]
-        grads_next_2 = (- dmcav_next * cav_1[idxs, :] / cav_2[idxs, :]**2 
-            - dvcav_next / cav_2[idxs, :]**2)
+        grads_next_2 = (- dmcav_next * cav_1[idxs, :] / cav_2[idxs, :]**2
+                        - dvcav_next / cav_2[idxs, :]**2)
         grads_x_1[idxs, :] += grads_next_1
         grads_x_2[idxs, :] += grads_next_2
 
-        scale_x_cav = (3.0 - alpha)*np.ones((self.N, 1))
+        scale_x_cav = (3.0 - alpha) * np.ones((self.N, 1))
         scale_x_cav[0] = 2.0 - alpha
         scale_x_cav[-1] = 2.0 - alpha
         grad_1 = grads_x_1 * scale_x_cav
@@ -2491,16 +2527,16 @@ class SGPSSM_GP(AEP_Model):
         return grads
 
     def compute_cavity_grad_x(self, alpha, cav_1, cav_2):
-        scale = -1.0/alpha
+        scale = -1.0 / alpha
         dcav_1 = cav_1 / cav_2
         dcav_2 = - 0.5 * cav_1**2 / cav_2**2 - 0.5 / cav_2
         scale_x_cav = scale * np.ones((self.N, 1))
-        scale_x_cav[0:self.N-1] = scale_x_cav[0:self.N-1] + scale
+        scale_x_cav[0:self.N - 1] = scale_x_cav[0:self.N - 1] + scale
         scale_x_cav[1:self.N] = scale_x_cav[1:self.N] + scale
         grads_x_1 = scale_x_cav * dcav_1
         grads_x_2 = scale_x_cav * dcav_2
 
-        scale_x_cav = (3.0 - alpha)*np.ones((self.N, 1))
+        scale_x_cav = (3.0 - alpha) * np.ones((self.N, 1))
         scale_x_cav[0] = 2.0 - alpha
         scale_x_cav[-1] = 2.0 - alpha
         grad_1 = grads_x_1 * scale_x_cav
@@ -2511,12 +2547,13 @@ class SGPSSM_GP(AEP_Model):
         return grads
 
     def compute_transition_tilted(self, m_prop, v_prop, m_t, v_t, alpha, scale):
-        sn2 = np.exp(2*self.sn)
+        sn2 = np.exp(2 * self.sn)
         v_sum = v_t + v_prop + sn2 / alpha
         m_diff = m_t - m_prop
         exp_term = -0.5 * m_diff**2 / v_sum
-        const_term = -0.5 * np.log(2*np.pi*v_sum)
-        alpha_term = 0.5 * (1-alpha) * np.log(2*np.pi*sn2) - 0.5*np.log(alpha)
+        const_term = -0.5 * np.log(2 * np.pi * v_sum)
+        alpha_term = 0.5 * (1 - alpha) * np.log(2 *
+                                                np.pi * sn2) - 0.5 * np.log(alpha)
         logZ = exp_term + const_term + alpha_term
         logZ = np.sum(logZ)
 
@@ -2526,13 +2563,14 @@ class SGPSSM_GP(AEP_Model):
         dmprop = m_diff / v_sum
 
         dv_sum = np.sum(dvt)
-        dsn = dv_sum*2*sn2/alpha + m_prop.shape[0]*self.Din*(1-alpha)
-        return scale*logZ, scale*dmprop, scale*dvprop, scale*dmt, scale*dvt, scale*dsn
+        dsn = dv_sum * 2 * sn2 / alpha + \
+            m_prop.shape[0] * self.Din * (1 - alpha)
+        return scale * logZ, scale * dmprop, scale * dvprop, scale * dmt, scale * dvt, scale * dsn
 
     def compute_cavity_x(self, alpha):
-        cav_1 = self.x_post_1 - alpha*self.x_factor_1
-        cav_2 = self.x_post_2 - alpha*self.x_factor_2
-        return cav_1/(cav_2+1e-16), 1.0/(cav_2+1e-16), cav_1, cav_2
+        cav_1 = self.x_post_1 - alpha * self.x_factor_1
+        cav_2 = self.x_post_2 - alpha * self.x_factor_2
+        return cav_1 / (cav_2 + 1e-16), 1.0 / (cav_2 + 1e-16), cav_1, cav_2
 
     def compute_phi_prior_x(self):
         t1 = self.x_prior_1
@@ -2546,18 +2584,18 @@ class SGPSSM_GP(AEP_Model):
         post_2 = self.x_post_2
         phi_post = 0.5 * (post_1**2 / post_2 - np.log(post_2))
         scale_x_post = - (1.0 - 1.0 / alpha) * np.ones((self.N, 1))
-        scale_x_post[0:self.N-1] = scale_x_post[0:self.N-1] + 1/alpha
-        scale_x_post[1:self.N] = scale_x_post[1:self.N] + 1/alpha
+        scale_x_post[0:self.N - 1] = scale_x_post[0:self.N - 1] + 1 / alpha
+        scale_x_post[1:self.N] = scale_x_post[1:self.N] + 1 / alpha
         return np.sum(scale_x_post * phi_post)
 
     def compute_phi_cavity_x(self, alpha):
-        scale = -1.0/alpha
-        cav_1 = self.x_post_1 - alpha*self.x_factor_1
-        cav_2 = self.x_post_2 - alpha*self.x_factor_2
+        scale = -1.0 / alpha
+        cav_1 = self.x_post_1 - alpha * self.x_factor_1
+        cav_2 = self.x_post_2 - alpha * self.x_factor_2
         phi_cav = 0.5 * (cav_1**2 / cav_2 - np.log(cav_2))
 
         scale_x_cav = scale * np.ones((self.N, 1))
-        scale_x_cav[0:self.N-1] = scale_x_cav[0:self.N-1] + scale
+        scale_x_cav[0:self.N - 1] = scale_x_cav[0:self.N - 1] + scale
         scale_x_cav[1:self.N] = scale_x_cav[1:self.N] + scale
         phi_cav_sum = np.sum(scale_x_cav * phi_cav)
         return phi_cav_sum
@@ -2644,25 +2682,25 @@ class SGPSSM_GP(AEP_Model):
         for _ in range(100):
             model.EM_step()
 
-        s = model.states_list.pop()    
+        s = model.states_list.pop()
         s.info_E_step()
         post_m = s.smoothed_mus
         # post_v = np.diagonal(s.smoothed_sigmas, axis1=1, axis2=2)
         scale = np.std(post_m, axis=0)
         post_m = (post_m - np.mean(post_m, axis=0)) / scale
-        post_v = 0.01*np.ones_like(post_m)
+        post_v = 0.01 * np.ones_like(post_m)
         post_2 = 1.0 / post_v
         post_1 = post_2 * post_m
         ssm_params = {'sn': np.log(0.01)}
-        ssm_params['x_factor_1'] = post_1/3
-        ssm_params['x_factor_2'] = np.log(post_2/3) / 2
-            
+        ssm_params['x_factor_1'] = post_1 / 3
+        ssm_params['x_factor_2'] = np.log(post_2 / 3) / 2
+
         # learn a GP mapping between hidden states
         print 'init latent function using GPR...'
-        x = post_m[:self.N-1, :]
+        x = post_m[:self.N - 1, :]
         y = post_m[1:, :]
         if self.Dcon > 0:
-            x = np.hstack((x, self.x_control[:self.N-1, :]))
+            x = np.hstack((x, self.x_control[:self.N - 1, :]))
         reg = SGPR(x, y, self.M, 'Gaussian')
         reg.set_fixed_params(['sn', 'sf', 'ls', 'zu'])
         # reg.set_fixed_params(['sn', 'sf'])
@@ -2684,7 +2722,7 @@ class SGPSSM_GP(AEP_Model):
         reg.optimise(method='L-BFGS-B', alpha=0.5, maxiter=500)
         emi_params = reg.sgp_layer.get_hypers(key_suffix='_emission')
         # emi_params['ls_emission'] -= np.log(5)
-        lik_params = self.lik_layer.init_hypers(key_suffix='_emission')       
+        lik_params = self.lik_layer.init_hypers(key_suffix='_emission')
 
         init_params = dict(dyn_params)
         init_params.update(emi_params)
@@ -2712,12 +2750,12 @@ class SGPSSM_GP(AEP_Model):
         self.lik_layer.update_hypers(params, key_suffix='_emission')
         self.sn = params['sn']
         self.x_factor_1 = params['x_factor_1']
-        self.x_factor_2 = np.exp(2*params['x_factor_2'])
+        self.x_factor_2 = np.exp(2 * params['x_factor_2'])
 
-        self.x_post_1 = 3*self.x_factor_1
-        self.x_post_2 = 3*self.x_factor_2
-        self.x_post_1[[0, -1], :] = 2*self.x_factor_1[[0, -1], :]
-        self.x_post_2[[0, -1], :] = 2*self.x_factor_2[[0, -1], :]
+        self.x_post_1 = 3 * self.x_factor_1
+        self.x_post_2 = 3 * self.x_factor_2
+        self.x_post_1[[0, -1], :] = 2 * self.x_factor_1[[0, -1], :]
+        self.x_post_2[[0, -1], :] = 2 * self.x_factor_2[[0, -1], :]
         self.x_post_1[0, :] += self.x_prior_1
         self.x_post_2[0, :] += self.x_prior_2
 
@@ -2725,8 +2763,8 @@ class SGPSSM_GP(AEP_Model):
 # mean parameter parameterisation with control, in progress, TODO: prediction
 class SGPSSM_M(AEP_Model):
 
-    def __init__(self, y_train, hidden_size, no_pseudo, 
-        lik='Gaussian', prior_mean=0, prior_var=1, x_control=None):
+    def __init__(self, y_train, hidden_size, no_pseudo,
+                 lik='Gaussian', prior_mean=0, prior_var=1, x_control=None):
         super(SGPSSM, self).__init__(y_train)
         if x_control is not None:
             self.Dcon = Dcon = x_control.shape[1]
@@ -2739,7 +2777,7 @@ class SGPSSM_M(AEP_Model):
         self.Din = Din = hidden_size
         self.M = M = no_pseudo
 
-        self.sgp_layer = SGP_Layer(N-1, Din+Dcon, Din, M)
+        self.sgp_layer = SGP_Layer(N - 1, Din + Dcon, Din, M)
         if lik.lower() == 'gaussian':
             self.emi_layer = Gauss_Emis(y_train, Dout, Din)
         elif lik.lower() == 'probit':
@@ -2761,11 +2799,11 @@ class SGPSSM_M(AEP_Model):
         # self.plot()
         N = self.N
         # TODO: deal with minibatch here
-        batch_size_dyn = (N-1)
+        batch_size_dyn = (N - 1)
         scale_logZ_dyn = - 1.0 / alpha
         batch_size_emi = N
         scale_logZ_emi = - 1.0 / alpha
-        
+
         # update model with new hypers
         self.update_hypers(params)
         self.sgp_layer.compute_cavity(alpha)
@@ -2773,11 +2811,12 @@ class SGPSSM_M(AEP_Model):
         # deal with the transition/dynamic factors here
         idxs_prev = np.arange(1, self.N)
         cav_t_m, cav_t_v = cav_m[idxs_prev, :], cav_v[idxs_prev, :]
-        idxs_next = np.arange(0, self.N-1)
+        idxs_next = np.arange(0, self.N - 1)
         cav_tm1_m, cav_tm1_v = cav_m[idxs_next, :], cav_v[idxs_next, :]
         if self.Dcon > 0:
             cav_tm1_mc = np.hstack((cav_tm1_m, self.x_control[idxs_next, :]))
-            cav_tm1_vc = np.hstack((cav_tm1_v, np.zeros((self.N-1, self.Dcon))))
+            cav_tm1_vc = np.hstack(
+                (cav_tm1_v, np.zeros((self.N - 1, self.Dcon))))
         else:
             cav_tm1_mc, cav_tm1_vc = cav_tm1_m, cav_tm1_v
         mprop, vprop, psi1, psi2 = self.sgp_layer.forward_prop_thru_cav(
@@ -2785,7 +2824,7 @@ class SGPSSM_M(AEP_Model):
         logZ_dyn, dmprop, dvprop, dmt, dvt, dsn = self.compute_transition_tilted(
             mprop, vprop, cav_t_m, cav_t_v, alpha, scale_logZ_dyn)
         sgp_grad_hyper, sgp_grad_input = self.sgp_layer.backprop_grads_lvm_mm(
-            mprop, vprop, dmprop, dvprop, 
+            mprop, vprop, dmprop, dvprop,
             psi1, psi2, cav_tm1_mc, cav_tm1_vc, alpha)
 
         # deal with the emission factors here
@@ -2805,7 +2844,7 @@ class SGPSSM_M(AEP_Model):
         dmcav_prev, dvcav_prev = dmt, dvt
         dmcav_next = sgp_grad_input['mx'][:, :self.Din]
         dvcav_next = sgp_grad_input['vx'][:, :self.Din]
-        
+
         # compute posterior
         grads_x_via_post = self.compute_posterior_grad_x(alpha)
         grads_x_via_cavity = self.compute_cavity_grad_x(
@@ -2817,7 +2856,8 @@ class SGPSSM_M(AEP_Model):
 
         grads_x = {}
         for key in ['x_factor_1', 'x_factor_2']:
-            grads_x[key] = grads_x_via_post[key] + grads_x_via_cavity[key] + grads_x_via_logZ[key]
+            grads_x[key] = grads_x_via_post[key] + \
+                grads_x_via_cavity[key] + grads_x_via_logZ[key]
 
         for key in grads_x.keys():
             grad_all[key] = grads_x[key]
@@ -2835,7 +2875,7 @@ class SGPSSM_M(AEP_Model):
         # energy /= self.N
         # for key in grad_all.keys():
         #     grad_all[key] /= self.N
-        
+
         return energy, grad_all
 
     def compute_posterior_grad_x(self, alpha):
@@ -2844,20 +2884,20 @@ class SGPSSM_M(AEP_Model):
         dpost_1 = post_1 / post_2
         dpost_2 = - 0.5 * post_1**2 / post_2**2 - 0.5 / post_2
         scale_x_post = - (1.0 - 1.0 / alpha) * np.ones((self.N, 1))
-        scale_x_post[0:self.N-1] = scale_x_post[0:self.N-1] + 1.0/alpha
-        scale_x_post[1:self.N] = scale_x_post[1:self.N] + 1.0/alpha
+        scale_x_post[0:self.N - 1] = scale_x_post[0:self.N - 1] + 1.0 / alpha
+        scale_x_post[1:self.N] = scale_x_post[1:self.N] + 1.0 / alpha
         grads_x_1 = scale_x_post * dpost_1
         grads_x_2 = scale_x_post * dpost_2
         grads = {}
-        grads['x_factor_1'] = 3.0*grads_x_1
-        grads['x_factor_2'] = 6.0*grads_x_2*self.x_factor_2
-        grads['x_factor_1'][[0, -1], :] = 2.0*grads_x_1[[0, -1], :]
+        grads['x_factor_1'] = 3.0 * grads_x_1
+        grads['x_factor_2'] = 6.0 * grads_x_2 * self.x_factor_2
+        grads['x_factor_1'][[0, -1], :] = 2.0 * grads_x_1[[0, -1], :]
         grads['x_factor_2'][[0, -1], :] = (
-            4.0*grads_x_2[[0, -1], :] * self.x_factor_2[[0, -1], :])
+            4.0 * grads_x_2[[0, -1], :] * self.x_factor_2[[0, -1], :])
         return grads
 
-    def compute_logZ_grad_x(self, alpha, cav_1, cav_2, dmcav_up, dvcav_up, 
-        dmcav_prev, dvcav_prev, dmcav_next, dvcav_next):
+    def compute_logZ_grad_x(self, alpha, cav_1, cav_2, dmcav_up, dvcav_up,
+                            dmcav_prev, dvcav_prev, dmcav_next, dvcav_next):
 
         grads_up_1 = dmcav_up / cav_2
         grads_up_2 = - dmcav_up * cav_1 / cav_2**2 - dvcav_up / cav_2**2
@@ -2866,19 +2906,19 @@ class SGPSSM_M(AEP_Model):
 
         idxs = np.arange(1, self.N)
         grads_prev_1 = dmcav_prev / cav_2[idxs, :]
-        grads_prev_2 = (- dmcav_prev * cav_1[idxs, :] / cav_2[idxs, :]**2 
-            - dvcav_prev / cav_2[idxs, :]**2)
+        grads_prev_2 = (- dmcav_prev * cav_1[idxs, :] / cav_2[idxs, :]**2
+                        - dvcav_prev / cav_2[idxs, :]**2)
         grads_x_1[idxs, :] += grads_prev_1
         grads_x_2[idxs, :] += grads_prev_2
 
-        idxs = np.arange(0, self.N-1)
+        idxs = np.arange(0, self.N - 1)
         grads_next_1 = dmcav_next / cav_2[idxs, :]
-        grads_next_2 = (- dmcav_next * cav_1[idxs, :] / cav_2[idxs, :]**2 
-            - dvcav_next / cav_2[idxs, :]**2)
+        grads_next_2 = (- dmcav_next * cav_1[idxs, :] / cav_2[idxs, :]**2
+                        - dvcav_next / cav_2[idxs, :]**2)
         grads_x_1[idxs, :] += grads_next_1
         grads_x_2[idxs, :] += grads_next_2
 
-        scale_x_cav = (3.0 - alpha)*np.ones((self.N, 1))
+        scale_x_cav = (3.0 - alpha) * np.ones((self.N, 1))
         scale_x_cav[0] = 2.0 - alpha
         scale_x_cav[-1] = 2.0 - alpha
         grad_1 = grads_x_1 * scale_x_cav
@@ -2889,16 +2929,16 @@ class SGPSSM_M(AEP_Model):
         return grads
 
     def compute_cavity_grad_x(self, alpha, cav_1, cav_2):
-        scale = -1.0/alpha
+        scale = -1.0 / alpha
         dcav_1 = cav_1 / cav_2
         dcav_2 = - 0.5 * cav_1**2 / cav_2**2 - 0.5 / cav_2
         scale_x_cav = scale * np.ones((self.N, 1))
-        scale_x_cav[0:self.N-1] = scale_x_cav[0:self.N-1] + scale
+        scale_x_cav[0:self.N - 1] = scale_x_cav[0:self.N - 1] + scale
         scale_x_cav[1:self.N] = scale_x_cav[1:self.N] + scale
         grads_x_1 = scale_x_cav * dcav_1
         grads_x_2 = scale_x_cav * dcav_2
 
-        scale_x_cav = (3.0 - alpha)*np.ones((self.N, 1))
+        scale_x_cav = (3.0 - alpha) * np.ones((self.N, 1))
         scale_x_cav[0] = 2.0 - alpha
         scale_x_cav[-1] = 2.0 - alpha
         grad_1 = grads_x_1 * scale_x_cav
@@ -2909,12 +2949,13 @@ class SGPSSM_M(AEP_Model):
         return grads
 
     def compute_transition_tilted(self, m_prop, v_prop, m_t, v_t, alpha, scale):
-        sn2 = np.exp(2*self.sn)
+        sn2 = np.exp(2 * self.sn)
         v_sum = v_t + v_prop + sn2 / alpha
         m_diff = m_t - m_prop
         exp_term = -0.5 * m_diff**2 / v_sum
-        const_term = -0.5 * np.log(2*np.pi*v_sum)
-        alpha_term = 0.5 * (1-alpha) * np.log(2*np.pi*sn2) - 0.5*np.log(alpha)
+        const_term = -0.5 * np.log(2 * np.pi * v_sum)
+        alpha_term = 0.5 * (1 - alpha) * np.log(2 *
+                                                np.pi * sn2) - 0.5 * np.log(alpha)
         logZ = exp_term + const_term + alpha_term
         logZ = np.sum(logZ)
 
@@ -2924,13 +2965,14 @@ class SGPSSM_M(AEP_Model):
         dmprop = m_diff / v_sum
 
         dv_sum = np.sum(dvt)
-        dsn = dv_sum*2*sn2/alpha + m_prop.shape[0]*self.Din*(1-alpha)
-        return scale*logZ, scale*dmprop, scale*dvprop, scale*dmt, scale*dvt, scale*dsn
+        dsn = dv_sum * 2 * sn2 / alpha + \
+            m_prop.shape[0] * self.Din * (1 - alpha)
+        return scale * logZ, scale * dmprop, scale * dvprop, scale * dmt, scale * dvt, scale * dsn
 
     def compute_cavity_x(self, alpha):
-        cav_1 = self.x_post_1 - alpha*self.x_factor_1
-        cav_2 = self.x_post_2 - alpha*self.x_factor_2
-        return cav_1/(cav_2+1e-16), 1.0/(cav_2+1e-16), cav_1, cav_2
+        cav_1 = self.x_post_1 - alpha * self.x_factor_1
+        cav_2 = self.x_post_2 - alpha * self.x_factor_2
+        return cav_1 / (cav_2 + 1e-16), 1.0 / (cav_2 + 1e-16), cav_1, cav_2
 
     def compute_phi_prior_x(self):
         t1 = self.x_prior_1
@@ -2944,18 +2986,18 @@ class SGPSSM_M(AEP_Model):
         post_2 = self.x_post_2
         phi_post = 0.5 * (post_1**2 / post_2 - np.log(post_2))
         scale_x_post = - (1.0 - 1.0 / alpha) * np.ones((self.N, 1))
-        scale_x_post[0:self.N-1] = scale_x_post[0:self.N-1] + 1/alpha
-        scale_x_post[1:self.N] = scale_x_post[1:self.N] + 1/alpha
+        scale_x_post[0:self.N - 1] = scale_x_post[0:self.N - 1] + 1 / alpha
+        scale_x_post[1:self.N] = scale_x_post[1:self.N] + 1 / alpha
         return np.sum(scale_x_post * phi_post)
 
     def compute_phi_cavity_x(self, alpha):
-        scale = -1.0/alpha
-        cav_1 = self.x_post_1 - alpha*self.x_factor_1
-        cav_2 = self.x_post_2 - alpha*self.x_factor_2
+        scale = -1.0 / alpha
+        cav_1 = self.x_post_1 - alpha * self.x_factor_1
+        cav_2 = self.x_post_2 - alpha * self.x_factor_2
         phi_cav = 0.5 * (cav_1**2 / cav_2 - np.log(cav_2))
 
         scale_x_cav = scale * np.ones((self.N, 1))
-        scale_x_cav[0:self.N-1] = scale_x_cav[0:self.N-1] + scale
+        scale_x_cav[0:self.N - 1] = scale_x_cav[0:self.N - 1] + scale
         scale_x_cav[1:self.N] = scale_x_cav[1:self.N] + scale
         phi_cav_sum = np.sum(scale_x_cav * phi_cav)
         return phi_cav_sum
@@ -3027,12 +3069,12 @@ class SGPSSM_M(AEP_Model):
 
         sgp_params = self.sgp_layer.init_hypers()
         emi_params = self.emi_layer.init_hypers()
-        
+
         post_2 = 1.0 / post_v
         post_1 = post_2 * post_m
         ssm_params = {'sn': np.log(0.01)}
-        ssm_params['x_factor_1'] = post_1/3
-        ssm_params['x_factor_2'] = np.log(post_2/3) / 2
+        ssm_params['x_factor_1'] = post_1 / 3
+        ssm_params['x_factor_2'] = np.log(post_2 / 3) / 2
         init_params = dict(sgp_params)
         init_params.update(emi_params)
         init_params.update(ssm_params)
@@ -3051,29 +3093,29 @@ class SGPSSM_M(AEP_Model):
         for _ in range(100):
             model.EM_step()
 
-        s = model.states_list.pop()    
+        s = model.states_list.pop()
         s.info_E_step()
         post_m = s.smoothed_mus
         # post_v = np.diagonal(s.smoothed_sigmas, axis1=1, axis2=2)
         scale = np.std(post_m, axis=0)
         post_m = (post_m - np.mean(post_m, axis=0)) / scale
         # post_v = post_v / scale**2
-        post_v = 0.01*np.ones_like(post_m)
+        post_v = 0.01 * np.ones_like(post_m)
         post_2 = 1.0 / post_v
         post_1 = post_2 * post_m
         ssm_params = {'sn': np.log(0.01)}
-        ssm_params['x_factor_1'] = post_1/3
-        ssm_params['x_factor_2'] = np.log(post_2/3) / 2
+        ssm_params['x_factor_1'] = post_1 / 3
+        ssm_params['x_factor_2'] = np.log(post_2 / 3) / 2
         emi_params = self.emi_layer.init_hypers()
         if isinstance(self.emi_layer, Gauss_Emis):
             emi_params['C'] = np.dot(s.C, np.diag(scale))
-            
+
         # learnt a GP mapping between hidden states
         print 'init latent function using GPR...'
-        x = post_m[:self.N-1, :]
+        x = post_m[:self.N - 1, :]
         y = post_m[1:, :]
         if self.Dcon > 0:
-            x = np.hstack((x, self.x_control[:self.N-1, :]))
+            x = np.hstack((x, self.x_control[:self.N - 1, :]))
         reg = SGPR(x, y, self.M, 'Gaussian')
         reg.set_fixed_params(['sn', 'sf', 'ls', 'zu'])
         reg.optimise(method='L-BFGS-B', alpha=0.5, maxiter=200)
@@ -3104,17 +3146,17 @@ class SGPSSM_M(AEP_Model):
         self.emi_layer.update_hypers(params)
         self.sn = params['sn']
         self.x_factor_1 = params['x_factor_1']
-        self.x_factor_2 = np.exp(2*params['x_factor_2'])
+        self.x_factor_2 = np.exp(2 * params['x_factor_2'])
 
-        self.x_post_1 = 3*self.x_factor_1
-        self.x_post_2 = 3*self.x_factor_2
-        self.x_post_1[[0, -1], :] = 2*self.x_factor_1[[0, -1], :]
-        self.x_post_2[[0, -1], :] = 2*self.x_factor_2[[0, -1], :]
+        self.x_post_1 = 3 * self.x_factor_1
+        self.x_post_2 = 3 * self.x_factor_2
+        self.x_post_1[[0, -1], :] = 2 * self.x_factor_1[[0, -1], :]
+        self.x_post_2[[0, -1], :] = 2 * self.x_factor_2[[0, -1], :]
         self.x_post_1[0, :] += self.x_prior_1
         self.x_post_2[0, :] += self.x_prior_2
 
 
-# deep GP regression with hidden variables 
+# deep GP regression with hidden variables
 class SDGPR_H(AEP_Model):
 
     def __init__(self, x_train, y_train, no_pseudos, hidden_sizes, lik='Gaussian'):
@@ -3134,7 +3176,7 @@ class SDGPR_H(AEP_Model):
         self.lik_layer = []
         for i in range(L):
             Din_i = self.size[i]
-            Dout_i = self.size[i+1]
+            Dout_i = self.size[i + 1]
             M_i = self.Ms[i]
             self.sgp_layers.append(SGP_Layer(N, Din_i, Dout_i, M_i))
 
@@ -3147,8 +3189,8 @@ class SDGPR_H(AEP_Model):
         # natural params for latent variables
         self.h_factor_1 = []
         self.h_factor_2 = []
-        for i in range(L-1):
-            Dout_i = self.size[i+1]
+        for i in range(L - 1):
+            Dout_i = self.size[i + 1]
             self.h_factor_1.append(np.zeros((N, Dout_i)))
             self.h_factor_2.append(np.zeros((N, Dout_i)))
 
@@ -3167,7 +3209,7 @@ class SDGPR_H(AEP_Model):
         scale_poste = N * 1.0 / alpha - 1.0
         scale_cav = - N * 1.0 / alpha
         scale_prior = 1
-        
+
         # update model with new hypers
         self.update_hypers(params)
         for layer in self.sgp_layers:
@@ -3178,38 +3220,38 @@ class SDGPR_H(AEP_Model):
         dsn = np.zeros_like(self.sn)
         grad_all = {}
         logZ = 0
-        for i in range(self.L-1):
+        for i in range(self.L - 1):
             layer_i = self.sgp_layers[i]
             if i == 0:
                 mprop, vprop, kfu = layer_i.forward_prop_thru_cav(xb)
             else:
                 mprop, vprop, psi1, psi2 = layer_i.forward_prop_thru_cav(
-                    cav_h_m[i-1], cav_h_v[i-1])
+                    cav_h_m[i - 1], cav_h_v[i - 1])
             m_i, v_i = cav_h_m[i], cav_h_v[i]
             logZ_i, dmprop, dvprop, dmi, dvi, dsni = self.compute_transition_tilted(
                 mprop, vprop, m_i, v_i, alpha, i, scale_logZ)
-            
+
             if i == 0:
                 sgp_grad_hyper = layer_i.backprop_grads_reg(
                     mprop, vprop, dmprop, dvprop, kfu, xb, alpha)
             else:
                 sgp_grad_hyper, sgp_grad_input = layer_i.backprop_grads_lvm_mm(
-                    mprop, vprop, dmprop, dvprop, 
-                    psi1, psi2, cav_h_m[i-1], cav_h_v[i-1], alpha)
-                dmcav_h[i-1] += sgp_grad_input['mx']
-                dvcav_h[i-1] += sgp_grad_input['vx']
+                    mprop, vprop, dmprop, dvprop,
+                    psi1, psi2, cav_h_m[i - 1], cav_h_v[i - 1], alpha)
+                dmcav_h[i - 1] += sgp_grad_input['mx']
+                dvcav_h[i - 1] += sgp_grad_input['vx']
 
             logZ += logZ_i
             for key in sgp_grad_hyper.keys():
-                grad_all[key+'_%d'%i] = sgp_grad_hyper[key]
+                grad_all[key + '_%d' % i] = sgp_grad_hyper[key]
             dmcav_h.append(dmi)
             dvcav_h.append(dvi)
             dsn[i] = dsni
 
         # final layer
-        i = self.L-1
+        i = self.L - 1
         layer_i = self.sgp_layers[-1]
-        m_im1, v_im1 = cav_h_m[i-1], cav_h_v[i-1]
+        m_im1, v_im1 = cav_h_m[i - 1], cav_h_v[i - 1]
         mprop, vprop, psi1, psi2 = layer_i.forward_prop_thru_cav(m_im1, v_im1)
         # compute logZ and gradients
         logZ_lik, dmprop, dvprop = self.lik_layer.compute_log_Z(
@@ -3218,22 +3260,22 @@ class SDGPR_H(AEP_Model):
         dm_scale = scale_logZ * dmprop
         dv_scale = scale_logZ * dvprop
         grad_hyper, grad_input = layer_i.backprop_grads_lvm_mm(
-            mprop, vprop, dm_scale, dv_scale, psi1, psi2, 
+            mprop, vprop, dm_scale, dv_scale, psi1, psi2,
             m_im1, v_im1, alpha)
         lik_grad_hyper = self.lik_layer.backprop_grads(
             mprop, vprop, dmprop, dvprop, alpha, scale_logZ)
         logZ += logZ_scale
-        dmcav_h[i-1] += grad_input['mx']
-        dvcav_h[i-1] += grad_input['vx']
+        dmcav_h[i - 1] += grad_input['mx']
+        dvcav_h[i - 1] += grad_input['vx']
         # compute grads via posterior and cavity
         grads_h = self.compute_grads_hidden(dmcav_h, dvcav_h, alpha)
 
         for key in grad_hyper.keys():
-            grad_all[key+'_%d'%i] = grad_hyper[key]
+            grad_all[key + '_%d' % i] = grad_hyper[key]
         for key in lik_grad_hyper.keys():
             grad_all[key] = lik_grad_hyper[key]
         for key in grads_h.keys():
-            grad_all[key] = grads_h[key]    
+            grad_all[key] = grads_h[key]
         grad_all['sn_hidden'] = dsn
 
         # compute objective
@@ -3251,36 +3293,36 @@ class SDGPR_H(AEP_Model):
 
     def compute_grads_hidden(self, dmcav_logZ, dvcav_logZ, alpha):
         grads = {}
-        for i in range(self.L-1):
-            post_1 = self.h_factor_1[i]*2
-            post_2 = self.h_factor_2[i]*2
-            d1_post = 2*(post_1 / post_2)
+        for i in range(self.L - 1):
+            post_1 = self.h_factor_1[i] * 2
+            post_2 = self.h_factor_2[i] * 2
+            d1_post = 2 * (post_1 / post_2)
             d2_post = - post_1**2 / post_2**2 - 1 / post_2
-            scale_post = - (1.0 - 1.0/alpha)
+            scale_post = - (1.0 - 1.0 / alpha)
 
-            cav_1 = self.h_factor_1[i]*(2.0-alpha)
-            cav_2 = self.h_factor_2[i]*(2.0-alpha)
-            d1_cav = (2-alpha)*(cav_1 / cav_2)
-            d2_cav = (2-alpha)*(- 0.5 * cav_1**2 / cav_2**2 - 0.5 / cav_2)
-            scale_cav = -1.0/alpha
+            cav_1 = self.h_factor_1[i] * (2.0 - alpha)
+            cav_2 = self.h_factor_2[i] * (2.0 - alpha)
+            d1_cav = (2 - alpha) * (cav_1 / cav_2)
+            d2_cav = (2 - alpha) * (- 0.5 * cav_1**2 / cav_2**2 - 0.5 / cav_2)
+            scale_cav = -1.0 / alpha
 
-            d1_logZ = (2-alpha) * (dmcav_logZ[i] / cav_2)
-            d2_logZ = (2-alpha) * (- dmcav_logZ[i] * cav_1 / cav_2**2 
-                - dvcav_logZ[i] / cav_2**2)
-            
+            d1_logZ = (2 - alpha) * (dmcav_logZ[i] / cav_2)
+            d2_logZ = (2 - alpha) * (- dmcav_logZ[i] * cav_1 / cav_2**2
+                                     - dvcav_logZ[i] / cav_2**2)
+
             d1 = d1_logZ + scale_cav * d1_cav + scale_post * d1_post
             d2 = d2_logZ + scale_cav * d2_cav + scale_post * d2_post
 
-            grads['h_factor_1_%d'%i] = d1
-            grads['h_factor_2_%d'%i] = 2*d2*self.h_factor_2[i]
+            grads['h_factor_1_%d' % i] = d1
+            grads['h_factor_2_%d' % i] = 2 * d2 * self.h_factor_2[i]
         return grads
 
     def compute_phi_cavity_h(self, alpha):
         scale = - 1.0 / alpha
         phi_cav = 0
-        for i in range(self.L-1):
-            cav_1 = self.h_factor_1[i]*(2.0-alpha)
-            cav_2 = self.h_factor_2[i]*(2.0-alpha)
+        for i in range(self.L - 1):
+            cav_1 = self.h_factor_1[i] * (2.0 - alpha)
+            cav_2 = self.h_factor_2[i] * (2.0 - alpha)
             phi_cav_i = 0.5 * (cav_1**2 / cav_2 - np.log(cav_2))
             phi_cav += scale * np.sum(phi_cav_i)
         return phi_cav
@@ -3288,21 +3330,22 @@ class SDGPR_H(AEP_Model):
     def compute_phi_posterior_h(self, alpha):
         scale = - (1.0 - 1.0 / alpha)
         phi_post = 0
-        for i in range(self.L-1):
-            post_1 = self.h_factor_1[i]*2.0
-            post_2 = self.h_factor_2[i]*2.0
+        for i in range(self.L - 1):
+            post_1 = self.h_factor_1[i] * 2.0
+            post_2 = self.h_factor_2[i] * 2.0
             phi_post_i = 0.5 * (post_1**2 / post_2 - np.log(post_2))
             phi_post += scale * np.sum(phi_post_i)
         return phi_post
 
     def compute_transition_tilted(self, m_prop, v_prop, m_t, v_t, alpha,
-        layer_ind, scale):
-        sn2 = np.exp(2*self.sn[layer_ind])
+                                  layer_ind, scale):
+        sn2 = np.exp(2 * self.sn[layer_ind])
         v_sum = v_t + v_prop + sn2 / alpha
         m_diff = m_t - m_prop
         exp_term = -0.5 * m_diff**2 / v_sum
-        const_term = -0.5 * np.log(2*np.pi*v_sum)
-        alpha_term = 0.5 * (1-alpha) * np.log(2*np.pi*sn2) - 0.5*np.log(alpha)
+        const_term = -0.5 * np.log(2 * np.pi * v_sum)
+        alpha_term = 0.5 * (1 - alpha) * np.log(2 *
+                                                np.pi * sn2) - 0.5 * np.log(alpha)
         logZ = exp_term + const_term + alpha_term
         logZ = np.sum(logZ)
 
@@ -3312,18 +3355,19 @@ class SDGPR_H(AEP_Model):
         dmprop = m_diff / v_sum
 
         dv_sum = np.sum(dvt)
-        dsn = dv_sum*2*sn2/alpha + m_prop.shape[0]*self.size[layer_ind+1]*(1-alpha)
-        return scale*logZ, scale*dmprop, scale*dvprop, scale*dmt, scale*dvt, scale*dsn
+        dsn = dv_sum * 2 * sn2 / alpha + \
+            m_prop.shape[0] * self.size[layer_ind + 1] * (1 - alpha)
+        return scale * logZ, scale * dmprop, scale * dvprop, scale * dmt, scale * dvt, scale * dsn
 
     def compute_cavity_h(self, idxs, alpha):
         cav_h_1, cav_h_2, cav_h_m, cav_h_v = [], [], [], []
-        for i in range(self.L-1):
-            cav_h_1_i = self.h_factor_1[i][idxs, :]*(2.0-alpha)
-            cav_h_2_i = self.h_factor_2[i][idxs, :]*(2.0-alpha)
+        for i in range(self.L - 1):
+            cav_h_1_i = self.h_factor_1[i][idxs, :] * (2.0 - alpha)
+            cav_h_2_i = self.h_factor_2[i][idxs, :] * (2.0 - alpha)
             cav_h_1.append(cav_h_1_i)
             cav_h_2.append(cav_h_2_i)
-            cav_h_m.append(cav_h_1_i/cav_h_2_i)
-            cav_h_v.append(1.0/cav_h_2_i)
+            cav_h_m.append(cav_h_1_i / cav_h_2_i)
+            cav_h_v.append(1.0 / cav_h_2_i)
         return cav_h_1, cav_h_2, cav_h_m, cav_h_v
 
     def predict_f(self, inputs):
@@ -3364,37 +3408,40 @@ class SDGPR_H(AEP_Model):
         for i in range(self.L):
             if i == 0:
                 sgp_params = self.sgp_layers[i].init_hypers(
-                    self.x_train, 
-                    key_suffix='_%d'%i)
+                    self.x_train,
+                    key_suffix='_%d' % i)
             else:
-                sgp_params = self.sgp_layers[i].init_hypers(key_suffix='_%d'%i)
+                sgp_params = self.sgp_layers[
+                    i].init_hypers(key_suffix='_%d' % i)
             init_params.update(sgp_params)
         lik_params = self.lik_layer.init_hypers()
         init_params.update(lik_params)
-        init_params['sn_hidden'] = np.log(0.001)*np.ones(self.L-1)
-        for i in range(self.L-1):
-            init_params['h_factor_1_%d'%i] = np.zeros((self.N, self.size[i+1]))
-            init_params['h_factor_2_%d'%i] = np.log(0.01)*np.ones((self.N, self.size[i+1]))
+        init_params['sn_hidden'] = np.log(0.001) * np.ones(self.L - 1)
+        for i in range(self.L - 1):
+            init_params['h_factor_1_%d' % i] = np.zeros(
+                (self.N, self.size[i + 1]))
+            init_params['h_factor_2_%d' % i] = np.log(
+                0.01) * np.ones((self.N, self.size[i + 1]))
         return init_params
 
     def get_hypers(self):
         params = dict()
         for i in range(self.L):
-            sgp_params = self.sgp_layers[i].get_hypers(key_suffix='_%d'%i)
+            sgp_params = self.sgp_layers[i].get_hypers(key_suffix='_%d' % i)
             params.update(sgp_params)
         lik_params = self.lik_layer.get_hypers()
         params.update(lik_params)
         params['sn_hidden'] = self.sn
-        for i in range(self.L-1):
-            params['h_factor_1_%d'%i] = self.h_factor_1[i]
-            params['h_factor_2_%d'%i] = np.log(self.h_factor_2[i])/2
+        for i in range(self.L - 1):
+            params['h_factor_1_%d' % i] = self.h_factor_1[i]
+            params['h_factor_2_%d' % i] = np.log(self.h_factor_2[i]) / 2
         return params
 
     def update_hypers(self, params):
         for i in range(self.L):
-            self.sgp_layers[i].update_hypers(params, key_suffix='_%d'%i)
+            self.sgp_layers[i].update_hypers(params, key_suffix='_%d' % i)
         self.lik_layer.update_hypers(params)
         self.sn = params['sn_hidden']
-        for i in range(self.L-1):
-            self.h_factor_1[i] = params['h_factor_1_%d'%i]
-            self.h_factor_2[i]  = np.exp(2*params['h_factor_2_%d'%i])
+        for i in range(self.L - 1):
+            self.h_factor_1[i] = params['h_factor_1_%d' % i]
+            self.h_factor_2[i] = np.exp(2 * params['h_factor_2_%d' % i])

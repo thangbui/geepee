@@ -16,6 +16,7 @@ from .context import flatten_dict, unflatten_dict
 pp = pprint.PrettyPrinter(indent=4)
 np.random.seed(42)
 
+
 def objective(params, params_args, obj, idxs, alpha):
     params_dict = unflatten_dict(params, params_args)
     f, grad_dict = obj.objective_function(
@@ -68,8 +69,8 @@ def test_gplvm_aep_gaussian():
 
         dls_id = (logZ1 - logZ2) / eps / 2
         # print logZ1, logZ2
-        print ('ls d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-            % (d, grad_all['ls'][d], dls_id, (grad_all['ls'][d]-dls_id)/dls_id))
+        print('ls d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+              % (d, grad_all['ls'][d], dls_id, (grad_all['ls'][d] - dls_id) / dls_id))
 
     # check grad sf
     params1 = copy.deepcopy(params)
@@ -82,8 +83,8 @@ def test_gplvm_aep_gaussian():
         params2, N_train, alpha=alpha)
 
     dsf_i = (logZ1 - logZ2) / eps / 2
-    print ('sf computed=%.5f, numerical=%.5f, diff=%.5f' 
-        % (grad_all['sf'], dsf_i, (grad_all['sf'] - dsf_i) / dsf_i))
+    print('sf computed=%.5f, numerical=%.5f, diff=%.5f'
+          % (grad_all['sf'], dsf_i, (grad_all['sf'] - dsf_i) / dsf_i))
 
     # check grad sn
     params1 = copy.deepcopy(params)
@@ -96,8 +97,8 @@ def test_gplvm_aep_gaussian():
         params2, N_train, alpha=alpha)
 
     dsn_i = (logZ1 - logZ2) / eps / 2
-    print ('sn computed=%.5f, numerical=%.5f, diff=%.5f' 
-        % (grad_all['sn'], dsn_i, (grad_all['sn'] - dsn_i) / dsn_i))
+    print('sn computed=%.5f, numerical=%.5f, diff=%.5f'
+          % (grad_all['sn'], dsn_i, (grad_all['sn'] - dsn_i) / dsn_i))
 
     # check grad zu
     Din_i = lvm.Din
@@ -117,8 +118,8 @@ def test_gplvm_aep_gaussian():
                 params2, N_train, alpha=alpha)
 
             dzu_id = (logZ1 - logZ2) / eps / 2
-            print ('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (m, k, grad_all['zu'][m, k], dzu_id, (grad_all['zu'][m, k]-dzu_id)/dzu_id))
+            print('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (m, k, grad_all['zu'][m, k], dzu_id, (grad_all['zu'][m, k] - dzu_id) / dzu_id))
 
     # check grad theta_1
     for d in range(Dout_i):
@@ -133,8 +134,8 @@ def test_gplvm_aep_gaussian():
                 params2, N_train, alpha=alpha)
 
             dR_id = (logZ1 - logZ2) / eps / 2
-            print ('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (d, j, grad_all['eta1_R'][d][j], dR_id, (grad_all['eta1_R'][d][j]-dR_id)/dR_id))
+            print('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (d, j, grad_all['eta1_R'][d][j], dR_id, (grad_all['eta1_R'][d][j] - dR_id) / dR_id))
 
     # check grad theta_2
     for d in range(Dout_i):
@@ -149,8 +150,8 @@ def test_gplvm_aep_gaussian():
                 params2, N_train, alpha=alpha)
 
             dR_id = (logZ1 - logZ2) / eps / 2
-            print ('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (d, j, grad_all['eta2'][d][j], dR_id, (grad_all['eta2'][d][j]-dR_id)/dR_id))
+            print('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (d, j, grad_all['eta2'][d][j], dR_id, (grad_all['eta2'][d][j] - dR_id) / dR_id))
 
     # check grad x1
     Din = lvm.Din
@@ -166,8 +167,8 @@ def test_gplvm_aep_gaussian():
                 params2, N_train, alpha=alpha)
 
             dx1_nd = (logZ1 - logZ2) / eps / 2
-            print ('x1 n=%d, d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (n, d, grad_all['x1'][n, d], dx1_nd, (grad_all['x1'][n, d] - dx1_nd) / dx1_nd))
+            print('x1 n=%d, d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (n, d, grad_all['x1'][n, d], dx1_nd, (grad_all['x1'][n, d] - dx1_nd) / dx1_nd))
 
     # check grad x1
     Din = lvm.Din
@@ -183,8 +184,8 @@ def test_gplvm_aep_gaussian():
                 params2, N_train, alpha=alpha)
 
             dx2_nd = (logZ1 - logZ2) / eps / 2
-            print ('x2 n=%d, d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (n, d, grad_all['x2'][n, d], dx2_nd, (grad_all['x2'][n, d] - dx2_nd)/dx2_nd))
+            print('x2 n=%d, d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (n, d, grad_all['x2'][n, d], dx2_nd, (grad_all['x2'][n, d] - dx2_nd) / dx2_nd))
 
 
 def test_gplvm_aep_probit():
@@ -195,7 +196,7 @@ def test_gplvm_aep_probit():
     M = 3
     D = 2
     Q = 3
-    y_train = 2*np.random.randint(0, 2, size=(N_train, Q)) - 1
+    y_train = 2 * np.random.randint(0, 2, size=(N_train, Q)) - 1
     lvm = aep.SGPLVM(y_train, D, M, lik='Probit')
 
     # init hypers, inducing points and q(u) params
@@ -222,8 +223,8 @@ def test_gplvm_aep_probit():
 
         dls_id = (logZ1 - logZ2) / eps / 2
         # print logZ1, logZ2
-        print ('ls d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-            % (d, grad_all['ls'][d], dls_id, (grad_all['ls'][d]-dls_id)/dls_id))
+        print('ls d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+              % (d, grad_all['ls'][d], dls_id, (grad_all['ls'][d] - dls_id) / dls_id))
 
     # check grad sf
     params1 = copy.deepcopy(params)
@@ -236,8 +237,8 @@ def test_gplvm_aep_probit():
         params2, N_train, alpha=alpha)
 
     dsf_i = (logZ1 - logZ2) / eps / 2
-    print ('sf computed=%.5f, numerical=%.5f, diff=%.5f' 
-        % (grad_all['sf'], dsf_i, (grad_all['sf'] - dsf_i) / dsf_i))
+    print('sf computed=%.5f, numerical=%.5f, diff=%.5f'
+          % (grad_all['sf'], dsf_i, (grad_all['sf'] - dsf_i) / dsf_i))
 
     # check grad zu
     Din_i = lvm.Din
@@ -257,8 +258,8 @@ def test_gplvm_aep_probit():
                 params2, N_train, alpha=alpha)
 
             dzu_id = (logZ1 - logZ2) / eps / 2
-            print ('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (m, k, grad_all['zu'][m, k], dzu_id, (grad_all['zu'][m, k]-dzu_id)/dzu_id))
+            print('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (m, k, grad_all['zu'][m, k], dzu_id, (grad_all['zu'][m, k] - dzu_id) / dzu_id))
 
     # check grad theta_1
     for d in range(Dout_i):
@@ -273,8 +274,8 @@ def test_gplvm_aep_probit():
                 params2, N_train, alpha=alpha)
 
             dR_id = (logZ1 - logZ2) / eps / 2
-            print ('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (d, j, grad_all['eta1_R'][d][j], dR_id, (grad_all['eta1_R'][d][j]-dR_id)/dR_id))
+            print('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (d, j, grad_all['eta1_R'][d][j], dR_id, (grad_all['eta1_R'][d][j] - dR_id) / dR_id))
 
     # check grad theta_2
     for d in range(Dout_i):
@@ -289,8 +290,8 @@ def test_gplvm_aep_probit():
                 params2, N_train, alpha=alpha)
 
             dR_id = (logZ1 - logZ2) / eps / 2
-            print ('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (d, j, grad_all['eta2'][d][j], dR_id, (grad_all['eta2'][d][j]-dR_id)/dR_id))
+            print('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (d, j, grad_all['eta2'][d][j], dR_id, (grad_all['eta2'][d][j] - dR_id) / dR_id))
 
     # check grad x1
     Din = lvm.Din
@@ -306,8 +307,8 @@ def test_gplvm_aep_probit():
                 params2, N_train, alpha=alpha)
 
             dx1_nd = (logZ1 - logZ2) / eps / 2
-            print ('x1 n=%d, d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (n, d, grad_all['x1'][n, d], dx1_nd, (grad_all['x1'][n, d]-dx1_nd)/dx1_nd))
+            print('x1 n=%d, d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (n, d, grad_all['x1'][n, d], dx1_nd, (grad_all['x1'][n, d] - dx1_nd) / dx1_nd))
 
     # check grad x1
     Din = lvm.Din
@@ -323,8 +324,8 @@ def test_gplvm_aep_probit():
                 params2, N_train, alpha=alpha)
 
             dx2_nd = (logZ1 - logZ2) / eps / 2
-            print ('x2 n=%d, d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (n, d, grad_all['x2'][n, d], dx2_nd, (grad_all['x2'][n, d]-dx2_nd)/dx2_nd))
+            print('x2 n=%d, d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (n, d, grad_all['x2'][n, d], dx2_nd, (grad_all['x2'][n, d] - dx2_nd) / dx2_nd))
 
 
 def test_gplvm_aep_gaussian_MC():
@@ -367,8 +368,8 @@ def test_gplvm_aep_gaussian_MC():
 
         dls_id = (logZ1 - logZ2) / eps / 2
         # print logZ1, logZ2
-        print ('ls d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-            % (d, grad_all['ls'][d], dls_id, (grad_all['ls'][d]-dls_id)/dls_id))
+        print('ls d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+              % (d, grad_all['ls'][d], dls_id, (grad_all['ls'][d] - dls_id) / dls_id))
 
     # check grad sf
     params1 = copy.deepcopy(params)
@@ -383,8 +384,8 @@ def test_gplvm_aep_gaussian_MC():
         params2, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
 
     dsf_i = (logZ1 - logZ2) / eps / 2
-    print ('sf computed=%.5f, numerical=%.5f, diff=%.5f' 
-        % (grad_all['sf'], dsf_i, (grad_all['sf'] - dsf_i) / dsf_i))
+    print('sf computed=%.5f, numerical=%.5f, diff=%.5f'
+          % (grad_all['sf'], dsf_i, (grad_all['sf'] - dsf_i) / dsf_i))
 
     # check grad sn
     params1 = copy.deepcopy(params)
@@ -399,8 +400,8 @@ def test_gplvm_aep_gaussian_MC():
         params2, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
 
     dsn_i = (logZ1 - logZ2) / eps / 2
-    print ('sn computed=%.5f, numerical=%.5f, diff=%.5f' 
-        % (grad_all['sn'], dsn_i, (grad_all['sn'] - dsn_i) / dsn_i))
+    print('sn computed=%.5f, numerical=%.5f, diff=%.5f'
+          % (grad_all['sn'], dsn_i, (grad_all['sn'] - dsn_i) / dsn_i))
 
     # check grad zu
     Din_i = lvm.Din
@@ -422,8 +423,8 @@ def test_gplvm_aep_gaussian_MC():
                 params2, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
 
             dzu_id = (logZ1 - logZ2) / eps / 2
-            print ('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (m, k, grad_all['zu'][m, k], dzu_id, (grad_all['zu'][m, k]-dzu_id)/dzu_id))
+            print('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (m, k, grad_all['zu'][m, k], dzu_id, (grad_all['zu'][m, k] - dzu_id) / dzu_id))
 
     # check grad theta_1
     for d in range(Dout_i):
@@ -440,8 +441,8 @@ def test_gplvm_aep_gaussian_MC():
                 params2, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
 
             dR_id = (logZ1 - logZ2) / eps / 2
-            print ('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (d, j, grad_all['eta1_R'][d][j], dR_id, (grad_all['eta1_R'][d][j]-dR_id)/dR_id))
+            print('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (d, j, grad_all['eta1_R'][d][j], dR_id, (grad_all['eta1_R'][d][j] - dR_id) / dR_id))
 
     # check grad theta_2
     for d in range(Dout_i):
@@ -458,8 +459,8 @@ def test_gplvm_aep_gaussian_MC():
                 params2, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
 
             dR_id = (logZ1 - logZ2) / eps / 2
-            print ('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (d, j, grad_all['eta2'][d][j], dR_id, (grad_all['eta2'][d][j]-dR_id)/dR_id))
+            print('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (d, j, grad_all['eta2'][d][j], dR_id, (grad_all['eta2'][d][j] - dR_id) / dR_id))
 
     # check grad x1
     Din = lvm.Din
@@ -477,8 +478,8 @@ def test_gplvm_aep_gaussian_MC():
                 params2, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
 
             dx1_nd = (logZ1 - logZ2) / eps / 2
-            print ('x1 n=%d, d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (n, d, grad_all['x1'][n, d], dx1_nd, (grad_all['x1'][n, d] - dx1_nd) / dx1_nd))
+            print('x1 n=%d, d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (n, d, grad_all['x1'][n, d], dx1_nd, (grad_all['x1'][n, d] - dx1_nd) / dx1_nd))
 
     # check grad x1
     Din = lvm.Din
@@ -496,8 +497,8 @@ def test_gplvm_aep_gaussian_MC():
                 params2, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
 
             dx2_nd = (logZ1 - logZ2) / eps / 2
-            print ('x2 n=%d, d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (n, d, grad_all['x2'][n, d], dx2_nd, (grad_all['x2'][n, d] - dx2_nd)/dx2_nd))
+            print('x2 n=%d, d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (n, d, grad_all['x2'][n, d], dx2_nd, (grad_all['x2'][n, d] - dx2_nd) / dx2_nd))
 
 
 def test_gplvm_aep_gaussian_stochastic():
@@ -541,8 +542,8 @@ def test_gplvm_aep_gaussian_stochastic():
 
         dls_id = (logZ1 - logZ2) / eps / 2
         # print logZ1, logZ2
-        print ('ls d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-            % (d, grad_all['ls'][d], dls_id, (grad_all['ls'][d]-dls_id)/dls_id))
+        print('ls d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+              % (d, grad_all['ls'][d], dls_id, (grad_all['ls'][d] - dls_id) / dls_id))
 
     # check grad sf
     params1 = copy.deepcopy(params)
@@ -557,8 +558,8 @@ def test_gplvm_aep_gaussian_stochastic():
         params2, mb_size, alpha=alpha)
 
     dsf_i = (logZ1 - logZ2) / eps / 2
-    print ('sf computed=%.5f, numerical=%.5f, diff=%.5f' 
-        % (grad_all['sf'], dsf_i, (grad_all['sf'] - dsf_i) / dsf_i))
+    print('sf computed=%.5f, numerical=%.5f, diff=%.5f'
+          % (grad_all['sf'], dsf_i, (grad_all['sf'] - dsf_i) / dsf_i))
 
     # check grad sn
     params1 = copy.deepcopy(params)
@@ -573,8 +574,8 @@ def test_gplvm_aep_gaussian_stochastic():
         params2, mb_size, alpha=alpha)
 
     dsn_i = (logZ1 - logZ2) / eps / 2
-    print ('sn computed=%.5f, numerical=%.5f, diff=%.5f' 
-        % (grad_all['sn'], dsn_i, (grad_all['sn'] - dsn_i) / dsn_i))
+    print('sn computed=%.5f, numerical=%.5f, diff=%.5f'
+          % (grad_all['sn'], dsn_i, (grad_all['sn'] - dsn_i) / dsn_i))
 
     # check grad zu
     Din_i = lvm.Din
@@ -596,8 +597,8 @@ def test_gplvm_aep_gaussian_stochastic():
                 params2, mb_size, alpha=alpha)
 
             dzu_id = (logZ1 - logZ2) / eps / 2
-            print ('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (m, k, grad_all['zu'][m, k], dzu_id, (grad_all['zu'][m, k]-dzu_id)/dzu_id))
+            print('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (m, k, grad_all['zu'][m, k], dzu_id, (grad_all['zu'][m, k] - dzu_id) / dzu_id))
 
     # check grad theta_1
     for d in range(Dout_i):
@@ -614,8 +615,8 @@ def test_gplvm_aep_gaussian_stochastic():
                 params2, mb_size, alpha=alpha)
 
             dR_id = (logZ1 - logZ2) / eps / 2
-            print ('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (d, j, grad_all['eta1_R'][d][j], dR_id, (grad_all['eta1_R'][d][j]-dR_id)/dR_id))
+            print('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (d, j, grad_all['eta1_R'][d][j], dR_id, (grad_all['eta1_R'][d][j] - dR_id) / dR_id))
 
     # check grad theta_2
     for d in range(Dout_i):
@@ -632,8 +633,8 @@ def test_gplvm_aep_gaussian_stochastic():
                 params2, mb_size, alpha=alpha)
 
             dR_id = (logZ1 - logZ2) / eps / 2
-            print ('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (d, j, grad_all['eta2'][d][j], dR_id, (grad_all['eta2'][d][j]-dR_id)/dR_id))
+            print('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (d, j, grad_all['eta2'][d][j], dR_id, (grad_all['eta2'][d][j] - dR_id) / dR_id))
 
     # check grad x1
     Din = lvm.Din
@@ -651,8 +652,8 @@ def test_gplvm_aep_gaussian_stochastic():
                 params2, mb_size, alpha=alpha)
 
             dx1_nd = (logZ1 - logZ2) / eps / 2
-            print ('x1 n=%d, d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (n, d, grad_all['x1'][n, d], dx1_nd, (grad_all['x1'][n, d] - dx1_nd) / dx1_nd))
+            print('x1 n=%d, d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (n, d, grad_all['x1'][n, d], dx1_nd, (grad_all['x1'][n, d] - dx1_nd) / dx1_nd))
 
     # check grad x1
     Din = lvm.Din
@@ -670,8 +671,8 @@ def test_gplvm_aep_gaussian_stochastic():
                 params2, mb_size, alpha=alpha)
 
             dx2_nd = (logZ1 - logZ2) / eps / 2
-            print ('x2 n=%d, d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (n, d, grad_all['x2'][n, d], dx2_nd, (grad_all['x2'][n, d] - dx2_nd)/dx2_nd))
+            print('x2 n=%d, d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (n, d, grad_all['x2'][n, d], dx2_nd, (grad_all['x2'][n, d] - dx2_nd) / dx2_nd))
 
 
 def test_gplvm_aep_probit_stochastic():
@@ -682,7 +683,7 @@ def test_gplvm_aep_probit_stochastic():
     M = 3
     D = 2
     Q = 3
-    y_train = 2*np.random.randint(0, 2, size=(N_train, Q)) - 1
+    y_train = 2 * np.random.randint(0, 2, size=(N_train, Q)) - 1
     lvm = aep.SGPLVM(y_train, D, M, lik='Probit')
 
     # init hypers, inducing points and q(u) params
@@ -712,8 +713,8 @@ def test_gplvm_aep_probit_stochastic():
 
         dls_id = (logZ1 - logZ2) / eps / 2
         # print logZ1, logZ2
-        print ('ls d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-            % (d, grad_all['ls'][d], dls_id, (grad_all['ls'][d]-dls_id)/dls_id))
+        print('ls d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+              % (d, grad_all['ls'][d], dls_id, (grad_all['ls'][d] - dls_id) / dls_id))
 
     # check grad sf
     params1 = copy.deepcopy(params)
@@ -728,8 +729,8 @@ def test_gplvm_aep_probit_stochastic():
         params2, mb_size, alpha=alpha)
 
     dsf_i = (logZ1 - logZ2) / eps / 2
-    print ('sf computed=%.5f, numerical=%.5f, diff=%.5f' 
-        % (grad_all['sf'], dsf_i, (grad_all['sf'] - dsf_i) / dsf_i))
+    print('sf computed=%.5f, numerical=%.5f, diff=%.5f'
+          % (grad_all['sf'], dsf_i, (grad_all['sf'] - dsf_i) / dsf_i))
 
     # check grad zu
     Din_i = lvm.Din
@@ -751,8 +752,8 @@ def test_gplvm_aep_probit_stochastic():
                 params2, mb_size, alpha=alpha)
 
             dzu_id = (logZ1 - logZ2) / eps / 2
-            print ('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (m, k, grad_all['zu'][m, k], dzu_id, (grad_all['zu'][m, k]-dzu_id)/dzu_id))
+            print('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (m, k, grad_all['zu'][m, k], dzu_id, (grad_all['zu'][m, k] - dzu_id) / dzu_id))
 
     # check grad theta_1
     for d in range(Dout_i):
@@ -769,8 +770,8 @@ def test_gplvm_aep_probit_stochastic():
                 params2, mb_size, alpha=alpha)
 
             dR_id = (logZ1 - logZ2) / eps / 2
-            print ('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (d, j, grad_all['eta1_R'][d][j], dR_id, (grad_all['eta1_R'][d][j]-dR_id)/dR_id))
+            print('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (d, j, grad_all['eta1_R'][d][j], dR_id, (grad_all['eta1_R'][d][j] - dR_id) / dR_id))
 
     # check grad theta_2
     for d in range(Dout_i):
@@ -787,8 +788,8 @@ def test_gplvm_aep_probit_stochastic():
                 params2, mb_size, alpha=alpha)
 
             dR_id = (logZ1 - logZ2) / eps / 2
-            print ('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (d, j, grad_all['eta2'][d][j], dR_id, (grad_all['eta2'][d][j]-dR_id)/dR_id))
+            print('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (d, j, grad_all['eta2'][d][j], dR_id, (grad_all['eta2'][d][j] - dR_id) / dR_id))
 
     # check grad x1
     Din = lvm.Din
@@ -806,8 +807,8 @@ def test_gplvm_aep_probit_stochastic():
                 params2, mb_size, alpha=alpha)
 
             dx1_nd = (logZ1 - logZ2) / eps / 2
-            print ('x1 n=%d, d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (n, d, grad_all['x1'][n, d], dx1_nd, (grad_all['x1'][n, d]-dx1_nd)/dx1_nd))
+            print('x1 n=%d, d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (n, d, grad_all['x1'][n, d], dx1_nd, (grad_all['x1'][n, d] - dx1_nd) / dx1_nd))
 
     # check grad x1
     Din = lvm.Din
@@ -825,8 +826,8 @@ def test_gplvm_aep_probit_stochastic():
                 params2, mb_size, alpha=alpha)
 
             dx2_nd = (logZ1 - logZ2) / eps / 2
-            print ('x2 n=%d, d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (n, d, grad_all['x2'][n, d], dx2_nd, (grad_all['x2'][n, d]-dx2_nd)/dx2_nd))
+            print('x2 n=%d, d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (n, d, grad_all['x2'][n, d], dx2_nd, (grad_all['x2'][n, d] - dx2_nd) / dx2_nd))
 
 
 def plot_gplvm_aep_gaussian_stochastic():
@@ -851,7 +852,8 @@ def plot_gplvm_aep_gaussian_stochastic():
         no_points = int(N_train * mb)
         start_time = time.time()
         for k in range(reps):
-            objs[i, k] = model.objective_function(params, no_points, alpha=alpha)[0]
+            objs[i, k] = model.objective_function(
+                params, no_points, alpha=alpha)[0]
         times[i] = time.time() - start_time
 
     f, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
@@ -876,7 +878,7 @@ def plot_gplvm_aep_probit_stochastic():
     M = 50
     D = 2
     Q = 3
-    y_train = 2*np.random.randint(0, 2, size=(N_train, Q)) - 1
+    y_train = 2 * np.random.randint(0, 2, size=(N_train, Q)) - 1
     model = aep.SGPLVM(y_train, D, M, lik='Probit')
 
     # init hypers, inducing points and q(u) params
@@ -890,7 +892,8 @@ def plot_gplvm_aep_probit_stochastic():
         no_points = int(N_train * mb)
         start_time = time.time()
         for k in range(reps):
-            objs[i, k] = model.objective_function(params, no_points, alpha=alpha)[0]
+            objs[i, k] = model.objective_function(
+                params, no_points, alpha=alpha)[0]
         times[i] = time.time() - start_time
 
     f, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
@@ -929,7 +932,8 @@ def test_gplvm_aep_gaussian_scipy():
     logZ = objective(init_params_vec, params_args, lvm, N_train, alpha)
     pp.pprint(logZ)
 
-    pp.pprint(check_grad(objective, gradient, init_params_vec, params_args, lvm, N_train, alpha))
+    pp.pprint(check_grad(objective, gradient, init_params_vec,
+                         params_args, lvm, N_train, alpha))
 
 
 def test_gplvm_aep_probit_scipy():
@@ -939,7 +943,7 @@ def test_gplvm_aep_probit_scipy():
     M = 10
     D = 2
     Q = 3
-    y_train = 2*np.random.randint(0, 2, size=(N_train, Q)) - 1
+    y_train = 2 * np.random.randint(0, 2, size=(N_train, Q)) - 1
     lvm = aep.SGPLVM(y_train, D, M, lik='Gaussian')
 
     # init hypers, inducing points and q(u) params
@@ -954,7 +958,8 @@ def test_gplvm_aep_probit_scipy():
     logZ = objective(init_params_vec, params_args, lvm, N_train, alpha)
     pp.pprint(logZ)
 
-    pp.pprint(check_grad(objective, gradient, init_params_vec, params_args, lvm, N_train, alpha))
+    pp.pprint(check_grad(objective, gradient, init_params_vec,
+                         params_args, lvm, N_train, alpha))
 
 
 def test_gpr_aep_gaussian():
@@ -993,8 +998,8 @@ def test_gpr_aep_gaussian():
 
         dls_id = (logZ1 - logZ2) / eps / 2
         # print logZ1, logZ2
-        print ('ls d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-            % (d, grad_all['ls'][d], dls_id, (grad_all['ls'][d]-dls_id)/dls_id))
+        print('ls d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+              % (d, grad_all['ls'][d], dls_id, (grad_all['ls'][d] - dls_id) / dls_id))
 
     # check grad sf
     params1 = copy.deepcopy(params)
@@ -1007,8 +1012,8 @@ def test_gpr_aep_gaussian():
         params2, N_train, alpha=alpha)
 
     dsf_i = (logZ1 - logZ2) / eps / 2
-    print ('sf computed=%.5f, numerical=%.5f, diff=%.5f' 
-        % (grad_all['sf'], dsf_i, (grad_all['sf'] - dsf_i) / dsf_i))
+    print('sf computed=%.5f, numerical=%.5f, diff=%.5f'
+          % (grad_all['sf'], dsf_i, (grad_all['sf'] - dsf_i) / dsf_i))
 
     # check grad sn
     params1 = copy.deepcopy(params)
@@ -1021,8 +1026,8 @@ def test_gpr_aep_gaussian():
         params2, N_train, alpha=alpha)
 
     dsn_i = (logZ1 - logZ2) / eps / 2
-    print ('sn computed=%.5f, numerical=%.5f, diff=%.5f' 
-        % (grad_all['sn'], dsn_i, (grad_all['sn'] - dsn_i) / dsn_i))
+    print('sn computed=%.5f, numerical=%.5f, diff=%.5f'
+          % (grad_all['sn'], dsn_i, (grad_all['sn'] - dsn_i) / dsn_i))
 
     # check grad zu
     Din_i = model.Din
@@ -1042,8 +1047,8 @@ def test_gpr_aep_gaussian():
                 params2, N_train, alpha=alpha)
 
             dzu_id = (logZ1 - logZ2) / eps / 2
-            print ('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (m, k, grad_all['zu'][m, k], dzu_id, (grad_all['zu'][m, k]-dzu_id)/dzu_id))
+            print('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (m, k, grad_all['zu'][m, k], dzu_id, (grad_all['zu'][m, k] - dzu_id) / dzu_id))
 
     # check grad theta_1
     for d in range(Dout_i):
@@ -1058,8 +1063,8 @@ def test_gpr_aep_gaussian():
                 params2, N_train, alpha=alpha)
 
             dR_id = (logZ1 - logZ2) / eps / 2
-            print ('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (d, j, grad_all['eta1_R'][d][j], dR_id, (grad_all['eta1_R'][d][j]-dR_id)/dR_id))
+            print('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (d, j, grad_all['eta1_R'][d][j], dR_id, (grad_all['eta1_R'][d][j] - dR_id) / dR_id))
 
     # check grad theta_2
     for d in range(Dout_i):
@@ -1074,8 +1079,8 @@ def test_gpr_aep_gaussian():
                 params2, N_train, alpha=alpha)
 
             dR_id = (logZ1 - logZ2) / eps / 2
-            print ('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (d, j, grad_all['eta2'][d][j], dR_id, (grad_all['eta2'][d][j]-dR_id)/dR_id))
+            print('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (d, j, grad_all['eta2'][d][j], dR_id, (grad_all['eta2'][d][j] - dR_id) / dR_id))
 
 
 def test_gpr_aep_probit():
@@ -1087,7 +1092,7 @@ def test_gpr_aep_probit():
     D = 2
     Q = 3
     x_train = np.random.randn(N_train, D)
-    y_train = 2*np.random.randint(0, 2, size=(N_train, Q)) - 1
+    y_train = 2 * np.random.randint(0, 2, size=(N_train, Q)) - 1
     model = aep.SGPR(x_train, y_train, M, lik='Probit')
 
     # init hypers, inducing points and q(u) params
@@ -1114,8 +1119,8 @@ def test_gpr_aep_probit():
 
         dls_id = (logZ1 - logZ2) / eps / 2
         # print logZ1, logZ2
-        print ('ls d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-            % (d, grad_all['ls'][d], dls_id, (grad_all['ls'][d]-dls_id)/dls_id))
+        print('ls d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+              % (d, grad_all['ls'][d], dls_id, (grad_all['ls'][d] - dls_id) / dls_id))
 
     # check grad sf
     params1 = copy.deepcopy(params)
@@ -1128,8 +1133,8 @@ def test_gpr_aep_probit():
         params2, N_train, alpha=alpha)
 
     dsf_i = (logZ1 - logZ2) / eps / 2
-    print ('sf computed=%.5f, numerical=%.5f, diff=%.5f' 
-        % (grad_all['sf'], dsf_i, (grad_all['sf'] - dsf_i) / dsf_i))
+    print('sf computed=%.5f, numerical=%.5f, diff=%.5f'
+          % (grad_all['sf'], dsf_i, (grad_all['sf'] - dsf_i) / dsf_i))
 
     # check grad zu
     Din_i = model.Din
@@ -1149,8 +1154,8 @@ def test_gpr_aep_probit():
                 params2, N_train, alpha=alpha)
 
             dzu_id = (logZ1 - logZ2) / eps / 2
-            print ('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (m, k, grad_all['zu'][m, k], dzu_id, (grad_all['zu'][m, k]-dzu_id)/dzu_id))
+            print('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (m, k, grad_all['zu'][m, k], dzu_id, (grad_all['zu'][m, k] - dzu_id) / dzu_id))
 
     # check grad theta_1
     for d in range(Dout_i):
@@ -1165,8 +1170,8 @@ def test_gpr_aep_probit():
                 params2, N_train, alpha=alpha)
 
             dR_id = (logZ1 - logZ2) / eps / 2
-            print ('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (d, j, grad_all['eta1_R'][d][j], dR_id, (grad_all['eta1_R'][d][j]-dR_id)/dR_id))
+            print('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (d, j, grad_all['eta1_R'][d][j], dR_id, (grad_all['eta1_R'][d][j] - dR_id) / dR_id))
 
     # check grad theta_2
     for d in range(Dout_i):
@@ -1181,8 +1186,8 @@ def test_gpr_aep_probit():
                 params2, N_train, alpha=alpha)
 
             dR_id = (logZ1 - logZ2) / eps / 2
-            print ('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (d, j, grad_all['eta2'][d][j], dR_id, (grad_all['eta2'][d][j]-dR_id)/dR_id))
+            print('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (d, j, grad_all['eta2'][d][j], dR_id, (grad_all['eta2'][d][j] - dR_id) / dR_id))
 
 
 def test_gpr_aep_gaussian_stochastic():
@@ -1225,8 +1230,8 @@ def test_gpr_aep_gaussian_stochastic():
 
         dls_id = (logZ1 - logZ2) / eps / 2
         # print logZ1, logZ2
-        print ('ls d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-            % (d, grad_all['ls'][d], dls_id, (grad_all['ls'][d]-dls_id)/dls_id))
+        print('ls d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+              % (d, grad_all['ls'][d], dls_id, (grad_all['ls'][d] - dls_id) / dls_id))
 
     # check grad sf
     params1 = copy.deepcopy(params)
@@ -1241,8 +1246,8 @@ def test_gpr_aep_gaussian_stochastic():
         params2, mb_size, alpha=alpha)
 
     dsf_i = (logZ1 - logZ2) / eps / 2
-    print ('sf computed=%.5f, numerical=%.5f, diff=%.5f' 
-        % (grad_all['sf'], dsf_i, (grad_all['sf'] - dsf_i) / dsf_i))
+    print('sf computed=%.5f, numerical=%.5f, diff=%.5f'
+          % (grad_all['sf'], dsf_i, (grad_all['sf'] - dsf_i) / dsf_i))
 
     # check grad sn
     params1 = copy.deepcopy(params)
@@ -1257,8 +1262,8 @@ def test_gpr_aep_gaussian_stochastic():
         params2, mb_size, alpha=alpha)
 
     dsn_i = (logZ1 - logZ2) / eps / 2
-    print ('sn computed=%.5f, numerical=%.5f, diff=%.5f' 
-        % (grad_all['sn'], dsn_i, (grad_all['sn'] - dsn_i) / dsn_i))
+    print('sn computed=%.5f, numerical=%.5f, diff=%.5f'
+          % (grad_all['sn'], dsn_i, (grad_all['sn'] - dsn_i) / dsn_i))
 
     # check grad zu
     Din_i = model.Din
@@ -1280,8 +1285,8 @@ def test_gpr_aep_gaussian_stochastic():
                 params2, mb_size, alpha=alpha)
 
             dzu_id = (logZ1 - logZ2) / eps / 2
-            print ('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (m, k, grad_all['zu'][m, k], dzu_id, (grad_all['zu'][m, k]-dzu_id)/dzu_id))
+            print('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (m, k, grad_all['zu'][m, k], dzu_id, (grad_all['zu'][m, k] - dzu_id) / dzu_id))
 
     # check grad theta_1
     for d in range(Dout_i):
@@ -1298,8 +1303,8 @@ def test_gpr_aep_gaussian_stochastic():
                 params2, mb_size, alpha=alpha)
 
             dR_id = (logZ1 - logZ2) / eps / 2
-            print ('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (d, j, grad_all['eta1_R'][d][j], dR_id, (grad_all['eta1_R'][d][j]-dR_id)/dR_id))
+            print('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (d, j, grad_all['eta1_R'][d][j], dR_id, (grad_all['eta1_R'][d][j] - dR_id) / dR_id))
 
     # check grad theta_2
     for d in range(Dout_i):
@@ -1316,8 +1321,8 @@ def test_gpr_aep_gaussian_stochastic():
                 params2, mb_size, alpha=alpha)
 
             dR_id = (logZ1 - logZ2) / eps / 2
-            print ('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (d, j, grad_all['eta2'][d][j], dR_id, (grad_all['eta2'][d][j]-dR_id)/dR_id))
+            print('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (d, j, grad_all['eta2'][d][j], dR_id, (grad_all['eta2'][d][j] - dR_id) / dR_id))
 
 
 def test_gpr_aep_probit_stochastic():
@@ -1330,7 +1335,7 @@ def test_gpr_aep_probit_stochastic():
     D = 2
     Q = 3
     x_train = np.random.randn(N_train, D)
-    y_train = 2*np.random.randint(0, 2, size=(N_train, Q)) - 1
+    y_train = 2 * np.random.randint(0, 2, size=(N_train, Q)) - 1
     model = aep.SGPR(x_train, y_train, M, lik='Probit')
 
     # init hypers, inducing points and q(u) params
@@ -1360,8 +1365,8 @@ def test_gpr_aep_probit_stochastic():
 
         dls_id = (logZ1 - logZ2) / eps / 2
         # print logZ1, logZ2
-        print ('ls d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-            % (d, grad_all['ls'][d], dls_id, (grad_all['ls'][d]-dls_id)/dls_id))
+        print('ls d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+              % (d, grad_all['ls'][d], dls_id, (grad_all['ls'][d] - dls_id) / dls_id))
 
     # check grad sf
     params1 = copy.deepcopy(params)
@@ -1376,8 +1381,8 @@ def test_gpr_aep_probit_stochastic():
         params2, mb_size, alpha=alpha)
 
     dsf_i = (logZ1 - logZ2) / eps / 2
-    print ('sf computed=%.5f, numerical=%.5f, diff=%.5f' 
-        % (grad_all['sf'], dsf_i, (grad_all['sf'] - dsf_i) / dsf_i))
+    print('sf computed=%.5f, numerical=%.5f, diff=%.5f'
+          % (grad_all['sf'], dsf_i, (grad_all['sf'] - dsf_i) / dsf_i))
 
     # check grad zu
     Din_i = model.Din
@@ -1399,8 +1404,8 @@ def test_gpr_aep_probit_stochastic():
                 params2, mb_size, alpha=alpha)
 
             dzu_id = (logZ1 - logZ2) / eps / 2
-            print ('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (m, k, grad_all['zu'][m, k], dzu_id, (grad_all['zu'][m, k]-dzu_id)/dzu_id))
+            print('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (m, k, grad_all['zu'][m, k], dzu_id, (grad_all['zu'][m, k] - dzu_id) / dzu_id))
 
     # check grad theta_1
     for d in range(Dout_i):
@@ -1417,8 +1422,8 @@ def test_gpr_aep_probit_stochastic():
                 params2, mb_size, alpha=alpha)
 
             dR_id = (logZ1 - logZ2) / eps / 2
-            print ('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (d, j, grad_all['eta1_R'][d][j], dR_id, (grad_all['eta1_R'][d][j]-dR_id)/dR_id))
+            print('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (d, j, grad_all['eta1_R'][d][j], dR_id, (grad_all['eta1_R'][d][j] - dR_id) / dR_id))
 
     # check grad theta_2
     for d in range(Dout_i):
@@ -1435,8 +1440,8 @@ def test_gpr_aep_probit_stochastic():
                 params2, mb_size, alpha=alpha)
 
             dR_id = (logZ1 - logZ2) / eps / 2
-            print ('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (d, j, grad_all['eta2'][d][j], dR_id, (grad_all['eta2'][d][j]-dR_id)/dR_id))
+            print('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (d, j, grad_all['eta2'][d][j], dR_id, (grad_all['eta2'][d][j] - dR_id) / dR_id))
 
 
 def plot_gpr_aep_gaussian_stochastic():
@@ -1462,7 +1467,8 @@ def plot_gpr_aep_gaussian_stochastic():
         no_points = int(N_train * mb)
         start_time = time.time()
         for k in range(reps):
-            objs[i, k] = model.objective_function(params, no_points, alpha=alpha)[0]
+            objs[i, k] = model.objective_function(
+                params, no_points, alpha=alpha)[0]
         times[i] = time.time() - start_time
 
     f, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
@@ -1488,7 +1494,7 @@ def plot_gpr_aep_probit_stochastic():
     D = 2
     Q = 3
     x_train = np.random.randn(N_train, D)
-    y_train = 2*np.random.randint(0, 2, size=(N_train, Q)) - 1
+    y_train = 2 * np.random.randint(0, 2, size=(N_train, Q)) - 1
     model = aep.SGPR(x_train, y_train, M, lik='Probit')
 
     # init hypers, inducing points and q(u) params
@@ -1502,7 +1508,8 @@ def plot_gpr_aep_probit_stochastic():
         no_points = int(N_train * mb)
         start_time = time.time()
         for k in range(reps):
-            objs[i, k] = model.objective_function(params, no_points, alpha=alpha)[0]
+            objs[i, k] = model.objective_function(
+                params, no_points, alpha=alpha)[0]
         times[i] = time.time() - start_time
 
     f, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
@@ -1542,7 +1549,8 @@ def test_gpr_aep_gaussian_scipy():
     logZ = objective(init_params_vec, params_args, model, N_train, alpha)
     pp.pprint(logZ)
 
-    pp.pprint(check_grad(objective, gradient, init_params_vec, params_args, model, N_train, alpha))
+    pp.pprint(check_grad(objective, gradient, init_params_vec,
+                         params_args, model, N_train, alpha))
 
 
 def test_gpr_aep_probit_scipy():
@@ -1553,7 +1561,7 @@ def test_gpr_aep_probit_scipy():
     D = 2
     Q = 3
     x_train = np.random.randn(N_train, D)
-    y_train = 2*np.random.randint(0, 2, size=(N_train, Q)) - 1
+    y_train = 2 * np.random.randint(0, 2, size=(N_train, Q)) - 1
     model = aep.SGPR(x_train, y_train, M, lik='Probit')
 
     # init hypers, inducing points and q(u) params
@@ -1568,7 +1576,8 @@ def test_gpr_aep_probit_scipy():
     logZ = objective(init_params_vec, params_args, model, N_train, alpha)
     pp.pprint(logZ)
 
-    pp.pprint(check_grad(objective, gradient, init_params_vec, params_args, model, N_train, alpha))
+    pp.pprint(check_grad(objective, gradient, init_params_vec,
+                         params_args, model, N_train, alpha))
 
 
 def test_dgpr_aep_gaussian():
@@ -1600,7 +1609,7 @@ def test_dgpr_aep_gaussian():
     for i in range(L):
         Din_i = size[i]
         M_i = Ms[i]
-        Dout_i = size[i+1]
+        Dout_i = size[i + 1]
         suffix = '_%d' % (i)
         name = 'ls' + suffix
         for d in range(Din_i):
@@ -1616,8 +1625,8 @@ def test_dgpr_aep_gaussian():
 
             dls_id = (logZ1 - logZ2) / eps / 2
             # print logZ1, logZ2
-            print ('ls d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (d, grad_all[name][d], dls_id, (grad_all[name][d]-dls_id)/dls_id))
+            print('ls d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (d, grad_all[name][d], dls_id, (grad_all[name][d] - dls_id) / dls_id))
 
         # check grad sf
         name = 'sf' + suffix
@@ -1631,8 +1640,8 @@ def test_dgpr_aep_gaussian():
             params2, N_train, alpha=alpha)
 
         dsf_i = (logZ1 - logZ2) / eps / 2
-        print ('sf computed=%.5f, numerical=%.5f, diff=%.5f' 
-            % (grad_all[name], dsf_i, (grad_all[name] - dsf_i) / dsf_i))
+        print('sf computed=%.5f, numerical=%.5f, diff=%.5f'
+              % (grad_all[name], dsf_i, (grad_all[name] - dsf_i) / dsf_i))
 
         # check grad zu
         name = 'zu' + suffix
@@ -1650,8 +1659,8 @@ def test_dgpr_aep_gaussian():
                     params2, N_train, alpha=alpha)
 
                 dzu_id = (logZ1 - logZ2) / eps / 2
-                print ('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                    % (m, k, grad_all[name][m, k], dzu_id, (grad_all[name][m, k]-dzu_id)/dzu_id))
+                print('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                      % (m, k, grad_all[name][m, k], dzu_id, (grad_all[name][m, k] - dzu_id) / dzu_id))
 
         # check grad theta_1
         name = 'eta1_R' + suffix
@@ -1667,8 +1676,8 @@ def test_dgpr_aep_gaussian():
                     params2, N_train, alpha=alpha)
 
                 dR_id = (logZ1 - logZ2) / eps / 2
-                print ('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                    % (d, j, grad_all[name][d][j], dR_id, (grad_all[name][d][j]-dR_id)/dR_id))
+                print('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                      % (d, j, grad_all[name][d][j], dR_id, (grad_all[name][d][j] - dR_id) / dR_id))
 
         # check grad theta_2
         name = 'eta2' + suffix
@@ -1684,8 +1693,8 @@ def test_dgpr_aep_gaussian():
                     params2, N_train, alpha=alpha)
 
                 dR_id = (logZ1 - logZ2) / eps / 2
-                print ('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                    % (d, j, grad_all[name][d][j], dR_id, (grad_all[name][d][j]-dR_id)/dR_id))
+                print('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                      % (d, j, grad_all[name][d][j], dR_id, (grad_all[name][d][j] - dR_id) / dR_id))
 
     # check grad sn
     params1 = copy.deepcopy(params)
@@ -1698,8 +1707,8 @@ def test_dgpr_aep_gaussian():
         params2, N_train, alpha=alpha)
 
     dsn_i = (logZ1 - logZ2) / eps / 2
-    print ('sn computed=%.5f, numerical=%.5f, diff=%.5f' 
-        % (grad_all['sn'], dsn_i, (grad_all['sn'] - dsn_i) / dsn_i))
+    print('sn computed=%.5f, numerical=%.5f, diff=%.5f'
+          % (grad_all['sn'], dsn_i, (grad_all['sn'] - dsn_i) / dsn_i))
 
 
 def test_dgpr_aep_probit():
@@ -1712,7 +1721,7 @@ def test_dgpr_aep_probit():
     Q = 3
     hidden_size = [3, 2]
     x_train = np.random.randn(N_train, D)
-    y_train = 2*np.random.randint(0, 2, size=(N_train, Q)) - 1
+    y_train = 2 * np.random.randint(0, 2, size=(N_train, Q)) - 1
     model = aep.SDGPR(x_train, y_train, M, hidden_size, lik='Probit')
 
     # init hypers, inducing points and q(u) params
@@ -1730,7 +1739,7 @@ def test_dgpr_aep_probit():
     for i in range(L):
         Din_i = size[i]
         M_i = Ms[i]
-        Dout_i = size[i+1]
+        Dout_i = size[i + 1]
         suffix = '_%d' % (i)
         name = 'ls' + suffix
         for d in range(Din_i):
@@ -1746,8 +1755,8 @@ def test_dgpr_aep_probit():
 
             dls_id = (logZ1 - logZ2) / eps / 2
             # print logZ1, logZ2
-            print ('ls d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (d, grad_all[name][d], dls_id, (grad_all[name][d]-dls_id)/dls_id))
+            print('ls d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (d, grad_all[name][d], dls_id, (grad_all[name][d] - dls_id) / dls_id))
 
         # check grad sf
         name = 'sf' + suffix
@@ -1761,8 +1770,8 @@ def test_dgpr_aep_probit():
             params2, N_train, alpha=alpha)
 
         dsf_i = (logZ1 - logZ2) / eps / 2
-        print ('sf computed=%.5f, numerical=%.5f, diff=%.5f' 
-            % (grad_all[name], dsf_i, (grad_all[name] - dsf_i) / dsf_i))
+        print('sf computed=%.5f, numerical=%.5f, diff=%.5f'
+              % (grad_all[name], dsf_i, (grad_all[name] - dsf_i) / dsf_i))
 
         # check grad zu
         name = 'zu' + suffix
@@ -1780,8 +1789,8 @@ def test_dgpr_aep_probit():
                     params2, N_train, alpha=alpha)
 
                 dzu_id = (logZ1 - logZ2) / eps / 2
-                print ('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                    % (m, k, grad_all[name][m, k], dzu_id, (grad_all[name][m, k]-dzu_id)/dzu_id))
+                print('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                      % (m, k, grad_all[name][m, k], dzu_id, (grad_all[name][m, k] - dzu_id) / dzu_id))
 
         # check grad theta_1
         name = 'eta1_R' + suffix
@@ -1797,8 +1806,8 @@ def test_dgpr_aep_probit():
                     params2, N_train, alpha=alpha)
 
                 dR_id = (logZ1 - logZ2) / eps / 2
-                print ('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                    % (d, j, grad_all[name][d][j], dR_id, (grad_all[name][d][j]-dR_id)/dR_id))
+                print('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                      % (d, j, grad_all[name][d][j], dR_id, (grad_all[name][d][j] - dR_id) / dR_id))
 
         # check grad theta_2
         name = 'eta2' + suffix
@@ -1814,8 +1823,8 @@ def test_dgpr_aep_probit():
                     params2, N_train, alpha=alpha)
 
                 dR_id = (logZ1 - logZ2) / eps / 2
-                print ('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                    % (d, j, grad_all[name][d][j], dR_id, (grad_all[name][d][j]-dR_id)/dR_id))
+                print('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                      % (d, j, grad_all[name][d][j], dR_id, (grad_all[name][d][j] - dR_id) / dR_id))
 
 
 def test_dgpr_aep_gaussian_stochastic():
@@ -1849,7 +1858,7 @@ def test_dgpr_aep_gaussian_stochastic():
     for i in range(L):
         Din_i = size[i]
         M_i = Ms[i]
-        Dout_i = size[i+1]
+        Dout_i = size[i + 1]
         suffix = '_%d' % (i)
         name = 'ls' + suffix
         for d in range(Din_i):
@@ -1867,8 +1876,8 @@ def test_dgpr_aep_gaussian_stochastic():
 
             dls_id = (logZ1 - logZ2) / eps / 2
             # print logZ1, logZ2
-            print ('ls d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (d, grad_all[name][d], dls_id, (grad_all[name][d]-dls_id)/dls_id))
+            print('ls d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (d, grad_all[name][d], dls_id, (grad_all[name][d] - dls_id) / dls_id))
 
         # check grad sf
         name = 'sf' + suffix
@@ -1884,8 +1893,8 @@ def test_dgpr_aep_gaussian_stochastic():
             params2, mb_size, alpha=alpha)
 
         dsf_i = (logZ1 - logZ2) / eps / 2
-        print ('sf computed=%.5f, numerical=%.5f, diff=%.5f' 
-            % (grad_all[name], dsf_i, (grad_all[name] - dsf_i) / dsf_i))
+        print('sf computed=%.5f, numerical=%.5f, diff=%.5f'
+              % (grad_all[name], dsf_i, (grad_all[name] - dsf_i) / dsf_i))
 
         # check grad zu
         name = 'zu' + suffix
@@ -1905,8 +1914,8 @@ def test_dgpr_aep_gaussian_stochastic():
                     params2, mb_size, alpha=alpha)
 
                 dzu_id = (logZ1 - logZ2) / eps / 2
-                print ('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                    % (m, k, grad_all[name][m, k], dzu_id, (grad_all[name][m, k]-dzu_id)/dzu_id))
+                print('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                      % (m, k, grad_all[name][m, k], dzu_id, (grad_all[name][m, k] - dzu_id) / dzu_id))
 
         # check grad theta_1
         name = 'eta1_R' + suffix
@@ -1924,8 +1933,8 @@ def test_dgpr_aep_gaussian_stochastic():
                     params2, mb_size, alpha=alpha)
 
                 dR_id = (logZ1 - logZ2) / eps / 2
-                print ('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                    % (d, j, grad_all[name][d][j], dR_id, (grad_all[name][d][j]-dR_id)/dR_id))
+                print('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                      % (d, j, grad_all[name][d][j], dR_id, (grad_all[name][d][j] - dR_id) / dR_id))
 
         # check grad theta_2
         name = 'eta2' + suffix
@@ -1943,8 +1952,8 @@ def test_dgpr_aep_gaussian_stochastic():
                     params2, mb_size, alpha=alpha)
 
                 dR_id = (logZ1 - logZ2) / eps / 2
-                print ('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                    % (d, j, grad_all[name][d][j], dR_id, (grad_all[name][d][j]-dR_id)/dR_id))
+                print('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                      % (d, j, grad_all[name][d][j], dR_id, (grad_all[name][d][j] - dR_id) / dR_id))
 
     # check grad sn
     params1 = copy.deepcopy(params)
@@ -1959,8 +1968,8 @@ def test_dgpr_aep_gaussian_stochastic():
         params2, mb_size, alpha=alpha)
 
     dsn_i = (logZ1 - logZ2) / eps / 2
-    print ('sn computed=%.5f, numerical=%.5f, diff=%.5f' 
-        % (grad_all['sn'], dsn_i, (grad_all['sn'] - dsn_i) / dsn_i))
+    print('sn computed=%.5f, numerical=%.5f, diff=%.5f'
+          % (grad_all['sn'], dsn_i, (grad_all['sn'] - dsn_i) / dsn_i))
 
 
 def test_dgpr_aep_probit_stochastic():
@@ -1974,7 +1983,7 @@ def test_dgpr_aep_probit_stochastic():
     Q = 3
     hidden_size = [3, 2]
     x_train = np.random.randn(N_train, D)
-    y_train = 2*np.random.randint(0, 2, size=(N_train, Q)) - 1
+    y_train = 2 * np.random.randint(0, 2, size=(N_train, Q)) - 1
     model = aep.SDGPR(x_train, y_train, M, hidden_size, lik='Probit')
 
     # init hypers, inducing points and q(u) params
@@ -1993,7 +2002,7 @@ def test_dgpr_aep_probit_stochastic():
     for i in range(L):
         Din_i = size[i]
         M_i = Ms[i]
-        Dout_i = size[i+1]
+        Dout_i = size[i + 1]
         suffix = '_%d' % (i)
         name = 'ls' + suffix
         for d in range(Din_i):
@@ -2011,8 +2020,8 @@ def test_dgpr_aep_probit_stochastic():
 
             dls_id = (logZ1 - logZ2) / eps / 2
             # print logZ1, logZ2
-            print ('ls d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (d, grad_all[name][d], dls_id, (grad_all[name][d]-dls_id)/dls_id))
+            print('ls d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (d, grad_all[name][d], dls_id, (grad_all[name][d] - dls_id) / dls_id))
 
         # check grad sf
         name = 'sf' + suffix
@@ -2028,8 +2037,8 @@ def test_dgpr_aep_probit_stochastic():
             params2, mb_size, alpha=alpha)
 
         dsf_i = (logZ1 - logZ2) / eps / 2
-        print ('sf computed=%.5f, numerical=%.5f, diff=%.5f' 
-            % (grad_all[name], dsf_i, (grad_all[name] - dsf_i) / dsf_i))
+        print('sf computed=%.5f, numerical=%.5f, diff=%.5f'
+              % (grad_all[name], dsf_i, (grad_all[name] - dsf_i) / dsf_i))
 
         # check grad zu
         name = 'zu' + suffix
@@ -2049,8 +2058,8 @@ def test_dgpr_aep_probit_stochastic():
                     params2, mb_size, alpha=alpha)
 
                 dzu_id = (logZ1 - logZ2) / eps / 2
-                print ('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                    % (m, k, grad_all[name][m, k], dzu_id, (grad_all[name][m, k]-dzu_id)/dzu_id))
+                print('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                      % (m, k, grad_all[name][m, k], dzu_id, (grad_all[name][m, k] - dzu_id) / dzu_id))
 
         # check grad theta_1
         name = 'eta1_R' + suffix
@@ -2068,8 +2077,8 @@ def test_dgpr_aep_probit_stochastic():
                     params2, mb_size, alpha=alpha)
 
                 dR_id = (logZ1 - logZ2) / eps / 2
-                print ('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                    % (d, j, grad_all[name][d][j], dR_id, (grad_all[name][d][j]-dR_id)/dR_id))
+                print('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                      % (d, j, grad_all[name][d][j], dR_id, (grad_all[name][d][j] - dR_id) / dR_id))
 
         # check grad theta_2
         name = 'eta2' + suffix
@@ -2087,8 +2096,8 @@ def test_dgpr_aep_probit_stochastic():
                     params2, mb_size, alpha=alpha)
 
                 dR_id = (logZ1 - logZ2) / eps / 2
-                print ('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                    % (d, j, grad_all[name][d][j], dR_id, (grad_all[name][d][j]-dR_id)/dR_id))
+                print('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                      % (d, j, grad_all[name][d][j], dR_id, (grad_all[name][d][j] - dR_id) / dR_id))
 
 
 def plot_dgpr_aep_gaussian_stochastic():
@@ -2114,7 +2123,8 @@ def plot_dgpr_aep_gaussian_stochastic():
         no_points = int(N_train * mb)
         start_time = time.time()
         for k in range(reps):
-            objs[i, k] = model.objective_function(params, no_points, alpha=1.0)[0]
+            objs[i, k] = model.objective_function(
+                params, no_points, alpha=1.0)[0]
         times[i] = time.time() - start_time
 
     f, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
@@ -2139,7 +2149,7 @@ def plot_dgpr_aep_probit_stochastic():
     D = 2
     Q = 3
     x_train = np.random.randn(N_train, D)
-    y_train = 2*np.random.randint(0, 2, size=(N_train, Q)) - 1
+    y_train = 2 * np.random.randint(0, 2, size=(N_train, Q)) - 1
     hidden_size = [3, 2]
     model = aep.SDGPR(x_train, y_train, M, hidden_size, lik='Gaussian')
 
@@ -2154,7 +2164,8 @@ def plot_dgpr_aep_probit_stochastic():
         no_points = int(N_train * mb)
         start_time = time.time()
         for k in range(reps):
-            objs[i, k] = model.objective_function(params, no_points, alpha=1.0)[0]
+            objs[i, k] = model.objective_function(
+                params, no_points, alpha=1.0)[0]
         times[i] = time.time() - start_time
 
     f, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
@@ -2181,7 +2192,7 @@ def test_dgpr_aep_gaussian_scipy():
     hidden_size = [3, 2]
     x_train = np.random.randn(N_train, D)
     y_train = np.random.randn(N_train, Q)
-    
+
     model = aep.SDGPR(x_train, y_train, M, hidden_size, lik='Gaussian')
 
     # init hypers, inducing points and q(u) params
@@ -2197,7 +2208,8 @@ def test_dgpr_aep_gaussian_scipy():
     logZ = objective(init_params_vec, params_args, model, N_train, alpha)
     pp.pprint(logZ)
 
-    pp.pprint(check_grad(objective, gradient, init_params_vec, params_args, model, N_train, alpha))
+    pp.pprint(check_grad(objective, gradient, init_params_vec,
+                         params_args, model, N_train, alpha))
 
 
 def test_dgpr_aep_probit_scipy():
@@ -2209,7 +2221,7 @@ def test_dgpr_aep_probit_scipy():
     Q = 3
     hidden_size = [3, 2]
     x_train = np.random.randn(N_train, D)
-    y_train = 2*np.random.randint(0, 2, size=(N_train, Q)) - 1
+    y_train = 2 * np.random.randint(0, 2, size=(N_train, Q)) - 1
     model = aep.SDGPR(x_train, y_train, M, hidden_size, lik='Probit')
 
     # init hypers, inducing points and q(u) params
@@ -2224,7 +2236,8 @@ def test_dgpr_aep_probit_scipy():
     logZ = objective(init_params_vec, params_args, model, N_train, alpha)
     pp.pprint(logZ)
 
-    pp.pprint(check_grad(objective, gradient, init_params_vec, params_args, model, N_train, alpha))
+    pp.pprint(check_grad(objective, gradient, init_params_vec,
+                         params_args, model, N_train, alpha))
 
 
 def test_dgprh_aep_gaussian():
@@ -2255,7 +2268,7 @@ def test_dgprh_aep_gaussian():
         print 'layer %d' % i
         Din_i = size[i]
         M_i = Ms[i]
-        Dout_i = size[i+1]
+        Dout_i = size[i + 1]
         suffix = '_%d' % (i)
         name = 'ls' + suffix
         for d in range(Din_i):
@@ -2271,8 +2284,8 @@ def test_dgprh_aep_gaussian():
 
             dls_id = (logZ1 - logZ2) / eps / 2
             # print logZ1, logZ2
-            print ('ls d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (d, grad_all[name][d], dls_id, (grad_all[name][d]-dls_id)/dls_id))
+            print('ls d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (d, grad_all[name][d], dls_id, (grad_all[name][d] - dls_id) / dls_id))
 
         # check grad sf
         name = 'sf' + suffix
@@ -2286,8 +2299,8 @@ def test_dgprh_aep_gaussian():
             params2, N_train, alpha=alpha)
 
         dsf_i = (logZ1 - logZ2) / eps / 2
-        print ('sf computed=%.5f, numerical=%.5f, diff=%.5f' 
-            % (grad_all[name], dsf_i, (grad_all[name] - dsf_i) / dsf_i))
+        print('sf computed=%.5f, numerical=%.5f, diff=%.5f'
+              % (grad_all[name], dsf_i, (grad_all[name] - dsf_i) / dsf_i))
 
         # check grad zu
         name = 'zu' + suffix
@@ -2305,8 +2318,8 @@ def test_dgprh_aep_gaussian():
                     params2, N_train, alpha=alpha)
 
                 dzu_id = (logZ1 - logZ2) / eps / 2
-                print ('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                    % (m, k, grad_all[name][m, k], dzu_id, (grad_all[name][m, k]-dzu_id)/dzu_id))
+                print('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                      % (m, k, grad_all[name][m, k], dzu_id, (grad_all[name][m, k] - dzu_id) / dzu_id))
 
         # check grad theta_1
         name = 'eta1_R' + suffix
@@ -2322,8 +2335,8 @@ def test_dgprh_aep_gaussian():
                     params2, N_train, alpha=alpha)
 
                 dR_id = (logZ1 - logZ2) / eps / 2
-                print ('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                    % (d, j, grad_all[name][d][j], dR_id, (grad_all[name][d][j]-dR_id)/dR_id))
+                print('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                      % (d, j, grad_all[name][d][j], dR_id, (grad_all[name][d][j] - dR_id) / dR_id))
 
         # check grad theta_2
         name = 'eta2' + suffix
@@ -2339,8 +2352,8 @@ def test_dgprh_aep_gaussian():
                     params2, N_train, alpha=alpha)
 
                 dR_id = (logZ1 - logZ2) / eps / 2
-                print ('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                    % (d, j, grad_all[name][d][j], dR_id, (grad_all[name][d][j]-dR_id)/dR_id))
+                print('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                      % (d, j, grad_all[name][d][j], dR_id, (grad_all[name][d][j] - dR_id) / dR_id))
 
     # check grad sn
     params1 = copy.deepcopy(params)
@@ -2353,7 +2366,7 @@ def test_dgprh_aep_gaussian():
         params2, N_train, alpha=alpha)
 
     # check grad sn hidden
-    for i in range(L-1):
+    for i in range(L - 1):
         params1 = copy.deepcopy(params)
         params1['sn_hidden'][i] = params1['sn_hidden'][i] + eps
         logZ1, grad1 = model.objective_function(
@@ -2364,37 +2377,41 @@ def test_dgprh_aep_gaussian():
             params2, N_train, alpha=alpha)
 
         dsn_i = (logZ1 - logZ2) / eps / 2
-        print ('sn_hidden %d computed=%.5f, numerical=%.5f, diff=%.5f' 
-            % (i, grad_all['sn_hidden'][i], dsn_i, (grad_all['sn_hidden'][i] - dsn_i) / dsn_i))
+        print('sn_hidden %d computed=%.5f, numerical=%.5f, diff=%.5f'
+              % (i, grad_all['sn_hidden'][i], dsn_i, (grad_all['sn_hidden'][i] - dsn_i) / dsn_i))
 
     # check grad hidden_1
-    for i in range(L-1):
+    for i in range(L - 1):
         for n in range(N_train):
-            for d in range(size[i+1]):
+            for d in range(size[i + 1]):
                 params1 = copy.deepcopy(params)
-                params1['h_factor_1_%d'%i][n, d] = params1['h_factor_1_%d'%i][n, d] + eps
+                params1['h_factor_1_%d' % i][n, d] = params1[
+                    'h_factor_1_%d' % i][n, d] + eps
                 logZ1, grad1 = model.objective_function(
                     params1, N_train, alpha=alpha)
                 params2 = copy.deepcopy(params)
-                params2['h_factor_1_%d'%i][n, d] = params2['h_factor_1_%d'%i][n, d] - eps
+                params2['h_factor_1_%d' % i][n, d] = params2[
+                    'h_factor_1_%d' % i][n, d] - eps
                 logZ2, grad2 = model.objective_function(
                     params2, N_train, alpha=alpha)
                 dsn_i = (logZ1 - logZ2) / eps / 2
-                print ('h_factor_1 %d %d %d computed=%.5f, numerical=%.5f, diff=%.5f' 
-                    % (i, n, d, grad_all['h_factor_1_%d'%i][n, d], dsn_i, (grad_all['h_factor_1_%d'%i][n, d] - dsn_i) / dsn_i))
+                print('h_factor_1 %d %d %d computed=%.5f, numerical=%.5f, diff=%.5f'
+                      % (i, n, d, grad_all['h_factor_1_%d' % i][n, d], dsn_i, (grad_all['h_factor_1_%d' % i][n, d] - dsn_i) / dsn_i))
 
                 params1 = copy.deepcopy(params)
-                params1['h_factor_2_%d'%i][n, d] = params1['h_factor_2_%d'%i][n, d] + eps
+                params1['h_factor_2_%d' % i][n, d] = params1[
+                    'h_factor_2_%d' % i][n, d] + eps
                 logZ1, grad1 = model.objective_function(
                     params1, N_train, alpha=alpha)
                 params2 = copy.deepcopy(params)
-                params2['h_factor_2_%d'%i][n, d] = params2['h_factor_2_%d'%i][n, d] - eps
+                params2['h_factor_2_%d' % i][n, d] = params2[
+                    'h_factor_2_%d' % i][n, d] - eps
                 logZ2, grad2 = model.objective_function(
                     params2, N_train, alpha=alpha)
 
                 dsn_i = (logZ1 - logZ2) / eps / 2
-                print ('h_factor_2 %d %d %d computed=%.5f, numerical=%.5f, diff=%.5f' 
-                    % (i, n, d, grad_all['h_factor_2_%d'%i][n, d], dsn_i, (grad_all['h_factor_2_%d'%i][n, d] - dsn_i) / dsn_i))
+                print('h_factor_2 %d %d %d computed=%.5f, numerical=%.5f, diff=%.5f'
+                      % (i, n, d, grad_all['h_factor_2_%d' % i][n, d], dsn_i, (grad_all['h_factor_2_%d' % i][n, d] - dsn_i) / dsn_i))
 
 
 def test_dgprh_aep_probit():
@@ -2407,7 +2424,7 @@ def test_dgprh_aep_probit():
     Q = 3
     hidden_size = [3, 2]
     x_train = np.random.randn(N_train, D)
-    y_train = 2*np.random.randint(0, 2, size=(N_train, Q)) - 1
+    y_train = 2 * np.random.randint(0, 2, size=(N_train, Q)) - 1
     model = aep.SDGPR_H(x_train, y_train, M, hidden_size, lik='Probit')
 
     # init hypers, inducing points and q(u) params
@@ -2426,7 +2443,7 @@ def test_dgprh_aep_probit():
         print 'layer %d' % i
         Din_i = size[i]
         M_i = Ms[i]
-        Dout_i = size[i+1]
+        Dout_i = size[i + 1]
         suffix = '_%d' % (i)
         name = 'ls' + suffix
         for d in range(Din_i):
@@ -2442,8 +2459,8 @@ def test_dgprh_aep_probit():
 
             dls_id = (logZ1 - logZ2) / eps / 2
             # print logZ1, logZ2
-            print ('ls d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (d, grad_all[name][d], dls_id, (grad_all[name][d]-dls_id)/dls_id))
+            print('ls d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (d, grad_all[name][d], dls_id, (grad_all[name][d] - dls_id) / dls_id))
 
         # check grad sf
         name = 'sf' + suffix
@@ -2457,8 +2474,8 @@ def test_dgprh_aep_probit():
             params2, N_train, alpha=alpha)
 
         dsf_i = (logZ1 - logZ2) / eps / 2
-        print ('sf computed=%.5f, numerical=%.5f, diff=%.5f' 
-            % (grad_all[name], dsf_i, (grad_all[name] - dsf_i) / dsf_i))
+        print('sf computed=%.5f, numerical=%.5f, diff=%.5f'
+              % (grad_all[name], dsf_i, (grad_all[name] - dsf_i) / dsf_i))
 
         # check grad zu
         name = 'zu' + suffix
@@ -2476,8 +2493,8 @@ def test_dgprh_aep_probit():
                     params2, N_train, alpha=alpha)
 
                 dzu_id = (logZ1 - logZ2) / eps / 2
-                print ('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                    % (m, k, grad_all[name][m, k], dzu_id, (grad_all[name][m, k]-dzu_id)/dzu_id))
+                print('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                      % (m, k, grad_all[name][m, k], dzu_id, (grad_all[name][m, k] - dzu_id) / dzu_id))
 
         # check grad theta_1
         name = 'eta1_R' + suffix
@@ -2493,8 +2510,8 @@ def test_dgprh_aep_probit():
                     params2, N_train, alpha=alpha)
 
                 dR_id = (logZ1 - logZ2) / eps / 2
-                print ('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                    % (d, j, grad_all[name][d][j], dR_id, (grad_all[name][d][j]-dR_id)/dR_id))
+                print('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                      % (d, j, grad_all[name][d][j], dR_id, (grad_all[name][d][j] - dR_id) / dR_id))
 
         # check grad theta_2
         name = 'eta2' + suffix
@@ -2510,11 +2527,11 @@ def test_dgprh_aep_probit():
                     params2, N_train, alpha=alpha)
 
                 dR_id = (logZ1 - logZ2) / eps / 2
-                print ('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                    % (d, j, grad_all[name][d][j], dR_id, (grad_all[name][d][j]-dR_id)/dR_id))
+                print('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                      % (d, j, grad_all[name][d][j], dR_id, (grad_all[name][d][j] - dR_id) / dR_id))
 
     # check grad sn hidden
-    for i in range(L-1):
+    for i in range(L - 1):
         params1 = copy.deepcopy(params)
         params1['sn_hidden'][i] = params1['sn_hidden'][i] + eps
         logZ1, grad1 = model.objective_function(
@@ -2525,37 +2542,41 @@ def test_dgprh_aep_probit():
             params2, N_train, alpha=alpha)
 
         dsn_i = (logZ1 - logZ2) / eps / 2
-        print ('sn_hidden %d computed=%.5f, numerical=%.5f, diff=%.5f' 
-            % (i, grad_all['sn_hidden'][i], dsn_i, (grad_all['sn_hidden'][i] - dsn_i) / dsn_i))
+        print('sn_hidden %d computed=%.5f, numerical=%.5f, diff=%.5f'
+              % (i, grad_all['sn_hidden'][i], dsn_i, (grad_all['sn_hidden'][i] - dsn_i) / dsn_i))
 
     # check grad hidden_1
-    for i in range(L-1):
+    for i in range(L - 1):
         for n in range(N_train):
-            for d in range(size[i+1]):
+            for d in range(size[i + 1]):
                 params1 = copy.deepcopy(params)
-                params1['h_factor_1_%d'%i][n, d] = params1['h_factor_1_%d'%i][n, d] + eps
+                params1['h_factor_1_%d' % i][n, d] = params1[
+                    'h_factor_1_%d' % i][n, d] + eps
                 logZ1, grad1 = model.objective_function(
                     params1, N_train, alpha=alpha)
                 params2 = copy.deepcopy(params)
-                params2['h_factor_1_%d'%i][n, d] = params2['h_factor_1_%d'%i][n, d] - eps
+                params2['h_factor_1_%d' % i][n, d] = params2[
+                    'h_factor_1_%d' % i][n, d] - eps
                 logZ2, grad2 = model.objective_function(
                     params2, N_train, alpha=alpha)
                 dsn_i = (logZ1 - logZ2) / eps / 2
-                print ('h_factor_1 %d %d %d computed=%.5f, numerical=%.5f, diff=%.5f' 
-                    % (i, n, d, grad_all['h_factor_1_%d'%i][n, d], dsn_i, (grad_all['h_factor_1_%d'%i][n, d] - dsn_i) / dsn_i))
+                print('h_factor_1 %d %d %d computed=%.5f, numerical=%.5f, diff=%.5f'
+                      % (i, n, d, grad_all['h_factor_1_%d' % i][n, d], dsn_i, (grad_all['h_factor_1_%d' % i][n, d] - dsn_i) / dsn_i))
 
                 params1 = copy.deepcopy(params)
-                params1['h_factor_2_%d'%i][n, d] = params1['h_factor_2_%d'%i][n, d] + eps
+                params1['h_factor_2_%d' % i][n, d] = params1[
+                    'h_factor_2_%d' % i][n, d] + eps
                 logZ1, grad1 = model.objective_function(
                     params1, N_train, alpha=alpha)
                 params2 = copy.deepcopy(params)
-                params2['h_factor_2_%d'%i][n, d] = params2['h_factor_2_%d'%i][n, d] - eps
+                params2['h_factor_2_%d' % i][n, d] = params2[
+                    'h_factor_2_%d' % i][n, d] - eps
                 logZ2, grad2 = model.objective_function(
                     params2, N_train, alpha=alpha)
 
                 dsn_i = (logZ1 - logZ2) / eps / 2
-                print ('h_factor_2 %d %d %d computed=%.5f, numerical=%.5f, diff=%.5f' 
-                    % (i, n, d, grad_all['h_factor_2_%d'%i][n, d], dsn_i, (grad_all['h_factor_2_%d'%i][n, d] - dsn_i) / dsn_i))
+                print('h_factor_2 %d %d %d computed=%.5f, numerical=%.5f, diff=%.5f'
+                      % (i, n, d, grad_all['h_factor_2_%d' % i][n, d], dsn_i, (grad_all['h_factor_2_%d' % i][n, d] - dsn_i) / dsn_i))
 
 
 def test_dgprh_aep_gaussian_scipy():
@@ -2568,7 +2589,7 @@ def test_dgprh_aep_gaussian_scipy():
     hidden_size = [3, 2]
     x_train = np.random.randn(N_train, D)
     y_train = np.random.randn(N_train, Q)
-    
+
     model = aep.SDGPR_H(x_train, y_train, M, hidden_size, lik='Gaussian')
 
     # init hypers, inducing points and q(u) params
@@ -2583,7 +2604,8 @@ def test_dgprh_aep_gaussian_scipy():
     logZ = objective(init_params_vec, params_args, model, N_train, alpha)
     pp.pprint(logZ)
 
-    pp.pprint(check_grad(objective, gradient, init_params_vec, params_args, model, N_train, alpha))
+    pp.pprint(check_grad(objective, gradient, init_params_vec,
+                         params_args, model, N_train, alpha))
 
 
 def test_dgprh_aep_probit_scipy():
@@ -2595,7 +2617,7 @@ def test_dgprh_aep_probit_scipy():
     Q = 3
     hidden_size = [3, 2]
     x_train = np.random.randn(N_train, D)
-    y_train = 2*np.random.randint(0, 2, size=(N_train, Q)) - 1
+    y_train = 2 * np.random.randint(0, 2, size=(N_train, Q)) - 1
     model = aep.SDGPR_H(x_train, y_train, M, hidden_size, lik='Probit')
 
     # init hypers, inducing points and q(u) params
@@ -2610,7 +2632,8 @@ def test_dgprh_aep_probit_scipy():
     logZ = objective(init_params_vec, params_args, model, N_train, alpha)
     pp.pprint(logZ)
 
-    pp.pprint(check_grad(objective, gradient, init_params_vec, params_args, model, N_train, alpha))
+    pp.pprint(check_grad(objective, gradient, init_params_vec,
+                         params_args, model, N_train, alpha))
 
 
 def test_gpssm_aep_gaussian():
@@ -2625,7 +2648,7 @@ def test_gpssm_aep_gaussian():
     lvm = aep.SGPSSM(y_train, Q, M, lik='Gaussian')
 
     # init hypers, inducing points and q(u) params
-    
+
     init_params = lvm.init_hypers(y_train)
     params = init_params.copy()
     logZ, grad_all = lvm.objective_function(
@@ -2650,8 +2673,8 @@ def test_gpssm_aep_gaussian():
 
         dls_id = (logZ1 - logZ2) / eps / 2
         # print logZ1, logZ2
-        print ('ls d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-            % (d, grad_all['ls'][d], dls_id, (grad_all['ls'][d]-dls_id)/dls_id))
+        print('ls d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+              % (d, grad_all['ls'][d], dls_id, (grad_all['ls'][d] - dls_id) / dls_id))
 
     # check grad sf
     params1 = copy.deepcopy(params)
@@ -2664,8 +2687,8 @@ def test_gpssm_aep_gaussian():
         params2, N_train, alpha=alpha)
 
     dsf_i = (logZ1 - logZ2) / eps / 2
-    print ('sf computed=%.5f, numerical=%.5f, diff=%.5f' 
-        % (grad_all['sf'], dsf_i, (grad_all['sf'] - dsf_i) / dsf_i))
+    print('sf computed=%.5f, numerical=%.5f, diff=%.5f'
+          % (grad_all['sf'], dsf_i, (grad_all['sf'] - dsf_i) / dsf_i))
 
     # check grad sn
     params1 = copy.deepcopy(params)
@@ -2678,8 +2701,8 @@ def test_gpssm_aep_gaussian():
         params2, N_train, alpha=alpha)
 
     dsn_i = (logZ1 - logZ2) / eps / 2
-    print ('sn computed=%.5f, numerical=%.5f, diff=%.5f' 
-        % (grad_all['sn'], dsn_i, (grad_all['sn'] - dsn_i) / dsn_i))
+    print('sn computed=%.5f, numerical=%.5f, diff=%.5f'
+          % (grad_all['sn'], dsn_i, (grad_all['sn'] - dsn_i) / dsn_i))
 
     # check grad zu
     for m in range(M):
@@ -2696,9 +2719,8 @@ def test_gpssm_aep_gaussian():
                 params2, N_train, alpha=alpha)
 
             dzu_id = (logZ1 - logZ2) / eps / 2
-            print ('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (m, k, grad_all['zu'][m, k], dzu_id, (grad_all['zu'][m, k]-dzu_id)/dzu_id))
-
+            print('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (m, k, grad_all['zu'][m, k], dzu_id, (grad_all['zu'][m, k] - dzu_id) / dzu_id))
 
     keys = ['x_factor_1', 'x_factor_2']
     for key in keys:
@@ -2715,8 +2737,8 @@ def test_gpssm_aep_gaussian():
                     params2, N_train, alpha=alpha)
 
                 dx1_nd = (logZ1 - logZ2) / eps / 2
-                print ('%s n=%d, d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                    % (key, n, d, grad_all[key][n, d], dx1_nd, (grad_all[key][n, d] - dx1_nd) / dx1_nd))
+                print('%s n=%d, d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                      % (key, n, d, grad_all[key][n, d], dx1_nd, (grad_all[key][n, d] - dx1_nd) / dx1_nd))
 
     # check grad C
     for d in range(D):
@@ -2731,8 +2753,8 @@ def test_gpssm_aep_gaussian():
                 params2, N_train, alpha=alpha)
 
             dx1_nd = (logZ1 - logZ2) / eps / 2
-            print ('C d=%d, q=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (d, q, grad_all['C'][d, q], dx1_nd, (grad_all['C'][d, q] - dx1_nd) / dx1_nd))
+            print('C d=%d, q=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (d, q, grad_all['C'][d, q], dx1_nd, (grad_all['C'][d, q] - dx1_nd) / dx1_nd))
 
     # check grad R
     for d in range(D):
@@ -2746,8 +2768,8 @@ def test_gpssm_aep_gaussian():
             params2, N_train, alpha=alpha)
 
         dx1_nd = (logZ1 - logZ2) / eps / 2
-        print ('R d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-            % (d, grad_all['R'][d], dx1_nd, (grad_all['R'][d] - dx1_nd) / dx1_nd))
+        print('R d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+              % (d, grad_all['R'][d], dx1_nd, (grad_all['R'][d] - dx1_nd) / dx1_nd))
 
 
 def test_gpssm_aep_gaussian_kink():
@@ -2759,7 +2781,7 @@ def test_gpssm_aep_gaussian_kink():
             if xt < 4:
                 fx[t] = xt + 1
             else:
-                fx[t] = -4*xt + 21
+                fx[t] = -4 * xt + 21
         return fx
 
     def kink(T, process_noise, obs_noise, xprev=None):
@@ -2772,12 +2794,12 @@ def test_gpssm_aep_gaussian_kink():
             if xprev < 4:
                 fx = xprev + 1
             else:
-                fx = -4*xprev + 21
+                fx = -4 * xprev + 21
 
             xtrue[t] = fx
-            x[t] = fx + np.sqrt(process_noise)*np.random.randn()
+            x[t] = fx + np.sqrt(process_noise) * np.random.randn()
             xprev = x[t]
-            y[t] = x[t] + np.sqrt(obs_noise)*np.random.randn()
+            y[t] = x[t] + np.sqrt(obs_noise) * np.random.randn()
 
         return xtrue, x, y
 
@@ -2817,8 +2839,8 @@ def test_gpssm_aep_gaussian_kink():
 
         dls_id = (logZ1 - logZ2) / eps / 2
         # print logZ1, logZ2
-        print ('ls d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-            % (d, grad_all['ls'][d], dls_id, (grad_all['ls'][d]-dls_id)/dls_id))
+        print('ls d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+              % (d, grad_all['ls'][d], dls_id, (grad_all['ls'][d] - dls_id) / dls_id))
 
     # check grad sf
     params1 = copy.deepcopy(params)
@@ -2831,8 +2853,8 @@ def test_gpssm_aep_gaussian_kink():
         params2, N_train, alpha=alpha)
 
     dsf_i = (logZ1 - logZ2) / eps / 2
-    print ('sf computed=%.5f, numerical=%.5f, diff=%.5f' 
-        % (grad_all['sf'], dsf_i, (grad_all['sf'] - dsf_i) / dsf_i))
+    print('sf computed=%.5f, numerical=%.5f, diff=%.5f'
+          % (grad_all['sf'], dsf_i, (grad_all['sf'] - dsf_i) / dsf_i))
 
     # check grad sn
     params1 = copy.deepcopy(params)
@@ -2845,8 +2867,8 @@ def test_gpssm_aep_gaussian_kink():
         params2, N_train, alpha=alpha)
 
     dsn_i = (logZ1 - logZ2) / eps / 2
-    print ('sn computed=%.5f, numerical=%.5f, diff=%.5f' 
-        % (grad_all['sn'], dsn_i, (grad_all['sn'] - dsn_i) / dsn_i))
+    print('sn computed=%.5f, numerical=%.5f, diff=%.5f'
+          % (grad_all['sn'], dsn_i, (grad_all['sn'] - dsn_i) / dsn_i))
 
     # check grad zu
     for m in range(M):
@@ -2863,9 +2885,8 @@ def test_gpssm_aep_gaussian_kink():
                 params2, N_train, alpha=alpha)
 
             dzu_id = (logZ1 - logZ2) / eps / 2
-            print ('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (m, k, grad_all['zu'][m, k], dzu_id, (grad_all['zu'][m, k]-dzu_id)/dzu_id))
-
+            print('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (m, k, grad_all['zu'][m, k], dzu_id, (grad_all['zu'][m, k] - dzu_id) / dzu_id))
 
     keys = ['x_factor_1', 'x_factor_2']
     for key in keys:
@@ -2882,8 +2903,8 @@ def test_gpssm_aep_gaussian_kink():
                     params2, N_train, alpha=alpha)
 
                 dx1_nd = (logZ1 - logZ2) / eps / 2
-                print ('%s n=%d, d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                    % (key, n, d, grad_all[key][n, d], dx1_nd, (grad_all[key][n, d] - dx1_nd) / dx1_nd))
+                print('%s n=%d, d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                      % (key, n, d, grad_all[key][n, d], dx1_nd, (grad_all[key][n, d] - dx1_nd) / dx1_nd))
 
     # check grad C
     for d in range(D):
@@ -2898,8 +2919,8 @@ def test_gpssm_aep_gaussian_kink():
                 params2, N_train, alpha=alpha)
 
             dx1_nd = (logZ1 - logZ2) / eps / 2
-            print ('C d=%d, q=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (d, q, grad_all['C'][d, q], dx1_nd, (grad_all['C'][d, q] - dx1_nd) / dx1_nd))
+            print('C d=%d, q=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (d, q, grad_all['C'][d, q], dx1_nd, (grad_all['C'][d, q] - dx1_nd) / dx1_nd))
 
     # check grad R
     for d in range(D):
@@ -2913,8 +2934,8 @@ def test_gpssm_aep_gaussian_kink():
             params2, N_train, alpha=alpha)
 
         dx1_nd = (logZ1 - logZ2) / eps / 2
-        print ('R d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-            % (d, grad_all['R'][d], dx1_nd, (grad_all['R'][d] - dx1_nd) / dx1_nd))
+        print('R d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+              % (d, grad_all['R'][d], dx1_nd, (grad_all['R'][d] - dx1_nd) / dx1_nd))
 
 
 if __name__ == '__main__':

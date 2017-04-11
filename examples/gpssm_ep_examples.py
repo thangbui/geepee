@@ -7,6 +7,7 @@ import pdb
 
 np.random.seed(42)
 
+
 def test_kink():
     def kink_true(x):
         fx = np.zeros(x.shape)
@@ -15,7 +16,7 @@ def test_kink():
             if xt < 4:
                 fx[t] = xt + 1
             else:
-                fx[t] = -4*xt + 21
+                fx[t] = -4 * xt + 21
         return fx
 
     def kink(T, process_noise, obs_noise, xprev=None):
@@ -28,12 +29,12 @@ def test_kink():
             if xprev < 4:
                 fx = xprev + 1
             else:
-                fx = -4*xprev + 21
+                fx = -4 * xprev + 21
 
             xtrue[t] = fx
-            x[t] = fx + np.sqrt(process_noise)*np.random.randn()
+            x[t] = fx + np.sqrt(process_noise) * np.random.randn()
             xprev = x[t]
-            y[t] = x[t] + np.sqrt(obs_noise)*np.random.randn()
+            y[t] = x[t] + np.sqrt(obs_noise) * np.random.randn()
 
         return xtrue, x, y
 
@@ -48,18 +49,18 @@ def test_kink():
     Dlatent = 1
     Dobs = 1
     M = 40
-    C = 1*np.ones((1, 1))
-    R = np.ones(1)*np.log(obs_noise)/2
+    C = 1 * np.ones((1, 1))
+    R = np.ones(1) * np.log(obs_noise) / 2
     lls = np.reshape(np.log(2), [Dlatent, ])
     lsf = np.reshape(np.log(2), [1, ])
     zu = np.linspace(-7, 7, M)
     zu = np.reshape(zu, [M, 1])
-    lsn = np.log(process_noise)/2
+    lsn = np.log(process_noise) / 2
     params = {'ls': lls, 'sf': lsf, 'sn': lsn, 'R': R, 'C': C, 'zu': zu}
 
     # create model
-    model = ep.SGPSSM(y_train, Dlatent, M, 
-        lik='Gaussian', prior_mean=0, prior_var=1)
+    model = ep.SGPSSM(y_train, Dlatent, M,
+                      lik='Gaussian', prior_mean=0, prior_var=1)
     # update hypers
     model.update_hypers(params)
     # run EP
@@ -74,17 +75,17 @@ def test_kink():
     # plot function
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    ax.plot(x_test[:,0], kink_true(x_test[:,0]), '-', color='k')
-    ax.plot(x_test[:,0], mf[:,0], 
-            '-', color='b', label='alpha=%.2f'%alpha)
+    ax.plot(x_test[:, 0], kink_true(x_test[:, 0]), '-', color='k')
+    ax.plot(x_test[:, 0], mf[:, 0],
+            '-', color='b', label='alpha=%.2f' % alpha)
     ax.fill_between(
-        x_test[:,0], 
-        mf[:,0] + 2*np.sqrt(vf[:,0]), 
-        mf[:,0] - 2*np.sqrt(vf[:,0]), 
+        x_test[:, 0],
+        mf[:, 0] + 2 * np.sqrt(vf[:, 0]),
+        mf[:, 0] - 2 * np.sqrt(vf[:, 0]),
         alpha=0.5, edgecolor='b', facecolor='b')
     ax.plot(
-        xtrue[0:model.N-1], 
-        xtrue[1:model.N], 
+        xtrue[0:model.N - 1],
+        xtrue[1:model.N],
         'k+', alpha=0.3)
     ax.set_xlabel(r'$x_{t-1}$')
     ax.set_ylabel(r'$x_{t}$')

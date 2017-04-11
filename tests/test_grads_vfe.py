@@ -11,6 +11,7 @@ from .context import flatten_dict, unflatten_dict
 pp = pprint.PrettyPrinter(indent=4)
 np.random.seed(0)
 
+
 def objective(params, params_args, obj, idxs, alpha):
     params_dict = unflatten_dict(params, params_args)
     f, grad_dict = obj.objective_function(
@@ -64,8 +65,8 @@ def test_gpr_vfe_gaussian():
 
         dls_id = (logZ1 - logZ2) / eps / 2
         # print logZ1, logZ2
-        print ('ls d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-            % (d, grad_all['ls'][d], dls_id, (grad_all['ls'][d]-dls_id)/dls_id))
+        print('ls d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+              % (d, grad_all['ls'][d], dls_id, (grad_all['ls'][d] - dls_id) / dls_id))
 
     # check grad sf
     params1 = copy.deepcopy(params)
@@ -78,8 +79,8 @@ def test_gpr_vfe_gaussian():
         params2, None, alpha=alpha)
 
     dsf_i = (logZ1 - logZ2) / eps / 2
-    print ('sf computed=%.5f, numerical=%.5f, diff=%.5f' 
-        % (grad_all['sf'], dsf_i, (grad_all['sf'] - dsf_i) / dsf_i))
+    print('sf computed=%.5f, numerical=%.5f, diff=%.5f'
+          % (grad_all['sf'], dsf_i, (grad_all['sf'] - dsf_i) / dsf_i))
 
     # check grad sn
     params1 = copy.deepcopy(params)
@@ -92,8 +93,8 @@ def test_gpr_vfe_gaussian():
         params2, None, alpha=alpha)
 
     dsn_i = (logZ1 - logZ2) / eps / 2
-    print ('sn computed=%.5f, numerical=%.5f, diff=%.5f' 
-        % (grad_all['sn'], dsn_i, (grad_all['sn'] - dsn_i) / dsn_i))
+    print('sn computed=%.5f, numerical=%.5f, diff=%.5f'
+          % (grad_all['sn'], dsn_i, (grad_all['sn'] - dsn_i) / dsn_i))
 
     # check grad zu
     Din_i = model.Din
@@ -113,8 +114,8 @@ def test_gpr_vfe_gaussian():
                 params2, None, alpha=alpha)
 
             dzu_id = (logZ1 - logZ2) / eps / 2
-            print ('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (m, k, grad_all['zu'][m, k], dzu_id, (grad_all['zu'][m, k]-dzu_id)/dzu_id))
+            print('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (m, k, grad_all['zu'][m, k], dzu_id, (grad_all['zu'][m, k] - dzu_id) / dzu_id))
 
 
 def test_gpr_vfe_gaussian_scipy():
@@ -141,10 +142,10 @@ def test_gpr_vfe_gaussian_scipy():
     logZ = objective(init_params_vec, params_args, model, None, alpha)
     pp.pprint(logZ)
 
-    pp.pprint(check_grad(objective, gradient, init_params_vec, params_args, model, None, alpha))
+    pp.pprint(check_grad(objective, gradient, init_params_vec,
+                         params_args, model, None, alpha))
 
 if __name__ == '__main__':
     for i in range(10):
         test_gpr_vfe_gaussian()
         test_gpr_vfe_gaussian_scipy()
-    

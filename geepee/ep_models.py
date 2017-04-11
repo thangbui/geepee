@@ -29,7 +29,7 @@ class SGP_Layer(object):
         # factor variables
         self.t1 = np.zeros([N, Dout, M])
         self.t2 = np.zeros([N, Dout, M, M])
-        
+
         # TODO
         self.mu = np.zeros([Dout, M, ])
         self.Su = np.zeros([Dout, M, M])
@@ -54,14 +54,16 @@ class SGP_Layer(object):
     def compute_phi_posterior(self):
         (sign, logdet) = np.linalg.slogdet(self.Su)
         phi_posterior = 0.5 * np.sum(logdet)
-        phi_posterior += 0.5 * np.sum(self.mu*np.linalg.solve(self.Su, self.mu))
+        phi_posterior += 0.5 * \
+            np.sum(self.mu * np.linalg.solve(self.Su, self.mu))
         return phi_posterior
 
     def compute_phi_cavity(self):
         logZ_posterior = 0
         (sign, logdet) = np.linalg.slogdet(self.Suhat)
         phi_cavity = 0.5 * np.sum(logdet)
-        phi_cavity += 0.5 * np.sum(self.muhat*np.linalg.solve(self.Suhat, self.muhat))
+        phi_cavity += 0.5 * \
+            np.sum(self.muhat * np.linalg.solve(self.Suhat, self.muhat))
         return phi_cavity
 
     def compute_phi(self, alpha=1.0):
@@ -72,7 +74,7 @@ class SGP_Layer(object):
         phi_prior = self.compute_phi_prior()
         phi_post = self.compute_phi_posterior()
         phi_cav = self.compute_phi_cavity()
-        phi = scale_prior*phi_prior + scale_post*phi_post + scale_cav*phi_cav
+        phi = scale_prior * phi_prior + scale_post * phi_post + scale_cav * phi_cav
         return phi
 
     def forward_prop_thru_cav(self, n, mx, vx=None, alpha=1.0):
@@ -86,10 +88,10 @@ class SGP_Layer(object):
         Kuuinv = self.Kuuinv
         Ahat = np.einsum('ab,ndb->nda', Kuuinv, muhat)
         Bhat = np.einsum(
-            'ab,ndbc->ndac', 
+            'ab,ndbc->ndac',
             Kuuinv, np.einsum('ndab,bc->ndac', Suhat, Kuuinv)) - Kuuinv
-        kff = np.exp(2*self.sf)
-        kfu = compute_kernel(2*self.ls, 2*self.sf, x, self.zu)
+        kff = np.exp(2 * self.sf)
+        kfu = compute_kernel(2 * self.ls, 2 * self.sf, x, self.zu)
         mout = np.einsum('nm,ndm->nd', kfu, Ahat)
         Bkfukuf = np.einsum('ndab,na,nb->nd', Bhat, kfu, kfu)
         vout = kff + Bkfukuf
@@ -102,14 +104,16 @@ class SGP_Layer(object):
         Ahat = np.einsum('ab,ndb->nda', Kuuinv, muhat)
         Smm = Suhat + np.einsum('nda,ndb->ndab', muhat, muhat)
         Bhat = np.einsum(
-            'ab,ndbc->ndac', 
+            'ab,ndbc->ndac',
             Kuuinv, np.einsum('ndab,bc->ndac', Smm, Kuuinv)) - Kuuinv
-        psi0 = np.exp(2*self.sf)
-        psi1, psi2 = compute_psi_weave(2*self.ls, 2*self.sf, mx, vx, self.zu)
+        psi0 = np.exp(2 * self.sf)
+        psi1, psi2 = compute_psi_weave(
+            2 * self.ls, 2 * self.sf, mx, vx, self.zu)
         mout = np.einsum('nm,ndm->nd', psi1, Ahat)
         Bhatpsi2 = np.einsum('ndab,nab->nd', Bhat, psi2)
         vout = psi0 + Bhatpsi2 - mout**2
-        extra_res = [muhat, Suhat, SuinvMuhat, Suinvhat, Smm, psi1, psi2, Ahat, Bhat]
+        extra_res = [muhat, Suhat, SuinvMuhat,
+                     Suinvhat, Smm, psi1, psi2, Ahat, Bhat]
         return mout, vout, extra_res
 
     def forward_prop_thru_post(self, mx, vx=None):
@@ -122,10 +126,10 @@ class SGP_Layer(object):
         Kuuinv = self.Kuuinv
         A = np.einsum('ab,db->da', Kuuinv, self.mu)
         B = np.einsum(
-            'ab,dbc->dac', 
+            'ab,dbc->dac',
             Kuuinv, np.einsum('dab,bc->dac', self.Su, Kuuinv)) - Kuuinv
-        kff = np.exp(2*self.sf)
-        kfu = compute_kernel(2*self.ls, 2*self.sf, x, self.zu)
+        kff = np.exp(2 * self.sf)
+        kfu = compute_kernel(2 * self.ls, 2 * self.sf, x, self.zu)
         mout = np.einsum('nm,dm->nd', kfu, A)
         Bpsi2 = np.einsum('dab,na,nb->nd', B, kfu, kfu)
         vout = kff + Bpsi2
@@ -137,10 +141,11 @@ class SGP_Layer(object):
         A = np.einsum('ab,db->da', Kuuinv, self.mu)
         Smm = self.Su + np.einsum('da,db->dab', self.mu, self.mu)
         B = np.einsum(
-            'ab,dbc->dac', 
+            'ab,dbc->dac',
             Kuuinv, np.einsum('dab,bc->dac', Smm, Kuuinv)) - Kuuinv
-        psi0 = np.exp(2.0*self.sf)
-        psi1, psi2 = compute_psi_weave(2*self.ls, 2*self.sf, mx, vx, self.zu)
+        psi0 = np.exp(2.0 * self.sf)
+        psi1, psi2 = compute_psi_weave(
+            2 * self.ls, 2 * self.sf, mx, vx, self.zu)
         mout = np.einsum('nm,dm->nd', psi1, A)
         Bpsi2 = np.einsum('dab,nab->nd', B, psi2)
         vout = psi0 + Bpsi2 - mout**2
@@ -150,7 +155,7 @@ class SGP_Layer(object):
         N = self.N
         M = self.M
         ls = np.exp(self.ls)
-        sf2 = np.exp(2*self.sf)
+        sf2 = np.exp(2 * self.sf)
         zu = self.zu
         Kuuinv = self.Kuuinv
         a = extra_args
@@ -171,7 +176,7 @@ class SGP_Layer(object):
         dmcav = 2 * np.einsum('ndab,ndb->nda', dvcav, muhat) \
             + np.einsum('ab,ndb->nda', Kuuinv, dAhat)
 
-        grad_hyper = {} 
+        grad_hyper = {}
         grad_input = {'mx': dmx, 'vx': dvx, 'mcav': dmcav, 'vcav': dvcav}
 
         return grad_hyper, grad_input
@@ -200,9 +205,9 @@ class SGP_Layer(object):
 
         # perform Power-EP update
         munew = muhat + np.einsum('ndab,ndb->nda', Suhat, dmcav)
-        inner = np.einsum('nda,ndb->ndab', dmcav, dmcav) - 2*dvcav
+        inner = np.einsum('nda,ndb->ndab', dmcav, dmcav) - 2 * dvcav
         Sunew = Suhat - np.einsum(
-            'ndab,ndbc->ndac', 
+            'ndab,ndbc->ndac',
             Suhat, np.einsum('ndab,ndbc->ndac', inner, Suhat))
         Suinvnew = np.linalg.inv(Sunew)
         SuinvMunew = np.einsum('ndab,ndb->nda', Suinvnew, munew)
@@ -210,8 +215,8 @@ class SGP_Layer(object):
         t1_frac = SuinvMunew - SuinvMuhat
         t1_old = self.t1[n, :, :]
         t2_old = self.t2[n, :, :, :]
-        t1_new = (1.0-alpha) * t1_old + t1_frac
-        t2_new = (1.0-alpha) * t2_old + t2_frac
+        t1_new = (1.0 - alpha) * t1_old + t1_frac
+        t2_new = (1.0 - alpha) * t2_old + t2_frac
 
         if t1_new.shape[0] == 1:
             # TODO: do damping here?
@@ -224,8 +229,8 @@ class SGP_Layer(object):
             self.SuinvMu = SuinvMunew[0, :, :]
         else:
             # parallel update
-            self.t1[n, :, :] = decay * t1_old + (1-decay) * t1_new
-            self.t2[n, :, :, :] = decay * t2_old + (1-decay) * t2_new
+            self.t1[n, :, :] = decay * t1_old + (1 - decay) * t1_new
+            self.t2[n, :, :, :] = decay * t2_old + (1 - decay) * t2_new
             self.update_posterior()
 
         # axs[0].errorbar(self.zu[:, 0]+0.05, self.mu[0, :], fmt='+r', yerr=np.sqrt(np.diag(self.Su[0, :, :])))
@@ -240,9 +245,9 @@ class SGP_Layer(object):
         epsilon = np.random.randn(self.Dout, self.M)
         u_sample = mu + np.einsum('dab,db->da', Lu, epsilon)
 
-        kff = compute_kernel(2*self.ls, 2*self.sf, x, x) 
+        kff = compute_kernel(2 * self.ls, 2 * self.sf, x, x)
         kff += np.diag(jitter * np.ones(x.shape[0]))
-        kfu = compute_kernel(2*self.ls, 2*self.sf, x, self.zu)
+        kfu = compute_kernel(2 * self.ls, 2 * self.sf, x, self.zu)
         qfu = np.dot(kfu, self.Kuuinv)
         mf = np.einsum('nm,dm->nd', qfu, u_sample)
         vf = kff - np.dot(qfu, kfu.T)
@@ -266,8 +271,8 @@ class SGP_Layer(object):
         # compute the leave one out moments
         t1n = self.t1[n, :, :]
         t2n = self.t2[n, :, :, :]
-        Suinvhat = self.Suinv - alpha*t2n
-        SuinvMuhat = self.SuinvMu - alpha*t1n
+        Suinvhat = self.Suinv - alpha * t2n
+        SuinvMuhat = self.SuinvMu - alpha * t1n
         Suhat = np.linalg.inv(Suinvhat)
         muhat = np.einsum('ndab,ndb->nda', Suhat, SuinvMuhat)
         return muhat, Suhat, SuinvMuhat, Suinvhat
@@ -309,9 +314,9 @@ class SGP_Layer(object):
             ls = np.zeros((Din, ))
             d2imed = np.median(x_dist[triu_ind])
             for i in range(Din):
-                ls[i] = np.log(d2imed  + 1e-16)
+                ls[i] = np.log(d2imed + 1e-16)
             sf = np.log(np.array([0.5]))
-        
+
         params = dict()
         params['sf' + key_suffix] = sf
         params['ls' + key_suffix] = ls
@@ -342,6 +347,7 @@ class SGP_Layer(object):
 
 
 class Lik_Layer(object):
+
     def __init__(self, N, D):
         self.N = N
         self.D = D
@@ -363,11 +369,11 @@ class Lik_Layer(object):
 
 
 class Gauss_Layer(Lik_Layer):
-    
+
     def __init__(self, N, D):
         super(Gauss_Layer, self).__init__(N, D)
         self.sn = 0
-    
+
     def compute_log_Z(self, mout, vout, y, alpha=1.0):
         # real valued data, gaussian lik
         sn2 = np.exp(2.0 * self.sn)
@@ -375,7 +381,7 @@ class Gauss_Layer(Lik_Layer):
         logZ = np.sum(-0.5 * (np.log(2 * np.pi * vout) +
                               (y - mout)**2 / vout))
         logZ += y.shape[0] * self.D * (0.5 * np.log(2 * np.pi * sn2 / alpha)
-                            - 0.5 * alpha * np.log(2 * np.pi * sn2))
+                                       - 0.5 * alpha * np.log(2 * np.pi * sn2))
         dlogZ_dm = (y - mout) / vout
         dlogZ_dv = -0.5 / vout + 0.5 * (y - mout)**2 / vout**2
 
@@ -384,7 +390,7 @@ class Gauss_Layer(Lik_Layer):
     def backprop_grads(self, mout, vout, dmout, dvout, alpha=1.0, scale=1.0):
         sn2 = np.exp(2.0 * self.sn)
         dv_sum = np.sum(dvout)
-        dsn = dv_sum*2*sn2/alpha + mout.shape[0]*self.D*(1-alpha)
+        dsn = dv_sum * 2 * sn2 / alpha + mout.shape[0] * self.D * (1 - alpha)
         dsn *= scale
         return {'sn': dsn}
 
@@ -393,7 +399,7 @@ class Gauss_Layer(Lik_Layer):
         return {'sn': self.sn}
 
     def get_hypers(self):
-        return {'sn': self.sn}    
+        return {'sn': self.sn}
 
     def update_hypers(self, params):
         self.sn = params['sn']
@@ -402,11 +408,12 @@ class Gauss_Layer(Lik_Layer):
 class Probit_Layer(Lik_Layer):
 
     __gh_points = None
+
     def _gh_points(self, T=20):
         if self.__gh_points is None:
             self.__gh_points = np.polynomial.hermite.hermgauss(T)
         return self.__gh_points
-    
+
     def compute_log_Z(self, mout, vout, y, alpha=1.0):
         # binary data probit likelihood
         if alpha == 1.0:
@@ -427,17 +434,19 @@ class Probit_Layer(Lik_Layer):
             gh_x = gh_x[:, np.newaxis, np.newaxis]
             gh_w = gh_w[:, np.newaxis, np.newaxis]
 
-            ts = gh_x * np.sqrt(2*vout[np.newaxis, :, :]) + mout[np.newaxis, :, :]
+            ts = gh_x * \
+                np.sqrt(2 * vout[np.newaxis, :, :]) + mout[np.newaxis, :, :]
             eps = 1e-8
-            pdfs = 0.5 * (1 + special.erf(y*ts / np.sqrt(2))) + eps
+            pdfs = 0.5 * (1 + special.erf(y * ts / np.sqrt(2))) + eps
             Ztilted = np.sum(pdfs**alpha * gh_w, axis=0) / np.sqrt(np.pi)
             logZ = np.sum(np.log(Ztilted))
-            
-            a = pdfs**(alpha-1.0)*np.exp(-ts**2/2)
+
+            a = pdfs**(alpha - 1.0) * np.exp(-ts**2 / 2)
             dZdm = np.sum(gh_w * a, axis=0) * y * alpha / np.pi / np.sqrt(2)
             dlogZ_dm = dZdm / Ztilted + eps
 
-            dZdv = np.sum(gh_w * (a*gh_x), axis=0) * y * alpha / np.pi / np.sqrt(2) / np.sqrt(2*vout)
+            dZdv = np.sum(gh_w * (a * gh_x), axis=0) * y * \
+                alpha / np.pi / np.sqrt(2) / np.sqrt(2 * vout)
             dlogZ_dv = dZdv / Ztilted + eps
 
         return logZ, dlogZ_dm, dlogZ_dv
@@ -461,8 +470,8 @@ class EP_Model(object):
         pass
 
     def optimise(
-        self, method='L-BFGS-B', tol=None, reinit_hypers=True, 
-        callback=None, maxiter=1000, alpha=0.5, adam_lr=0.05, **kargs):
+            self, method='L-BFGS-B', tol=None, reinit_hypers=True,
+            callback=None, maxiter=1000, alpha=0.5, adam_lr=0.05, **kargs):
         self.updated = False
 
         if reinit_hypers:
@@ -538,12 +547,14 @@ class SGPR(EP_Model):
                         yn = self.y_train[n, :].reshape([1, self.Dout])
                         xn = self.x_train[n, :].reshape([1, self.Din])
                         (mn, vn, extra_res) = \
-                            self.sgp_layer.forward_prop_thru_cav([n], xn, alpha=alpha)
+                            self.sgp_layer.forward_prop_thru_cav(
+                                [n], xn, alpha=alpha)
                         logZn, dmn, dvn = \
                             self.lik_layer.compute_log_Z(mn, vn, yn, alpha)
                         grad_hyper, grad_cav = self.sgp_layer.backprop_grads_reg(
                             mn, vn, dmn, dvn, extra_res, xn, alpha=alpha)
-                        self.sgp_layer.update_factor([n], alpha, grad_cav, extra_res)
+                        self.sgp_layer.update_factor(
+                            [n], alpha, grad_cav, extra_res)
                 else:
                     # parallel update for entire dataset
                     # TODO: minibatch parallel
@@ -551,7 +562,8 @@ class SGPR(EP_Model):
                     y = self.y_train[idxs, :]
                     x = self.x_train[idxs, :]
                     (m, v, extra_res) = \
-                        self.sgp_layer.forward_prop_thru_cav(idxs, x, alpha=alpha)
+                        self.sgp_layer.forward_prop_thru_cav(
+                            idxs, x, alpha=alpha)
                     logZ, dm, dv = \
                         self.lik_layer.compute_log_Z(m, v, y, alpha)
                     grad_hyper, grad_cav = self.sgp_layer.backprop_grads_reg(
@@ -579,7 +591,7 @@ class SGPR(EP_Model):
         for k in range(K):
             fs[:, :, k] = self.sgp_layer.sample(inputs)
         return fs
-        
+
     def predict_y(self, inputs):
         if not self.updated:
             self.sgp_layer.update_posterior()
@@ -609,8 +621,8 @@ class SGPR(EP_Model):
 
 class SGPLVM(EP_Model):
 
-    def __init__(self, y_train, hidden_size, no_pseudo, 
-        lik='Gaussian', prior_mean=0, prior_var=1):
+    def __init__(self, y_train, hidden_size, no_pseudo,
+                 lik='Gaussian', prior_mean=0, prior_var=1):
         super(SGPLVM, self).__init__(y_train)
         self.N = N = y_train.shape[0]
         self.Dout = Dout = y_train.shape[1]
@@ -651,15 +663,19 @@ class SGPLVM(EP_Model):
                 if not parallel:
                     for n in range(self.N):
                         yn = self.y_train[n, :].reshape([1, self.Dout])
-                        cav_m_n, cav_v_n, _, _ = self.compute_cavity_x([n], alpha)
+                        cav_m_n, cav_v_n, _, _ = self.compute_cavity_x([
+                                                                       n], alpha)
                         (mn, vn, extra_res) = \
-                            self.sgp_layer.forward_prop_thru_cav([n], cav_m_n, cav_v_n, alpha=alpha)
+                            self.sgp_layer.forward_prop_thru_cav(
+                                [n], cav_m_n, cav_v_n, alpha=alpha)
                         logZn, dmn, dvn = \
                             self.lik_layer.compute_log_Z(mn, vn, yn, alpha)
                         grad_hyper, grad_cav = self.sgp_layer.backprop_grads_lvm(
                             mn, vn, dmn, dvn, extra_res, cav_m_n, cav_v_n, alpha=alpha)
-                        self.sgp_layer.update_factor([n], alpha, grad_cav, extra_res, decay=decay)
-                        self.update_factor_x([n], alpha, grad_cav, cav_m_n, cav_v_n, decay=decay)
+                        self.sgp_layer.update_factor(
+                            [n], alpha, grad_cav, extra_res, decay=decay)
+                        self.update_factor_x(
+                            [n], alpha, grad_cav, cav_m_n, cav_v_n, decay=decay)
                 else:
                     # parallel update for entire dataset
                     # TODO: minibatch parallel
@@ -667,21 +683,24 @@ class SGPLVM(EP_Model):
                     y = self.y_train[idxs, :]
                     cav_m, cav_v, _, _ = self.compute_cavity_x(idxs, alpha)
                     (m, v, extra_res) = \
-                        self.sgp_layer.forward_prop_thru_cav(idxs, cav_m, cav_v, alpha=alpha)
+                        self.sgp_layer.forward_prop_thru_cav(
+                            idxs, cav_m, cav_v, alpha=alpha)
                     logZ, dm, dv = \
                         self.lik_layer.compute_log_Z(m, v, y, alpha)
                     grad_hyper, grad_cav = self.sgp_layer.backprop_grads_lvm(
                         m, v, dm, dv, extra_res, cav_m, cav_v, alpha=alpha)
-                    self.sgp_layer.update_factor(idxs, alpha, grad_cav, extra_res, decay=decay)
-                    self.update_factor_x(idxs, alpha, grad_cav, cav_m, cav_v, decay=decay)
-                    
+                    self.sgp_layer.update_factor(
+                        idxs, alpha, grad_cav, extra_res, decay=decay)
+                    self.update_factor_x(
+                        idxs, alpha, grad_cav, cav_m, cav_v, decay=decay)
+
         except KeyboardInterrupt:
             print 'Caught KeyboardInterrupt ...'
 
     def compute_cavity_x(self, n, alpha):
         # prior factor
-        cav_x1 = self.t01 + (1-alpha) * self.tx1[n, :]
-        cav_x2 = self.t02 + (1-alpha) * self.tx2[n, :]
+        cav_x1 = self.t01 + (1 - alpha) * self.tx1[n, :]
+        cav_x2 = self.t02 + (1 - alpha) * self.tx2[n, :]
         cav_v = 1.0 / cav_x2
         cav_m = cav_v * cav_x1
         return cav_m, cav_v, cav_x1, cav_x2
@@ -690,7 +709,7 @@ class SGPLVM(EP_Model):
         dmx = grad_cav['mx']
         dvx = grad_cav['vx']
         new_m = cav_m + cav_v * dmx
-        new_v = cav_v - cav_v**2 * (dmx**2 - 2*dvx)
+        new_v = cav_v - cav_v**2 * (dmx**2 - 2 * dvx)
         new_p2 = 1.0 / new_v
         new_p1 = new_p2 * new_m
 
@@ -700,10 +719,10 @@ class SGPLVM(EP_Model):
         # frac_t2[neg_idxs] = 0
         cur_t1 = self.tx1[n, :]
         cur_t2 = self.tx2[n, :]
-        tx1_new = (1-alpha) * cur_t1 + frac_t1
-        tx2_new = (1-alpha) * cur_t2 + frac_t2
-        tx1_new = decay * cur_t1 + (1-decay) * tx1_new
-        tx2_new = decay * cur_t2 + (1-decay) * tx2_new
+        tx1_new = (1 - alpha) * cur_t1 + frac_t1
+        tx2_new = (1 - alpha) * cur_t2 + frac_t2
+        tx1_new = decay * cur_t1 + (1 - decay) * tx1_new
+        tx2_new = decay * cur_t2 + (1 - decay) * tx2_new
 
         self.tx1[n, :] = tx1_new
         self.tx2[n, :] = tx2_new
@@ -732,7 +751,7 @@ class SGPLVM(EP_Model):
         for k in range(K):
             fs[:, :, k] = self.sgp_layer.sample(inputs)
         return fs
-        
+
     def predict_y(self, inputs):
         if not self.updated:
             self.sgp_layer.update_posterior()
@@ -750,7 +769,7 @@ class SGPLVM(EP_Model):
         lik_params = self.lik_layer.init_hypers()
         init_params = dict(sgp_params)
         init_params.update(lik_params)
-        
+
         return init_params
 
     def get_hypers(self):
@@ -773,11 +792,11 @@ class Gauss_Emis():
 
     def update_hypers(self, params):
         self.C = params['C']
-        self.R = np.exp(2*params['R'])
+        self.R = np.exp(2 * params['R'])
 
     def init_hypers(self):
         params = {}
-        params['C'] = np.ones((Dout, Din)) / (Dout*Din)
+        params['C'] = np.ones((Dout, Din)) / (Dout * Din)
         params['R'] = np.log(0.01) * np.ones(Dout)
         return params
 
@@ -800,10 +819,11 @@ class Gauss_Emis():
         vy = vy_noiseless + np.diag(self.R)
         return my, vy_noiseless, vy
 
+
 class SGPSSM(EP_Model):
 
-    def __init__(self, y_train, hidden_size, no_pseudo, 
-        lik='Gaussian', prior_mean=0, prior_var=1):
+    def __init__(self, y_train, hidden_size, no_pseudo,
+                 lik='Gaussian', prior_mean=0, prior_var=1):
         super(SGPSSM, self).__init__(y_train)
         self.N = N = y_train.shape[0]
         self.Dout = Dout = y_train.shape[1]
@@ -811,7 +831,7 @@ class SGPSSM(EP_Model):
         self.M = M = no_pseudo
         self.lik = lik.lower()
 
-        self.sgp_layer = SGP_Layer(N-1, Din, Din, M)
+        self.sgp_layer = SGP_Layer(N - 1, Din, Din, M)
         if lik.lower() == 'gaussian':
             self.emi_layer = Gauss_Emis(y_train, Dout, Din)
         elif lik.lower() == 'probit':
@@ -851,8 +871,8 @@ class SGPSSM(EP_Model):
             self.compute_cavity_x(self.PREV, alpha)
         cav_tm1_m, cav_tm1_v, cav_tm1_1, cav_tm1_2 = \
             self.compute_cavity_x(self.NEXT, alpha)
-        
-        idxs = np.arange(self.N-1)
+
+        idxs = np.arange(self.N - 1)
         (mprop, vprop, extra_res) = \
             self.sgp_layer.forward_prop_thru_cav(
                 idxs, cav_tm1_m, cav_tm1_v, alpha=alpha)
@@ -860,19 +880,19 @@ class SGPSSM(EP_Model):
             self.compute_transition_tilted(
                 mprop, vprop, cav_t_m, cav_t_v, alpha)
         grad_hyper, grad_cav = self.sgp_layer.backprop_grads_lvm(
-            mprop, vprop, dmprop, dvprop, 
+            mprop, vprop, dmprop, dvprop,
             extra_res, cav_tm1_m, cav_tm1_v, alpha=alpha)
         self.sgp_layer.update_factor(
             idxs, alpha, grad_cav, extra_res, decay=decay)
-        
+
         self.update_factor_x(
             self.NEXT,
-            grad_cav['mx'], grad_cav['vx'], 
+            grad_cav['mx'], grad_cav['vx'],
             cav_tm1_m, cav_tm1_v, cav_tm1_1, cav_tm1_2,
             decay=decay, alpha=alpha)
         self.update_factor_x(
             self.PREV,
-            dmt, dvt, 
+            dmt, dvt,
             cav_t_m, cav_t_v, cav_t_1, cav_t_2,
             decay=decay, alpha=alpha)
 
@@ -891,13 +911,13 @@ class SGPSSM(EP_Model):
             self.x_up_1 = up_1
             self.x_up_2 = up_2
 
-        for n in range(0, self.N-1):
+        for n in range(0, self.N - 1):
             # deal with the dynamics factors here
             cav_t_m, cav_t_v, cav_t_1, cav_t_2 = \
-                self.compute_cavity_x_sequential(self.PREV, [n+1], alpha)
+                self.compute_cavity_x_sequential(self.PREV, [n + 1], alpha)
             cav_tm1_m, cav_tm1_v, cav_tm1_1, cav_tm1_2 = \
                 self.compute_cavity_x_sequential(self.NEXT, [n], alpha)
-            
+
             (mprop, vprop, extra_res) = \
                 self.sgp_layer.forward_prop_thru_cav(
                     [n], cav_tm1_m, cav_tm1_v, alpha=alpha)
@@ -905,20 +925,20 @@ class SGPSSM(EP_Model):
                 self.compute_transition_tilted(
                     mprop, vprop, cav_t_m, cav_t_v, alpha)
             grad_hyper, grad_cav = self.sgp_layer.backprop_grads_lvm(
-                mprop, vprop, dmprop, dvprop, 
+                mprop, vprop, dmprop, dvprop,
                 extra_res, cav_tm1_m, cav_tm1_v, alpha=alpha)
             self.sgp_layer.update_factor(
                 [n], alpha, grad_cav, extra_res, decay=decay)
-            
+
             self.update_factor_x_sequential(
                 self.NEXT,
-                grad_cav['mx'], grad_cav['vx'], 
+                grad_cav['mx'], grad_cav['vx'],
                 cav_tm1_m, cav_tm1_v, cav_tm1_1, cav_tm1_2, [n],
                 decay=decay, alpha=alpha)
             self.update_factor_x_sequential(
                 self.PREV,
-                dmt, dvt, 
-                cav_t_m, cav_t_v, cav_t_1, cav_t_2, [n+1],
+                dmt, dvt,
+                cav_t_m, cav_t_v, cav_t_1, cav_t_2, [n + 1],
                 decay=decay, alpha=alpha)
 
     def inference(self, alpha=1.0, no_epochs=10, parallel=True, decay=0):
@@ -930,63 +950,68 @@ class SGPSSM(EP_Model):
                     self.inf_parallel(e, alpha, decay)
                 else:
                     self.inf_sequential(e, alpha, decay)
-                    
+
         except KeyboardInterrupt:
             print 'Caught KeyboardInterrupt ...'
 
     def compute_cavity_x(self, mode, alpha):
         if mode == self.UP:
-            cav_up_1 = self.x_prev_1 + self.x_next_1 + (1-alpha) * self.x_up_1
-            cav_up_2 = self.x_prev_2 + self.x_next_2 + (1-alpha) * self.x_up_2
+            cav_up_1 = self.x_prev_1 + self.x_next_1 + \
+                (1 - alpha) * self.x_up_1
+            cav_up_2 = self.x_prev_2 + self.x_next_2 + \
+                (1 - alpha) * self.x_up_2
             cav_up_1[0, :] += self.x_prior_1
             cav_up_2[0, :] += self.x_prior_2
-            return cav_up_1/(cav_up_2+1e-16), 1.0/(cav_up_2+1e-16), cav_up_1, cav_up_2
+            return cav_up_1 / (cav_up_2 + 1e-16), 1.0 / (cav_up_2 + 1e-16), cav_up_1, cav_up_2
         elif mode == self.PREV:
             idxs = np.arange(1, self.N)
             cav_prev_1 = self.x_up_1[idxs, :] + self.x_next_1[idxs, :]
             cav_prev_2 = self.x_up_2[idxs, :] + self.x_next_2[idxs, :]
-            cav_prev_1 += (1-alpha) * self.x_prev_1[idxs, :]
-            cav_prev_2 += (1-alpha) * self.x_prev_2[idxs, :]
-            return cav_prev_1/cav_prev_2, 1.0/cav_prev_2, cav_prev_1, cav_prev_2
+            cav_prev_1 += (1 - alpha) * self.x_prev_1[idxs, :]
+            cav_prev_2 += (1 - alpha) * self.x_prev_2[idxs, :]
+            return cav_prev_1 / cav_prev_2, 1.0 / cav_prev_2, cav_prev_1, cav_prev_2
         elif mode == self.NEXT:
-            idxs = np.arange(0, self.N-1)
+            idxs = np.arange(0, self.N - 1)
             cav_next_1 = self.x_up_1[idxs, :] + self.x_prev_1[idxs, :]
             cav_next_2 = self.x_up_2[idxs, :] + self.x_prev_2[idxs, :]
-            cav_next_1 += (1-alpha) * self.x_next_1[idxs, :]
-            cav_next_2 += (1-alpha) * self.x_next_2[idxs, :]
-            return cav_next_1/cav_next_2, 1.0/cav_next_2, cav_next_1, cav_next_2
+            cav_next_1 += (1 - alpha) * self.x_next_1[idxs, :]
+            cav_next_2 += (1 - alpha) * self.x_next_2[idxs, :]
+            return cav_next_1 / cav_next_2, 1.0 / cav_next_2, cav_next_1, cav_next_2
         else:
             raise NotImplementedError('unknown mode')
 
     def compute_cavity_x_sequential(self, mode, idxs, alpha):
         if mode == self.UP:
-            cav_up_1 = self.x_prev_1 + self.x_next_1 + (1-alpha) * self.x_up_1
-            cav_up_2 = self.x_prev_2 + self.x_next_2 + (1-alpha) * self.x_up_2
+            cav_up_1 = self.x_prev_1 + self.x_next_1 + \
+                (1 - alpha) * self.x_up_1
+            cav_up_2 = self.x_prev_2 + self.x_next_2 + \
+                (1 - alpha) * self.x_up_2
             cav_up_1[0, :] += self.x_prior_1
             cav_up_2[0, :] += self.x_prior_2
-            return cav_up_1/(cav_up_2+1e-16), 1.0/(cav_up_2+1e-16), cav_up_1, cav_up_2
+            return cav_up_1 / (cav_up_2 + 1e-16), 1.0 / (cav_up_2 + 1e-16), cav_up_1, cav_up_2
         elif mode == self.PREV:
             cav_prev_1 = self.x_up_1[idxs, :] + self.x_next_1[idxs, :]
             cav_prev_2 = self.x_up_2[idxs, :] + self.x_next_2[idxs, :]
-            cav_prev_1 += (1-alpha) * self.x_prev_1[idxs, :]
-            cav_prev_2 += (1-alpha) * self.x_prev_2[idxs, :]
-            return cav_prev_1/cav_prev_2, 1.0/cav_prev_2, cav_prev_1, cav_prev_2
+            cav_prev_1 += (1 - alpha) * self.x_prev_1[idxs, :]
+            cav_prev_2 += (1 - alpha) * self.x_prev_2[idxs, :]
+            return cav_prev_1 / cav_prev_2, 1.0 / cav_prev_2, cav_prev_1, cav_prev_2
         elif mode == self.NEXT:
             cav_next_1 = self.x_up_1[idxs, :] + self.x_prev_1[idxs, :]
             cav_next_2 = self.x_up_2[idxs, :] + self.x_prev_2[idxs, :]
-            cav_next_1 += (1-alpha) * self.x_next_1[idxs, :]
-            cav_next_2 += (1-alpha) * self.x_next_2[idxs, :]
-            return cav_next_1/cav_next_2, 1.0/cav_next_2, cav_next_1, cav_next_2
+            cav_next_1 += (1 - alpha) * self.x_next_1[idxs, :]
+            cav_next_2 += (1 - alpha) * self.x_next_2[idxs, :]
+            return cav_next_1 / cav_next_2, 1.0 / cav_next_2, cav_next_1, cav_next_2
         else:
             raise NotImplementedError('unknown mode')
 
     def compute_transition_tilted(self, m_prop, v_prop, m_t, v_t, alpha):
-        sn2 = np.exp(2*self.sn)
+        sn2 = np.exp(2 * self.sn)
         v_sum = v_t + v_prop + sn2 / alpha
         m_diff = m_t - m_prop
         exp_term = -0.5 * m_diff**2 / v_sum
-        const_term = -0.5 * np.log(2*np.pi*v_sum)
-        alpha_term = 0.5 * (1-alpha) * np.log(2*np.pi*sn2) - 0.5*np.log(alpha)
+        const_term = -0.5 * np.log(2 * np.pi * v_sum)
+        alpha_term = 0.5 * (1 - alpha) * np.log(2 *
+                                                np.pi * sn2) - 0.5 * np.log(alpha)
         logZ = exp_term + const_term + alpha_term
 
         dvt = -0.5 / v_sum + 0.5 * m_diff**2 / v_sum**2
@@ -996,38 +1021,38 @@ class SGPSSM(EP_Model):
         return logZ, dmprop, dvprop, dmt, dvt
 
     def update_factor_x(
-        self, mode, dmcav, dvcav, mcav, vcav, n1cav, n2cav, 
-        decay=0.0, alpha=1.0):
+            self, mode, dmcav, dvcav, mcav, vcav, n1cav, n2cav,
+            decay=0.0, alpha=1.0):
         new_m = mcav + vcav * dmcav
-        new_v = vcav - vcav**2 * (dmcav**2 - 2*dvcav)
+        new_v = vcav - vcav**2 * (dmcav**2 - 2 * dvcav)
         new_n2 = 1.0 / new_v
         new_n1 = new_n2 * new_m
         frac_n2 = new_n2 - n2cav
         frac_n1 = new_n1 - n1cav
         if mode == self.NEXT:
-            idxs = np.arange(0, self.N-1)
+            idxs = np.arange(0, self.N - 1)
             cur_n1 = self.x_next_1[idxs, :]
             cur_n2 = self.x_next_2[idxs, :]
-            n1_new = (1-alpha) * cur_n1 + frac_n1
-            n2_new = (1-alpha) * cur_n2 + frac_n2
-            self.x_next_1[idxs, :] = decay * cur_n1 + (1-decay) * n1_new
-            self.x_next_2[idxs, :] = decay * cur_n2 + (1-decay) * n2_new
+            n1_new = (1 - alpha) * cur_n1 + frac_n1
+            n2_new = (1 - alpha) * cur_n2 + frac_n2
+            self.x_next_1[idxs, :] = decay * cur_n1 + (1 - decay) * n1_new
+            self.x_next_2[idxs, :] = decay * cur_n2 + (1 - decay) * n2_new
         elif mode == self.PREV:
             idxs = np.arange(1, self.N)
             cur_n1 = self.x_prev_1[idxs, :]
             cur_n2 = self.x_prev_2[idxs, :]
-            n1_new = (1-alpha) * cur_n1 + frac_n1
-            n2_new = (1-alpha) * cur_n2 + frac_n2
-            self.x_prev_1[idxs, :] = decay * cur_n1 + (1-decay) * n1_new
-            self.x_prev_2[idxs, :] = decay * cur_n2 + (1-decay) * n2_new
+            n1_new = (1 - alpha) * cur_n1 + frac_n1
+            n2_new = (1 - alpha) * cur_n2 + frac_n2
+            self.x_prev_1[idxs, :] = decay * cur_n1 + (1 - decay) * n1_new
+            self.x_prev_2[idxs, :] = decay * cur_n2 + (1 - decay) * n2_new
         else:
             raise NotImplementedError('unknown mode')
 
     def update_factor_x_sequential(
-        self, mode, dmcav, dvcav, mcav, vcav, n1cav, n2cav, 
-        idxs, decay=0.0, alpha=1.0):
+            self, mode, dmcav, dvcav, mcav, vcav, n1cav, n2cav,
+            idxs, decay=0.0, alpha=1.0):
         new_m = mcav + vcav * dmcav
-        new_v = vcav - vcav**2 * (dmcav**2 - 2*dvcav)
+        new_v = vcav - vcav**2 * (dmcav**2 - 2 * dvcav)
         new_n2 = 1.0 / new_v
         new_n1 = new_n2 * new_m
         frac_n2 = new_n2 - n2cav
@@ -1035,17 +1060,17 @@ class SGPSSM(EP_Model):
         if mode == self.NEXT:
             cur_n1 = self.x_next_1[idxs, :]
             cur_n2 = self.x_next_2[idxs, :]
-            n1_new = (1-alpha) * cur_n1 + frac_n1
-            n2_new = (1-alpha) * cur_n2 + frac_n2
-            self.x_next_1[idxs, :] = decay * cur_n1 + (1-decay) * n1_new
-            self.x_next_2[idxs, :] = decay * cur_n2 + (1-decay) * n2_new
+            n1_new = (1 - alpha) * cur_n1 + frac_n1
+            n2_new = (1 - alpha) * cur_n2 + frac_n2
+            self.x_next_1[idxs, :] = decay * cur_n1 + (1 - decay) * n1_new
+            self.x_next_2[idxs, :] = decay * cur_n2 + (1 - decay) * n2_new
         elif mode == self.PREV:
             cur_n1 = self.x_prev_1[idxs, :]
             cur_n2 = self.x_prev_2[idxs, :]
-            n1_new = (1-alpha) * cur_n1 + frac_n1
-            n2_new = (1-alpha) * cur_n2 + frac_n2
-            self.x_prev_1[idxs, :] = decay * cur_n1 + (1-decay) * n1_new
-            self.x_prev_2[idxs, :] = decay * cur_n2 + (1-decay) * n2_new
+            n1_new = (1 - alpha) * cur_n1 + frac_n1
+            n2_new = (1 - alpha) * cur_n2 + frac_n2
+            self.x_prev_1[idxs, :] = decay * cur_n1 + (1 - decay) * n1_new
+            self.x_prev_2[idxs, :] = decay * cur_n2 + (1 - decay) * n2_new
         else:
             raise NotImplementedError('unknown mode')
 
@@ -1080,7 +1105,7 @@ class SGPSSM(EP_Model):
         for k in range(K):
             fs[:, :, k] = self.sgp_layer.sample(inputs)
         return fs
-        
+
     def predict_y(self, inputs):
         if not self.updated:
             self.sgp_layer.update_posterior()

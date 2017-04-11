@@ -9,6 +9,7 @@ except AttributeError:
     # No line profiler, provide a pass-through version
     def profile(func): return func
 
+
 def chol2inv(chol):
     return spla.cho_solve((chol, False), np.eye(chol.shape[0]))
 
@@ -32,8 +33,9 @@ def PCA_reduce(X, Q):
     W = W[:, :Q]
     return (X - X.mean(0)).dot(W)
 
+
 class ObjectiveWrapper(object):
-    
+
     def __init__(self):
         self.previous_x = None
 
@@ -98,11 +100,11 @@ def adam(func, init_params, callback=None, maxiter=1000,
         f, g = func(x, *args)
         if i % 10 == 0:
             print 'iter %d \t obj %.3f' % (i, f)
-        if callback: callback(x, i, g)
+        if callback:
+            callback(x, i, g)
         m = (1 - b1) * g + b1 * m  # First  moment estimate.
         v = (1 - b2) * (g**2) + b2 * v  # Second moment estimate.
         mhat = m / (1 - b1**(i + 1))    # Bias correction.
         vhat = v / (1 - b2**(i + 1))
         x = x - step_size * mhat / (np.sqrt(vhat) + eps)
     return x
-    

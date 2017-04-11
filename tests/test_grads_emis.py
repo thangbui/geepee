@@ -11,6 +11,7 @@ from .context import flatten_dict, unflatten_dict
 pp = pprint.PrettyPrinter(indent=4)
 np.random.seed(0)
 
+
 def test_gauss_emis():
 
     # generate some datapoints for testing
@@ -23,11 +24,11 @@ def test_gauss_emis():
     model = aep.Gauss_Emis(y_train, Dout, Din)
 
     params = {'C': np.random.randn(Dout, Din),
-        'R': np.random.randn(Dout)}
+              'R': np.random.randn(Dout)}
     mx = np.random.randn(N, Din)
     vx = np.random.rand(N, Din)
     scale = 1
-    
+
     model.update_hypers(params)
     logZ, grad_input, grad_params = model.compute_emission_tilted(
         mx, vx, alpha, scale)
@@ -49,8 +50,8 @@ def test_gauss_emis():
                 mx, vx, alpha, scale)
 
             dab = (logZ1 - logZ2) / eps / 2
-            print ('C a=%d, b=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (a, b, grad_params['C'][a, b], dab, (grad_params['C'][a, b]-dab)/dab))
+            print('C a=%d, b=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (a, b, grad_params['C'][a, b], dab, (grad_params['C'][a, b] - dab) / dab))
 
     # check grad R
     for a in range(Dout):
@@ -67,8 +68,8 @@ def test_gauss_emis():
             mx, vx, alpha, scale)
 
         da = (logZ1 - logZ2) / eps / 2
-        print ('R a=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-            % (a, grad_params['R'][a], da, (grad_params['R'][a]-da)/da))
+        print('R a=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+              % (a, grad_params['R'][a], da, (grad_params['R'][a] - da) / da))
 
     eps = 1e-5
     # check grad mx
@@ -87,8 +88,8 @@ def test_gauss_emis():
                 mx2, vx, alpha, scale)
 
             dab = (logZ1 - logZ2) / eps / 2
-            print ('mx n=%d, d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (a, b, grad_input['mx'][a, b], dab, (grad_input['mx'][a, b]-dab)/dab))
+            print('mx n=%d, d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (a, b, grad_input['mx'][a, b], dab, (grad_input['mx'][a, b] - dab) / dab))
 
     # check grad mx
     for a in range(N):
@@ -106,11 +107,10 @@ def test_gauss_emis():
                 mx, vx2, alpha, scale)
 
             dab = (logZ1 - logZ2) / eps / 2
-            print ('vx n=%d, d=%d, computed=%.5f, numerical=%.5f, diff=%.5f' 
-                % (a, b, grad_input['vx'][a, b], dab, (grad_input['vx'][a, b]-dab)/dab))
+            print('vx n=%d, d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (a, b, grad_input['vx'][a, b], dab, (grad_input['vx'][a, b] - dab) / dab))
 
 
 if __name__ == '__main__':
     for i in range(10):
         test_gauss_emis()
-    

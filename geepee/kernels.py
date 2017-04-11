@@ -4,7 +4,8 @@ from scipy.spatial.distance import cdist
 import weave
 import pdb
 
-# class RBF(): 
+# class RBF():
+
 
 def compute_kernel(lls, lsf, x, z):
     ls = np.exp(lls)
@@ -50,6 +51,7 @@ def compute_psi1(lls, lsf, xmean, xvar, z):
     r2_psi1 = cdist(xmean, z, 'seuclidean', V=lspxvar)**2.0
     psi1 = sf * constterm2 * np.exp(-0.5 * r2_psi1)
     return psi1
+
 
 def compute_psi2(lls, lsf, xmean, xvar, z):
     ls = np.exp(lls)
@@ -164,6 +166,8 @@ def compute_psi2_weave(lls, lsf, xmean, xvar, z):
     return psi2
 
 # @profile
+
+
 def compute_psi_weave(lls2, lsf2, xmean, xvar, z):
     ls2 = np.exp(lls2)
     sf2 = np.exp(lsf2)
@@ -225,6 +229,7 @@ def compute_psi_weave(lls2, lsf2, xmean, xvar, z):
                  type_converters=weave.converters.blitz)
     return psi1, psi2
 
+
 def compute_psi_weave_single(lls, lsf, xmean, xvar, z):
     ls = np.exp(lls)
     sf = np.exp(lsf)
@@ -282,6 +287,7 @@ def compute_psi_weave_single(lls, lsf, xmean, xvar, z):
                             'xmean', 'xvar', 'log_denom_psi1', 'log_denom_psi2'],
                  type_converters=weave.converters.blitz)
     return psi1, psi2
+
 
 def compute_psi_derivatives(dL_dpsi1, psi1, dL_dpsi2, psi2, ls, sf2, xmean, xvar, z):
     _dL_dvar_1, _dL_dl_1, _dL_dZ_1, _dL_dmu_1, _dL_dS_1 = \
@@ -360,6 +366,7 @@ def psi1compDer(dL_dpsi1, _psi1, variance, lengthscale, Z, mu, S):
                                                (S / lengthscale2)[:, None, :]), denom * lengthscale)
 
     return _dL_dvar, _dL_dl, _dL_dZ, _dL_dmu, _dL_dS
+
 
 def kfucompDer(dL_dkfu, kfu, variance, lengthscale, Z, mu, grad_x):
     # here are the "statistics" for psi1
