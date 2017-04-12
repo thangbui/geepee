@@ -51,7 +51,6 @@ def test_gplvm_aep_gaussian():
         params, N_train, alpha=alpha)
     pp.pprint(logZ)
     pp.pprint(params)
-    # pdb.set_trace()
 
     eps = 1e-5
     # check grad ls
@@ -2645,7 +2644,7 @@ def test_gpssm_aep_gaussian():
     D = 3
     Q = 2
     y_train = np.random.randn(N_train, D)
-    lvm = aep.SGPSSM(y_train, Q, M, lik='Gaussian')
+    lvm = aep.SGPSSM_Linear(y_train, Q, M, lik='Gaussian')
 
     # init hypers, inducing points and q(u) params
 
@@ -2772,7 +2771,7 @@ def test_gpssm_aep_gaussian():
               % (d, grad_all['R'][d], dx1_nd, (grad_all['R'][d] - dx1_nd) / dx1_nd))
 
 
-def test_gpssm_aep_gaussian_kink():
+def test_gpssm_linear_aep_gaussian_kink():
 
     def kink_true(x):
         fx = np.zeros(x.shape)
@@ -2812,7 +2811,7 @@ def test_gpssm_aep_gaussian_kink():
     D = 1
     (xtrue, x, y) = kink(N_train, process_noise, obs_noise)
     y_train = np.reshape(y, [y.shape[0], 1])
-    lvm = aep.SGPSSM(y_train, Q, M, lik='Gaussian')
+    lvm = aep.SGPSSM_Linear(y_train, Q, M, lik='Gaussian')
 
     # init hypers, inducing points and q(u) params
     init_params = lvm.init_hypers(y_train)
@@ -2888,6 +2887,42 @@ def test_gpssm_aep_gaussian_kink():
             print('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
                   % (m, k, grad_all['zu'][m, k], dzu_id, (grad_all['zu'][m, k] - dzu_id) / dzu_id))
 
+    # check grad theta_1
+    Dout = lvm.dyn_layer.Dout
+    name = 'eta1_R'
+    for d in range(Dout):
+        for j in range(M * (M + 1) / 2):
+            params1 = copy.deepcopy(params)
+            params1[name][d][j, ] = params1[name][d][j, ] + eps
+            logZ1, grad1 = lvm.objective_function(
+                params1, N_train, alpha=alpha)
+            params2 = copy.deepcopy(params)
+            params2[name][d][j, ] = params2[name][d][j, ] - eps
+            logZ2, grad2 = lvm.objective_function(
+                params2, N_train, alpha=alpha)
+
+            dR_id = (logZ1 - logZ2) / eps / 2
+            print('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (d, j, grad_all[name][d][j], dR_id, (grad_all[name][d][j] - dR_id) / dR_id))
+
+    # check grad theta_2
+    name = 'eta2'
+    for d in range(Dout):
+        for j in range(M):
+            params1 = copy.deepcopy(params)
+            params1[name][d][j, ] = params1[name][d][j, ] + eps
+            logZ1, grad1 = lvm.objective_function(
+                params1, N_train, alpha=alpha)
+            params2 = copy.deepcopy(params)
+            params2[name][d][j, ] = params2[name][d][j, ] - eps
+            logZ2, grad2 = lvm.objective_function(
+                params2, N_train, alpha=alpha)
+
+            dR_id = (logZ1 - logZ2) / eps / 2
+            print('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (d, j, grad_all[name][d][j], dR_id, (grad_all[name][d][j] - dR_id) / dR_id))
+
+
     keys = ['x_factor_1', 'x_factor_2']
     for key in keys:
         # check grad x1
@@ -2938,13 +2973,565 @@ def test_gpssm_aep_gaussian_kink():
               % (d, grad_all['R'][d], dx1_nd, (grad_all['R'][d] - dx1_nd) / dx1_nd))
 
 
+def test_gpssm_gp_aep_gaussian_kink_MM():
+
+    def kink_true(x):
+        fx = np.zeros(x.shape)
+        for t in range(x.shape[0]):
+            xt = x[t]
+            if xt < 4:
+                fx[t] = xt + 1
+            else:
+                fx[t] = -4 * xt + 21
+        return fx
+
+    def kink(T, process_noise, obs_noise, xprev=None):
+        if xprev is None:
+            xprev = np.random.randn()
+        y = np.zeros([T, ])
+        x = np.zeros([T, ])
+        xtrue = np.zeros([T, ])
+        for t in range(T):
+            if xprev < 4:
+                fx = xprev + 1
+            else:
+                fx = -4 * xprev + 21
+
+            xtrue[t] = fx
+            x[t] = fx + np.sqrt(process_noise) * np.random.randn()
+            xprev = x[t]
+            y[t] = x[t] + np.sqrt(obs_noise) * np.random.randn()
+
+        return xtrue, x, y
+
+    N_train = 10
+    process_noise = 0.2
+    obs_noise = 0.1
+    alpha = 0.5
+    M = 4
+    Q = 1
+    D = 1
+    (xtrue, x, y) = kink(N_train, process_noise, obs_noise)
+    y_train = np.reshape(y, [y.shape[0], 1])
+    lvm = aep.SGPSSM_GP(y_train, Q, M, lik='Gaussian')
+
+    # init hypers, inducing points and q(u) params
+    init_params = lvm.init_hypers(y_train)
+    params = init_params.copy()
+    logZ, grad_all = lvm.objective_function(
+        params, N_train, alpha=alpha)
+    pp.pprint(logZ)
+    pp.pprint(params)
+
+    eps = 1e-5
+
+    ###################### TRANSITION LAYER #########################
+    # check grad ls
+    Din_i = lvm.Din
+    name = 'ls_dynamic'
+    for d in range(Din_i):
+        params1 = copy.deepcopy(params)
+        params1[name][d] = params1[name][d] + eps
+        logZ1, grad1 = lvm.objective_function(
+            params1, N_train, alpha=alpha)
+
+        params2 = copy.deepcopy(params)
+        params2[name][d] = params2[name][d] - eps
+        logZ2, grad2 = lvm.objective_function(
+            params2, N_train, alpha=alpha)
+
+        dls_id = (logZ1 - logZ2) / eps / 2
+        print('%s d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+              % (name, d, grad_all[name][d], dls_id, (grad_all[name][d] - dls_id) / dls_id))
+
+    # check grad sf
+    name = 'sf_dynamic'
+    params1 = copy.deepcopy(params)
+    params1[name] = params1[name] + eps
+    logZ1, grad1 = lvm.objective_function(
+        params1, N_train, alpha=alpha)
+    params2 = copy.deepcopy(params)
+    params2[name] = params2[name] - eps
+    logZ2, grad2 = lvm.objective_function(
+        params2, N_train, alpha=alpha)
+
+    dsf_i = (logZ1 - logZ2) / eps / 2
+    print('%s computed=%.5f, numerical=%.5f, diff=%.5f'
+          % (name, grad_all[name], dsf_i, (grad_all[name] - dsf_i) / dsf_i))
+
+    # check grad zu
+    name = 'zu_dynamic'
+    for m in range(M):
+        for k in range(Q):
+            params1 = copy.deepcopy(params)
+            eps1 = 0.0 * params1[name]
+            eps1[m, k] = eps
+            params1[name] = params1[name] + eps1
+            logZ1, grad1 = lvm.objective_function(
+                params1, N_train, alpha=alpha)
+            params2 = copy.deepcopy(params)
+            params2[name] = params2[name] - eps1
+            logZ2, grad2 = lvm.objective_function(
+                params2, N_train, alpha=alpha)
+
+            dzu_id = (logZ1 - logZ2) / eps / 2
+            print('%s m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (name, m, k, grad_all[name][m, k], dzu_id, (grad_all[name][m, k] - dzu_id) / dzu_id))
+
+    # check grad theta_1
+    Dout = lvm.dyn_layer.Dout
+    name = 'eta1_R_dynamic'
+    for d in range(Dout):
+        for j in range(M * (M + 1) / 2):
+            params1 = copy.deepcopy(params)
+            params1[name][d][j, ] = params1[name][d][j, ] + eps
+            logZ1, grad1 = lvm.objective_function(
+                params1, N_train, alpha=alpha)
+            params2 = copy.deepcopy(params)
+            params2[name][d][j, ] = params2[name][d][j, ] - eps
+            logZ2, grad2 = lvm.objective_function(
+                params2, N_train, alpha=alpha)
+
+            dR_id = (logZ1 - logZ2) / eps / 2
+            print('%s d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (name, d, j, grad_all[name][d][j], dR_id, (grad_all[name][d][j] - dR_id) / dR_id))
+
+    # check grad theta_2
+    name = 'eta2_dynamic'
+    for d in range(Dout):
+        for j in range(M):
+            params1 = copy.deepcopy(params)
+            params1[name][d][j, ] = params1[name][d][j, ] + eps
+            logZ1, grad1 = lvm.objective_function(
+                params1, N_train, alpha=alpha)
+            params2 = copy.deepcopy(params)
+            params2[name][d][j, ] = params2[name][d][j, ] - eps
+            logZ2, grad2 = lvm.objective_function(
+                params2, N_train, alpha=alpha)
+
+            dR_id = (logZ1 - logZ2) / eps / 2
+            print('%s d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (name, d, j, grad_all[name][d][j], dR_id, (grad_all[name][d][j] - dR_id) / dR_id))
+
+    ###################### EMISSION LAYER #########################
+    # check grad ls
+    Din_i = lvm.Din
+    name = 'ls_emission'
+    for d in range(Din_i):
+        params1 = copy.deepcopy(params)
+        params1[name][d] = params1[name][d] + eps
+        logZ1, grad1 = lvm.objective_function(
+            params1, N_train, alpha=alpha)
+
+        params2 = copy.deepcopy(params)
+        params2[name][d] = params2[name][d] - eps
+        logZ2, grad2 = lvm.objective_function(
+            params2, N_train, alpha=alpha)
+
+        dls_id = (logZ1 - logZ2) / eps / 2
+        print('%s d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+              % (name, d, grad_all[name][d], dls_id, (grad_all[name][d] - dls_id) / dls_id))
+
+    # check grad sf
+    name = 'sf_emission'
+    params1 = copy.deepcopy(params)
+    params1[name] = params1[name] + eps
+    logZ1, grad1 = lvm.objective_function(
+        params1, N_train, alpha=alpha)
+    params2 = copy.deepcopy(params)
+    params2[name] = params2[name] - eps
+    logZ2, grad2 = lvm.objective_function(
+        params2, N_train, alpha=alpha)
+
+    dsf_i = (logZ1 - logZ2) / eps / 2
+    print('%s computed=%.5f, numerical=%.5f, diff=%.5f'
+          % (name, grad_all[name], dsf_i, (grad_all[name] - dsf_i) / dsf_i))
+
+    # check grad zu
+    name = 'zu_emission'
+    for m in range(M):
+        for k in range(Q):
+            params1 = copy.deepcopy(params)
+            eps1 = 0.0 * params1[name]
+            eps1[m, k] = eps
+            params1[name] = params1[name] + eps1
+            logZ1, grad1 = lvm.objective_function(
+                params1, N_train, alpha=alpha)
+            params2 = copy.deepcopy(params)
+            params2[name] = params2[name] - eps1
+            logZ2, grad2 = lvm.objective_function(
+                params2, N_train, alpha=alpha)
+
+            dzu_id = (logZ1 - logZ2) / eps / 2
+            print('%s m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (name, m, k, grad_all[name][m, k], dzu_id, (grad_all[name][m, k] - dzu_id) / dzu_id))
+
+    # check grad theta_1
+    Dout = lvm.dyn_layer.Dout
+    name = 'eta1_R_emission'
+    for d in range(Dout):
+        for j in range(M * (M + 1) / 2):
+            params1 = copy.deepcopy(params)
+            params1[name][d][j, ] = params1[name][d][j, ] + eps
+            logZ1, grad1 = lvm.objective_function(
+                params1, N_train, alpha=alpha)
+            params2 = copy.deepcopy(params)
+            params2[name][d][j, ] = params2[name][d][j, ] - eps
+            logZ2, grad2 = lvm.objective_function(
+                params2, N_train, alpha=alpha)
+
+            dR_id = (logZ1 - logZ2) / eps / 2
+            print('%s d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (name, d, j, grad_all[name][d][j], dR_id, (grad_all[name][d][j] - dR_id) / dR_id))
+
+    # check grad theta_2
+    name = 'eta2_emission'
+    for d in range(Dout):
+        for j in range(M):
+            params1 = copy.deepcopy(params)
+            params1[name][d][j, ] = params1[name][d][j, ] + eps
+            logZ1, grad1 = lvm.objective_function(
+                params1, N_train, alpha=alpha)
+            params2 = copy.deepcopy(params)
+            params2[name][d][j, ] = params2[name][d][j, ] - eps
+            logZ2, grad2 = lvm.objective_function(
+                params2, N_train, alpha=alpha)
+
+            dR_id = (logZ1 - logZ2) / eps / 2
+            print('%s d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (name, d, j, grad_all[name][d][j], dR_id, (grad_all[name][d][j] - dR_id) / dR_id))
+
+    ############## LATENT VARIABLES and NOISE ##################
+    keys = ['x_factor_1', 'x_factor_2']
+    for key in keys:
+        # check grad x1
+        for n in range(N_train):
+            for d in range(Q):
+                params1 = copy.deepcopy(params)
+                params1[key][n, d] = params1[key][n, d] + eps
+                logZ1, grad1 = lvm.objective_function(
+                    params1, N_train, alpha=alpha)
+                params2 = copy.deepcopy(params)
+                params2[key][n, d] = params2[key][n, d] - eps
+                logZ2, grad2 = lvm.objective_function(
+                    params2, N_train, alpha=alpha)
+
+                dx1_nd = (logZ1 - logZ2) / eps / 2
+                print('%s n=%d, d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                      % (key, n, d, grad_all[key][n, d], dx1_nd, (grad_all[key][n, d] - dx1_nd) / dx1_nd))
+
+    # check grad sn
+    for suffix in ['', '_emission']:
+        name = 'sn' + suffix
+        params1 = copy.deepcopy(params)
+        params1[name] = params1[name] + eps
+        logZ1, grad1 = lvm.objective_function(
+            params1, N_train, alpha=alpha)
+        params2 = copy.deepcopy(params)
+        params2[name] = params2[name] - eps
+        logZ2, grad2 = lvm.objective_function(
+            params2, N_train, alpha=alpha)
+
+        dsn_i = (logZ1 - logZ2) / eps / 2
+        print('sn %s computed=%.5f, numerical=%.5f, diff=%.5f'
+              % (suffix, grad_all[name], dsn_i, (grad_all[name] - dsn_i) / dsn_i))
+
+
+def test_gpssm_gp_aep_gaussian_kink_MC():
+
+    def kink_true(x):
+        fx = np.zeros(x.shape)
+        for t in range(x.shape[0]):
+            xt = x[t]
+            if xt < 4:
+                fx[t] = xt + 1
+            else:
+                fx[t] = -4 * xt + 21
+        return fx
+
+    def kink(T, process_noise, obs_noise, xprev=None):
+        if xprev is None:
+            xprev = np.random.randn()
+        y = np.zeros([T, ])
+        x = np.zeros([T, ])
+        xtrue = np.zeros([T, ])
+        for t in range(T):
+            if xprev < 4:
+                fx = xprev + 1
+            else:
+                fx = -4 * xprev + 21
+
+            xtrue[t] = fx
+            x[t] = fx + np.sqrt(process_noise) * np.random.randn()
+            xprev = x[t]
+            y[t] = x[t] + np.sqrt(obs_noise) * np.random.randn()
+
+        return xtrue, x, y
+
+    N_train = 10
+    process_noise = 0.2
+    obs_noise = 0.1
+    alpha = 0.5
+    M = 4
+    Q = 1
+    D = 1
+    (xtrue, x, y) = kink(N_train, process_noise, obs_noise)
+    y_train = np.reshape(y, [y.shape[0], 1])
+    lvm = aep.SGPSSM_GP(y_train, Q, M, lik='Gaussian')
+
+    # init hypers, inducing points and q(u) params
+    init_params = lvm.init_hypers(y_train)
+    params = init_params.copy()
+    np.random.seed(42)
+    logZ, grad_all = lvm.objective_function(
+        params, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+    pp.pprint(logZ)
+    pp.pprint(params)
+
+    eps = 1e-5
+
+    ###################### TRANSITION LAYER #########################
+    # check grad ls
+    Din_i = lvm.Din
+    name = 'ls_dynamic'
+    for d in range(Din_i):
+        params1 = copy.deepcopy(params)
+        params1[name][d] = params1[name][d] + eps
+        np.random.seed(42)
+        logZ1, grad1 = lvm.objective_function(
+            params1, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+
+        params2 = copy.deepcopy(params)
+        params2[name][d] = params2[name][d] - eps
+        np.random.seed(42)
+        logZ2, grad2 = lvm.objective_function(
+            params2, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+
+        dls_id = (logZ1 - logZ2) / eps / 2
+        print('%s d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+              % (name, d, grad_all[name][d], dls_id, (grad_all[name][d] - dls_id) / dls_id))
+
+    # check grad sf
+    name = 'sf_dynamic'
+    params1 = copy.deepcopy(params)
+    params1[name] = params1[name] + eps
+    np.random.seed(42)
+    logZ1, grad1 = lvm.objective_function(
+        params1, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+    params2 = copy.deepcopy(params)
+    params2[name] = params2[name] - eps
+    np.random.seed(42)
+    logZ2, grad2 = lvm.objective_function(
+        params2, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+
+    dsf_i = (logZ1 - logZ2) / eps / 2
+    print('%s computed=%.5f, numerical=%.5f, diff=%.5f'
+          % (name, grad_all[name], dsf_i, (grad_all[name] - dsf_i) / dsf_i))
+
+    # check grad zu
+    name = 'zu_dynamic'
+    for m in range(M):
+        for k in range(Q):
+            params1 = copy.deepcopy(params)
+            eps1 = 0.0 * params1[name]
+            eps1[m, k] = eps
+            params1[name] = params1[name] + eps1
+            np.random.seed(42)
+            logZ1, grad1 = lvm.objective_function(
+                params1, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+            params2 = copy.deepcopy(params)
+            params2[name] = params2[name] - eps1
+            np.random.seed(42)
+            logZ2, grad2 = lvm.objective_function(
+                params2, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+
+            dzu_id = (logZ1 - logZ2) / eps / 2
+            print('%s m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (name, m, k, grad_all[name][m, k], dzu_id, (grad_all[name][m, k] - dzu_id) / dzu_id))
+
+    # check grad theta_1
+    Dout = lvm.dyn_layer.Dout
+    name = 'eta1_R_dynamic'
+    for d in range(Dout):
+        for j in range(M * (M + 1) / 2):
+            params1 = copy.deepcopy(params)
+            params1[name][d][j, ] = params1[name][d][j, ] + eps
+            np.random.seed(42)
+            logZ1, grad1 = lvm.objective_function(
+                params1, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+            params2 = copy.deepcopy(params)
+            params2[name][d][j, ] = params2[name][d][j, ] - eps
+            np.random.seed(42)
+            logZ2, grad2 = lvm.objective_function(
+                params2, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+
+            dR_id = (logZ1 - logZ2) / eps / 2
+            print('%s d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (name, d, j, grad_all[name][d][j], dR_id, (grad_all[name][d][j] - dR_id) / dR_id))
+
+    # check grad theta_2
+    name = 'eta2_dynamic'
+    for d in range(Dout):
+        for j in range(M):
+            params1 = copy.deepcopy(params)
+            params1[name][d][j, ] = params1[name][d][j, ] + eps
+            np.random.seed(42)
+            logZ1, grad1 = lvm.objective_function(
+                params1, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+            params2 = copy.deepcopy(params)
+            params2[name][d][j, ] = params2[name][d][j, ] - eps
+            np.random.seed(42)
+            logZ2, grad2 = lvm.objective_function(
+                params2, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+
+            dR_id = (logZ1 - logZ2) / eps / 2
+            print('%s d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (name, d, j, grad_all[name][d][j], dR_id, (grad_all[name][d][j] - dR_id) / dR_id))
+
+    ###################### EMISSION LAYER #########################
+    # check grad ls
+    Din_i = lvm.Din
+    name = 'ls_emission'
+    for d in range(Din_i):
+        params1 = copy.deepcopy(params)
+        params1[name][d] = params1[name][d] + eps
+        np.random.seed(42)
+        logZ1, grad1 = lvm.objective_function(
+            params1, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+
+        params2 = copy.deepcopy(params)
+        params2[name][d] = params2[name][d] - eps
+        np.random.seed(42)
+        logZ2, grad2 = lvm.objective_function(
+            params2, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+
+        dls_id = (logZ1 - logZ2) / eps / 2
+        print('%s d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+              % (name, d, grad_all[name][d], dls_id, (grad_all[name][d] - dls_id) / dls_id))
+
+    # check grad sf
+    name = 'sf_emission'
+    params1 = copy.deepcopy(params)
+    params1[name] = params1[name] + eps
+    np.random.seed(42)
+    logZ1, grad1 = lvm.objective_function(
+        params1, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+    params2 = copy.deepcopy(params)
+    params2[name] = params2[name] - eps
+    np.random.seed(42)
+    logZ2, grad2 = lvm.objective_function(
+        params2, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+
+    dsf_i = (logZ1 - logZ2) / eps / 2
+    print('%s computed=%.5f, numerical=%.5f, diff=%.5f'
+          % (name, grad_all[name], dsf_i, (grad_all[name] - dsf_i) / dsf_i))
+
+    # check grad zu
+    name = 'zu_emission'
+    for m in range(M):
+        for k in range(Q):
+            params1 = copy.deepcopy(params)
+            eps1 = 0.0 * params1[name]
+            eps1[m, k] = eps
+            params1[name] = params1[name] + eps1
+            np.random.seed(42)
+            logZ1, grad1 = lvm.objective_function(
+                params1, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+            params2 = copy.deepcopy(params)
+            params2[name] = params2[name] - eps1
+            np.random.seed(42)
+            logZ2, grad2 = lvm.objective_function(
+                params2, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+
+            dzu_id = (logZ1 - logZ2) / eps / 2
+            print('%s m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (name, m, k, grad_all[name][m, k], dzu_id, (grad_all[name][m, k] - dzu_id) / dzu_id))
+
+    # check grad theta_1
+    Dout = lvm.dyn_layer.Dout
+    name = 'eta1_R_emission'
+    for d in range(Dout):
+        for j in range(M * (M + 1) / 2):
+            params1 = copy.deepcopy(params)
+            params1[name][d][j, ] = params1[name][d][j, ] + eps
+            np.random.seed(42)
+            logZ1, grad1 = lvm.objective_function(
+                params1, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+            params2 = copy.deepcopy(params)
+            params2[name][d][j, ] = params2[name][d][j, ] - eps
+            np.random.seed(42)
+            logZ2, grad2 = lvm.objective_function(
+                params2, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+
+            dR_id = (logZ1 - logZ2) / eps / 2
+            print('%s d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (name, d, j, grad_all[name][d][j], dR_id, (grad_all[name][d][j] - dR_id) / dR_id))
+
+    # check grad theta_2
+    name = 'eta2_emission'
+    for d in range(Dout):
+        for j in range(M):
+            params1 = copy.deepcopy(params)
+            params1[name][d][j, ] = params1[name][d][j, ] + eps
+            np.random.seed(42)
+            logZ1, grad1 = lvm.objective_function(
+                params1, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+            params2 = copy.deepcopy(params)
+            params2[name][d][j, ] = params2[name][d][j, ] - eps
+            np.random.seed(42)
+            logZ2, grad2 = lvm.objective_function(
+                params2, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+
+            dR_id = (logZ1 - logZ2) / eps / 2
+            print('%s d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (name, d, j, grad_all[name][d][j], dR_id, (grad_all[name][d][j] - dR_id) / dR_id))
+
+    ############## LATENT VARIABLES and NOISE ##################
+    keys = ['x_factor_1', 'x_factor_2']
+    for key in keys:
+        # check grad x1
+        for n in range(N_train):
+            for d in range(Q):
+                params1 = copy.deepcopy(params)
+                params1[key][n, d] = params1[key][n, d] + eps
+                np.random.seed(42)
+                logZ1, grad1 = lvm.objective_function(
+                    params1, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+                params2 = copy.deepcopy(params)
+                params2[key][n, d] = params2[key][n, d] - eps
+                np.random.seed(42)
+                logZ2, grad2 = lvm.objective_function(
+                    params2, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+
+                dx1_nd = (logZ1 - logZ2) / eps / 2
+                print('%s n=%d, d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                      % (key, n, d, grad_all[key][n, d], dx1_nd, (grad_all[key][n, d] - dx1_nd) / dx1_nd))
+
+    # check grad sn
+    for suffix in ['', '_emission']:
+        name = 'sn' + suffix
+        params1 = copy.deepcopy(params)
+        params1[name] = params1[name] + eps
+        np.random.seed(42)
+        logZ1, grad1 = lvm.objective_function(
+            params1, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+        params2 = copy.deepcopy(params)
+        params2[name] = params2[name] - eps
+        np.random.seed(42)
+        logZ2, grad2 = lvm.objective_function(
+            params2, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+
+        dsn_i = (logZ1 - logZ2) / eps / 2
+        print('sn %s computed=%.5f, numerical=%.5f, diff=%.5f'
+              % (suffix, grad_all[name], dsn_i, (grad_all[name] - dsn_i) / dsn_i))
+
 if __name__ == '__main__':
     # test_gplvm_aep_gaussian()
     # test_gplvm_aep_probit()
     # test_gplvm_aep_gaussian_scipy()
     # test_gplvm_aep_probit_scipy()
 
-    test_gplvm_aep_gaussian_MC()
+    # test_gplvm_aep_gaussian_MC()
 
     # plot_gplvm_aep_probit_stochastic()
     # plot_gplvm_aep_gaussian_stochastic()
@@ -2977,5 +3564,6 @@ if __name__ == '__main__':
     # test_dgpr_aep_gaussian_stochastic()
 
     # test_gpssm_aep_gaussian()
-    # np.random.seed(42)
-    # test_gpssm_aep_gaussian_kink()
+    # test_gpssm_linear_aep_gaussian_kink()
+    test_gpssm_gp_aep_gaussian_kink_MM()
+    test_gpssm_gp_aep_gaussian_kink_MC()

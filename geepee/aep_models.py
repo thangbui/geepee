@@ -1428,6 +1428,8 @@ class SGPLVM(AEP_Model):
             NotImplementedError: Description
         """
         N = self.N
+        sgp_layer = self.sgp_layer
+        lik_layer = self.lik_layer
         if mb_size == N:
             idxs = np.arange(N)
             yb = self.y_train
@@ -1457,33 +1459,33 @@ class SGPLVM(AEP_Model):
         # prop_mode = PROP_MC
         if prop_mode == PROP_MM:
             # propagate x cavity forward
-            mout, vout, psi1, psi2 = self.sgp_layer.forward_prop_thru_cav(
+            mout, vout, psi1, psi2 = sgp_layer.forward_prop_thru_cav(
                 mx, vx)
             # compute logZ and gradients
             logZ, dm, dv = self.lik_layer.compute_log_Z(mout, vout, yb, alpha)
             logZ_scale = scale_logZ * logZ
             dm_scale = scale_logZ * dm
             dv_scale = scale_logZ * dv
-            sgp_grad_hyper, sgp_grad_input = self.sgp_layer.backprop_grads_lvm_mm(
+            sgp_grad_hyper, sgp_grad_input = sgp_layer.backprop_grads_lvm_mm(
                 mout, vout, dm_scale, dv_scale, psi1, psi2, mx, vx, alpha)
             lik_grad_hyper = self.lik_layer.backprop_grads(
                 mout, vout, dm, dv, alpha, scale_logZ)
         elif prop_mode == PROP_MC:
             # propagate x cavity forward
-            res, res_s = self.sgp_layer.forward_prop_thru_cav(mx, vx, PROP_MC)
+            res, res_s = sgp_layer.forward_prop_thru_cav(mx, vx, PROP_MC)
             m, v, kfu, x, eps = res[0], res[1], res[2], res[3], res[4]
-            m_s, v_s, kfu_s, x_s, eps_s = res_s[
-                0], res_s[1], res_s[2], res_s[3], res_s[4]
+            m_s, v_s, kfu_s, x_s, eps_s = (
+                res_s[0], res_s[1], res_s[2], res_s[3], res_s[4])
             # compute logZ and gradients
-            logZ, dm, dv = self.lik_layer.compute_log_Z(m, v, yb, alpha)
+            logZ, dm, dv = lik_layer.compute_log_Z(m, v, yb, alpha)
             logZ_scale = scale_logZ * logZ
             dm_scale = scale_logZ * dm
             dv_scale = scale_logZ * dv
-            sgp_grad_hyper, dx = self.sgp_layer.backprop_grads_lvm_mc(
+            sgp_grad_hyper, dx = sgp_layer.backprop_grads_lvm_mc(
                 m_s, v_s, dm_scale, dv_scale, kfu_s, x_s, alpha)
-            sgp_grad_input = self.sgp_layer.backprop_grads_reparam(
+            sgp_grad_input = sgp_layer.backprop_grads_reparam(
                 dx, mx, vx, eps)
-            lik_grad_hyper = self.lik_layer.backprop_grads(
+            lik_grad_hyper = lik_layer.backprop_grads(
                 m, v, dm, dv, alpha, scale_logZ)
         else:
             raise NotImplementedError('propagation mode not implemented')
@@ -3622,8 +3624,14 @@ class SGPSSM_GP(AEP_Model):
 
         Returns:
             TYPE: Description
+
+        Raises:
+            NotImplementedError: Description
         """
         N = self.N
+        dyn_layer = self.dyn_layer
+        emi_layer = self.emi_layer
+        lik_layer = self.lik_layer
         # TODO: deal with minibatch here
         batch_size_dyn = (N - 1)
         scale_logZ_dyn = - 1.0 / alpha
@@ -3632,10 +3640,10 @@ class SGPSSM_GP(AEP_Model):
 
         # update model with new hypers
         self.update_hypers(params)
-        self.dyn_layer.compute_cavity(alpha)
-        self.emi_layer.compute_cavity(alpha)
+        dyn_layer.compute_cavity(alpha)
+        emi_layer.compute_cavity(alpha)
         cav_m, cav_v, cav_1, cav_2 = self.compute_cavity_x(alpha)
-        # deal with the transition/dynamic factors here
+        # compute cavity factors for the latent variables
         idxs_prev = np.arange(1, self.N)
         cav_t_m, cav_t_v = cav_m[idxs_prev, :], cav_v[idxs_prev, :]
         idxs_next = np.arange(0, self.N - 1)
@@ -3646,15 +3654,7 @@ class SGPSSM_GP(AEP_Model):
                 (cav_tm1_v, np.zeros((self.N - 1, self.Dcon))))
         else:
             cav_tm1_mc, cav_tm1_vc = cav_tm1_m, cav_tm1_v
-        mprop, vprop, psi1, psi2 = self.dyn_layer.forward_prop_thru_cav(
-            cav_tm1_mc, cav_tm1_vc)
-        logZ_dyn, dmprop, dvprop, dmt, dvt, dsn = self.compute_transition_tilted(
-            mprop, vprop, cav_t_m, cav_t_v, alpha, scale_logZ_dyn)
-        sgp_grad_hyper, sgp_grad_input = self.dyn_layer.backprop_grads_lvm_mm(
-            mprop, vprop, dmprop, dvprop,
-            psi1, psi2, cav_tm1_mc, cav_tm1_vc, alpha)
 
-        # deal with the emission factors here
         idxs_up = np.arange(0, self.N)
         cav_up_m, cav_up_v = cav_m[idxs_up, :], cav_v[idxs_up, :]
         if self.Dcon > 0:
@@ -3662,17 +3662,64 @@ class SGPSSM_GP(AEP_Model):
             cav_up_vc = np.hstack((cav_up_v, np.zeros((self.N, self.Dcon))))
         else:
             cav_up_mc, cav_up_vc = cav_up_m, cav_up_v
-        mout, vout, psi1, psi2 = self.emi_layer.forward_prop_thru_cav(
-            cav_up_mc, cav_up_vc)
-        logZ_emi, dm, dv = self.lik_layer.compute_log_Z(
-            mout, vout, self.y_train, alpha)
-        logZ_emi = scale_logZ_emi * logZ_emi
-        dm_scale = scale_logZ_emi * dm
-        dv_scale = scale_logZ_emi * dv
-        emi_grad_hyper, emi_grad_input = self.emi_layer.backprop_grads_lvm_mm(
-            mout, vout, dm_scale, dv_scale, psi1, psi2, cav_up_mc, cav_up_vc, alpha)
-        lik_grad_hyper = self.lik_layer.backprop_grads(
-            mout, vout, dm, dv, alpha, logZ_emi)
+
+        if prop_mode == PROP_MM:
+            # deal with the transition/dynamic factors here
+            mprop, vprop, psi1, psi2 = dyn_layer.forward_prop_thru_cav(
+                cav_tm1_mc, cav_tm1_vc)
+            logZ_dyn, dmprop, dvprop, dmt, dvt, dsn = self.compute_transition_tilted(
+                mprop, vprop, cav_t_m, cav_t_v, alpha, scale_logZ_dyn)
+            sgp_grad_hyper, sgp_grad_input = dyn_layer.backprop_grads_lvm_mm(
+                mprop, vprop, dmprop, dvprop,
+                psi1, psi2, cav_tm1_mc, cav_tm1_vc, alpha)
+
+            # deal with the emission factors here
+            mout, vout, psi1, psi2 = emi_layer.forward_prop_thru_cav(
+                cav_up_mc, cav_up_vc)
+            logZ_emi, dm, dv = lik_layer.compute_log_Z(
+                mout, vout, self.y_train, alpha)
+            logZ_emi = scale_logZ_emi * logZ_emi
+            dm_scale = scale_logZ_emi * dm
+            dv_scale = scale_logZ_emi * dv
+            emi_grad_hyper, emi_grad_input = emi_layer.backprop_grads_lvm_mm(
+                mout, vout, dm_scale, dv_scale, psi1, psi2,
+                cav_up_mc, cav_up_vc, alpha)
+            lik_grad_hyper = lik_layer.backprop_grads(
+                mout, vout, dm, dv, alpha, scale_logZ_emi)
+        elif prop_mode == PROP_MC:
+            # deal with the transition/dynamic factors here
+            res, res_s = dyn_layer.forward_prop_thru_cav(
+                cav_tm1_mc, cav_tm1_vc, PROP_MC)
+            m, v, kfu, x, eps = res[0], res[1], res[2], res[3], res[4]
+            m_s, v_s, kfu_s, x_s, eps_s = (
+                res_s[0], res_s[1], res_s[2], res_s[3], res_s[4])
+            logZ_dyn, dmprop, dvprop, dmt, dvt, dsn = self.compute_transition_tilted(
+                m, v, cav_t_m, cav_t_v, alpha, scale_logZ_dyn)
+            sgp_grad_hyper, dx = dyn_layer.backprop_grads_lvm_mc(
+                m_s, v_s, dmprop, dvprop, kfu_s, x_s, alpha)
+            sgp_grad_input = dyn_layer.backprop_grads_reparam(
+                dx, cav_tm1_mc, cav_tm1_vc, eps)
+
+            # deal with the emission factors here
+            res, res_s = emi_layer.forward_prop_thru_cav(
+                cav_up_mc, cav_up_vc, PROP_MC)
+            m, v, kfu, x, eps = res[0], res[1], res[2], res[3], res[4]
+            m_s, v_s, kfu_s, x_s, eps_s = (
+                res_s[0], res_s[1], res_s[2], res_s[3], res_s[4])
+            # compute logZ and gradients
+            logZ_emi, dm, dv = lik_layer.compute_log_Z(
+                m, v, self.y_train, alpha)
+            logZ_emi = scale_logZ_emi * logZ_emi
+            dm_scale = scale_logZ_emi * dm
+            dv_scale = scale_logZ_emi * dv
+            emi_grad_hyper, dx = emi_layer.backprop_grads_lvm_mc(
+                m_s, v_s, dm_scale, dv_scale, kfu_s, x_s, alpha)
+            emi_grad_input = emi_layer.backprop_grads_reparam(
+                dx, cav_up_mc, cav_up_vc, eps)
+            lik_grad_hyper = lik_layer.backprop_grads(
+                m, v, dm, dv, alpha, scale_logZ_emi)
+        else:
+            raise NotImplementedError('propgation mode not implemented')
 
         # collect emission and GP hyperparameters
         grad_all = {'sn': dsn}
@@ -3707,8 +3754,8 @@ class SGPSSM_GP(AEP_Model):
             grad_all[key] = grads_x[key]
 
         # compute objective
-        dyn_contrib = self.dyn_layer.compute_phi(alpha)
-        emi_contrib = self.emi_layer.compute_phi(alpha)
+        dyn_contrib = dyn_layer.compute_phi(alpha)
+        emi_contrib = emi_layer.compute_phi(alpha)
         phi_prior_x = self.compute_phi_prior_x()
         phi_poste_x = self.compute_phi_posterior_x(alpha)
         phi_cavity_x = self.compute_phi_cavity_x(alpha)
@@ -3848,17 +3895,36 @@ class SGPSSM_GP(AEP_Model):
         alpha_term = 0.5 * (1 - alpha) * np.log(2 *
                                                 np.pi * sn2) - 0.5 * np.log(alpha)
         logZ = exp_term + const_term + alpha_term
-        logZ = np.sum(logZ)
+        if m_prop.ndim == 2:
+            logZ = scale * np.sum(logZ)
+            dvt = scale * (-0.5 / v_sum + 0.5 * m_diff**2 / v_sum**2)
+            dvprop = dvt
+            dmt = scale * (-m_diff / v_sum)
+            dmprop = -dmt
+            dv_sum = np.sum(dvt)
+            dsn = dv_sum * 2 * sn2 / alpha + \
+                scale * m_prop.shape[0] * self.Din * (1 - alpha)
+        elif m_prop.ndim == 3:
+            logZ_max = np.max(logZ, axis=0)
+            exp_term = np.exp(logZ - logZ_max)
+            sumexp = np.sum(exp_term, axis=0)
+            logZ_lse = logZ_max + np.log(sumexp)
+            logZ_lse -= np.log(m_prop.shape[0])
+            logZ = scale * np.sum(logZ_lse)
+            dlogZ = scale * exp_term / sumexp
+            dlogZ_dm = dlogZ * m_diff / v_sum
+            dlogZ_dv = dlogZ * (-0.5 / v_sum + 0.5 * m_diff**2 / v_sum**2)
+            dmt = -np.sum(dlogZ_dm, axis=0)
+            dmprop = dlogZ_dm
+            dvt = np.sum(dlogZ_dv, axis=0)
+            dvprop = dlogZ_dv
+            dv_sum = np.sum(dlogZ_dv)
+            dsn = dv_sum * 2 * sn2 / alpha + \
+                scale * m_prop.shape[1] * self.Din * (1 - alpha)
+        else:
+            raise RuntimeError('invalid ndim, ndim=%d' % mout.ndim)
 
-        dvt = -0.5 / v_sum + 0.5 * m_diff**2 / v_sum**2
-        dvprop = -0.5 / v_sum + 0.5 * m_diff**2 / v_sum**2
-        dmt = -m_diff / v_sum
-        dmprop = m_diff / v_sum
-
-        dv_sum = np.sum(dvt)
-        dsn = dv_sum * 2 * sn2 / alpha + \
-            m_prop.shape[0] * self.Din * (1 - alpha)
-        return scale * logZ, scale * dmprop, scale * dvprop, scale * dmt, scale * dvt, scale * dsn
+        return logZ, dmprop, dvprop, dmt, dvt, dsn
 
     def compute_cavity_x(self, alpha):
         """Summary
