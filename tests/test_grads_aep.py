@@ -2922,7 +2922,6 @@ def test_gpssm_linear_aep_gaussian_kink():
             print('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
                   % (d, j, grad_all[name][d][j], dR_id, (grad_all[name][d][j] - dR_id) / dR_id))
 
-
     keys = ['x_factor_1', 'x_factor_2']
     for key in keys:
         # check grad x1
