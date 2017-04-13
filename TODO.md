@@ -1,6 +1,49 @@
+## daily todos
+- [ ] merge GPSSMs with Linear emission and GP emission
+- [ ] make sure that GPSSMs init and learning is robust on many simple 1-D problems
+- [ ] cleaned up GPSSM examples
+- [ ] stochastic optimisation for GPSSMs and GPLVMs
+
+## GOALS
+
+GP regression/classification
++----------+-------+------+----------+
+| Method   | Batch | Stoc | Examples |
++----------+-------+------+----------+
+| BB-alpha |       |      |          |
++----------+-------+------+----------+
+| PEP      |       |      |          |
++----------+-------+------+----------+
+| VFE      |       |      |          |
++----------+-------+------+----------+
+
+GP LVM
++----------+-------+------+-----------------+-----------+---------------+----------+
+| Method   | Batch | Stoc | Moment-matching | Simple MC | Linearisation | Examples |
++----------+-------+------+-----------------+-----------+---------------+----------+
+| BB-alpha |       |      |                 |           |               |          |
++----------+-------+------+-----------------+-----------+---------------+----------+
+| PEP      |       |      |                 |           |               |          |
++----------+-------+------+-----------------+-----------+---------------+----------+
+| VFE      |       |      |                 |           |               |          |
++----------+-------+------+-----------------+-----------+---------------+----------+
+
+GP SSM
++----------+-------+------+----+-----------+-----+---------+--------+---------------+----------+
+| Method   | Batch | Stoc | MM | Simple MC | Lin | Lin emi | GP emi | Non-Gauss emi | Examples |
++----------+-------+------+----+-----------+-----+---------+--------+---------------+----------+
+| BB-alpha |       |      |    |           |     |         |        |               |          |
++----------+-------+------+----+-----------+-----+---------+--------+---------------+----------+
+| PEP      |       |      |    |           |     |         |        |               |          |
++----------+-------+------+----+-----------+-----+---------+--------+---------------+----------+
+| VFE      |       |      |    |           |     |         |        |               |          |
++----------+-------+------+----+-----------+-----+---------+--------+---------------+----------+
+
+Deep GPs should handle everything above
+
 ## General
 
-- [ ] save/load models: is saving parameters enough?
+- [x] save/load models: is saving parameters enough?
 - [x] remove for loops in aep_models update_posterior, compute_cavity
 - [ ] separate parameters for different output dimensions
 - [ ] stochastic optimisations for all models, 

@@ -11,7 +11,7 @@ import matplotlib.pylab as plt
 
 from .context import aep
 from .context import flatten_dict, unflatten_dict
-
+from .context import PROP_MC
 
 pp = pprint.PrettyPrinter(indent=4)
 np.random.seed(42)
@@ -344,7 +344,7 @@ def test_gplvm_aep_gaussian_MC():
     params = init_params.copy()
     np.random.seed(42)
     logZ, grad_all = lvm.objective_function(
-        params, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+        params, N_train, alpha=alpha, prop_mode=PROP_MC)
     pp.pprint(logZ)
     pp.pprint(params)
     # pdb.set_trace()
@@ -357,13 +357,13 @@ def test_gplvm_aep_gaussian_MC():
         params1['ls'][d] = params1['ls'][d] + eps
         np.random.seed(42)
         logZ1, grad1 = lvm.objective_function(
-            params1, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+            params1, N_train, alpha=alpha, prop_mode=PROP_MC)
 
         params2 = copy.deepcopy(params)
         params2['ls'][d] = params2['ls'][d] - eps
         np.random.seed(42)
         logZ2, grad2 = lvm.objective_function(
-            params2, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+            params2, N_train, alpha=alpha, prop_mode=PROP_MC)
 
         dls_id = (logZ1 - logZ2) / eps / 2
         # print logZ1, logZ2
@@ -375,12 +375,12 @@ def test_gplvm_aep_gaussian_MC():
     params1['sf'] = params1['sf'] + eps
     np.random.seed(42)
     logZ1, grad1 = lvm.objective_function(
-        params1, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+        params1, N_train, alpha=alpha, prop_mode=PROP_MC)
     params2 = copy.deepcopy(params)
     params2['sf'] = params2['sf'] - eps
     np.random.seed(42)
     logZ2, grad2 = lvm.objective_function(
-        params2, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+        params2, N_train, alpha=alpha, prop_mode=PROP_MC)
 
     dsf_i = (logZ1 - logZ2) / eps / 2
     print('sf computed=%.5f, numerical=%.5f, diff=%.5f'
@@ -391,12 +391,12 @@ def test_gplvm_aep_gaussian_MC():
     params1['sn'] = params1['sn'] + eps
     np.random.seed(42)
     logZ1, grad1 = lvm.objective_function(
-        params1, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+        params1, N_train, alpha=alpha, prop_mode=PROP_MC)
     params2 = copy.deepcopy(params)
     params2['sn'] = params2['sn'] - eps
     np.random.seed(42)
     logZ2, grad2 = lvm.objective_function(
-        params2, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+        params2, N_train, alpha=alpha, prop_mode=PROP_MC)
 
     dsn_i = (logZ1 - logZ2) / eps / 2
     print('sn computed=%.5f, numerical=%.5f, diff=%.5f'
@@ -414,12 +414,12 @@ def test_gplvm_aep_gaussian_MC():
             params1['zu'] = params1['zu'] + eps1
             np.random.seed(42)
             logZ1, grad1 = lvm.objective_function(
-                params1, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+                params1, N_train, alpha=alpha, prop_mode=PROP_MC)
             params2 = copy.deepcopy(params)
             params2['zu'] = params2['zu'] - eps1
             np.random.seed(42)
             logZ2, grad2 = lvm.objective_function(
-                params2, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+                params2, N_train, alpha=alpha, prop_mode=PROP_MC)
 
             dzu_id = (logZ1 - logZ2) / eps / 2
             print('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
@@ -432,12 +432,12 @@ def test_gplvm_aep_gaussian_MC():
             params1['eta1_R'][d][j, ] = params1['eta1_R'][d][j, ] + eps
             np.random.seed(42)
             logZ1, grad1 = lvm.objective_function(
-                params1, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+                params1, N_train, alpha=alpha, prop_mode=PROP_MC)
             params2 = copy.deepcopy(params)
             params2['eta1_R'][d][j, ] = params2['eta1_R'][d][j, ] - eps
             np.random.seed(42)
             logZ2, grad2 = lvm.objective_function(
-                params2, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+                params2, N_train, alpha=alpha, prop_mode=PROP_MC)
 
             dR_id = (logZ1 - logZ2) / eps / 2
             print('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
@@ -450,12 +450,12 @@ def test_gplvm_aep_gaussian_MC():
             params1['eta2'][d][j, ] = params1['eta2'][d][j, ] + eps
             np.random.seed(42)
             logZ1, grad1 = lvm.objective_function(
-                params1, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+                params1, N_train, alpha=alpha, prop_mode=PROP_MC)
             params2 = copy.deepcopy(params)
             params2['eta2'][d][j, ] = params2['eta2'][d][j, ] - eps
             np.random.seed(42)
             logZ2, grad2 = lvm.objective_function(
-                params2, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+                params2, N_train, alpha=alpha, prop_mode=PROP_MC)
 
             dR_id = (logZ1 - logZ2) / eps / 2
             print('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
@@ -469,12 +469,12 @@ def test_gplvm_aep_gaussian_MC():
             params1['x1'][n, d] = params1['x1'][n, d] + eps
             np.random.seed(42)
             logZ1, grad1 = lvm.objective_function(
-                params1, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+                params1, N_train, alpha=alpha, prop_mode=PROP_MC)
             params2 = copy.deepcopy(params)
             params2['x1'][n, d] = params2['x1'][n, d] - eps
             np.random.seed(42)
             logZ2, grad2 = lvm.objective_function(
-                params2, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+                params2, N_train, alpha=alpha, prop_mode=PROP_MC)
 
             dx1_nd = (logZ1 - logZ2) / eps / 2
             print('x1 n=%d, d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
@@ -488,12 +488,12 @@ def test_gplvm_aep_gaussian_MC():
             params1['x2'][n, d] = params1['x2'][n, d] + eps
             np.random.seed(42)
             logZ1, grad1 = lvm.objective_function(
-                params1, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+                params1, N_train, alpha=alpha, prop_mode=PROP_MC)
             params2 = copy.deepcopy(params)
             params2['x2'][n, d] = params2['x2'][n, d] - eps
             np.random.seed(42)
             logZ2, grad2 = lvm.objective_function(
-                params2, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+                params2, N_train, alpha=alpha, prop_mode=PROP_MC)
 
             dx2_nd = (logZ1 - logZ2) / eps / 2
             print('x2 n=%d, d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
@@ -3283,7 +3283,7 @@ def test_gpssm_gp_aep_gaussian_kink_MC():
     params = init_params.copy()
     np.random.seed(42)
     logZ, grad_all = lvm.objective_function(
-        params, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+        params, N_train, alpha=alpha, prop_mode=PROP_MC)
     pp.pprint(logZ)
     pp.pprint(params)
 
@@ -3298,13 +3298,13 @@ def test_gpssm_gp_aep_gaussian_kink_MC():
         params1[name][d] = params1[name][d] + eps
         np.random.seed(42)
         logZ1, grad1 = lvm.objective_function(
-            params1, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+            params1, N_train, alpha=alpha, prop_mode=PROP_MC)
 
         params2 = copy.deepcopy(params)
         params2[name][d] = params2[name][d] - eps
         np.random.seed(42)
         logZ2, grad2 = lvm.objective_function(
-            params2, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+            params2, N_train, alpha=alpha, prop_mode=PROP_MC)
 
         dls_id = (logZ1 - logZ2) / eps / 2
         print('%s d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
@@ -3316,12 +3316,12 @@ def test_gpssm_gp_aep_gaussian_kink_MC():
     params1[name] = params1[name] + eps
     np.random.seed(42)
     logZ1, grad1 = lvm.objective_function(
-        params1, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+        params1, N_train, alpha=alpha, prop_mode=PROP_MC)
     params2 = copy.deepcopy(params)
     params2[name] = params2[name] - eps
     np.random.seed(42)
     logZ2, grad2 = lvm.objective_function(
-        params2, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+        params2, N_train, alpha=alpha, prop_mode=PROP_MC)
 
     dsf_i = (logZ1 - logZ2) / eps / 2
     print('%s computed=%.5f, numerical=%.5f, diff=%.5f'
@@ -3337,12 +3337,12 @@ def test_gpssm_gp_aep_gaussian_kink_MC():
             params1[name] = params1[name] + eps1
             np.random.seed(42)
             logZ1, grad1 = lvm.objective_function(
-                params1, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+                params1, N_train, alpha=alpha, prop_mode=PROP_MC)
             params2 = copy.deepcopy(params)
             params2[name] = params2[name] - eps1
             np.random.seed(42)
             logZ2, grad2 = lvm.objective_function(
-                params2, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+                params2, N_train, alpha=alpha, prop_mode=PROP_MC)
 
             dzu_id = (logZ1 - logZ2) / eps / 2
             print('%s m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
@@ -3357,12 +3357,12 @@ def test_gpssm_gp_aep_gaussian_kink_MC():
             params1[name][d][j, ] = params1[name][d][j, ] + eps
             np.random.seed(42)
             logZ1, grad1 = lvm.objective_function(
-                params1, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+                params1, N_train, alpha=alpha, prop_mode=PROP_MC)
             params2 = copy.deepcopy(params)
             params2[name][d][j, ] = params2[name][d][j, ] - eps
             np.random.seed(42)
             logZ2, grad2 = lvm.objective_function(
-                params2, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+                params2, N_train, alpha=alpha, prop_mode=PROP_MC)
 
             dR_id = (logZ1 - logZ2) / eps / 2
             print('%s d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
@@ -3376,12 +3376,12 @@ def test_gpssm_gp_aep_gaussian_kink_MC():
             params1[name][d][j, ] = params1[name][d][j, ] + eps
             np.random.seed(42)
             logZ1, grad1 = lvm.objective_function(
-                params1, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+                params1, N_train, alpha=alpha, prop_mode=PROP_MC)
             params2 = copy.deepcopy(params)
             params2[name][d][j, ] = params2[name][d][j, ] - eps
             np.random.seed(42)
             logZ2, grad2 = lvm.objective_function(
-                params2, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+                params2, N_train, alpha=alpha, prop_mode=PROP_MC)
 
             dR_id = (logZ1 - logZ2) / eps / 2
             print('%s d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
@@ -3396,13 +3396,13 @@ def test_gpssm_gp_aep_gaussian_kink_MC():
         params1[name][d] = params1[name][d] + eps
         np.random.seed(42)
         logZ1, grad1 = lvm.objective_function(
-            params1, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+            params1, N_train, alpha=alpha, prop_mode=PROP_MC)
 
         params2 = copy.deepcopy(params)
         params2[name][d] = params2[name][d] - eps
         np.random.seed(42)
         logZ2, grad2 = lvm.objective_function(
-            params2, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+            params2, N_train, alpha=alpha, prop_mode=PROP_MC)
 
         dls_id = (logZ1 - logZ2) / eps / 2
         print('%s d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
@@ -3414,12 +3414,12 @@ def test_gpssm_gp_aep_gaussian_kink_MC():
     params1[name] = params1[name] + eps
     np.random.seed(42)
     logZ1, grad1 = lvm.objective_function(
-        params1, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+        params1, N_train, alpha=alpha, prop_mode=PROP_MC)
     params2 = copy.deepcopy(params)
     params2[name] = params2[name] - eps
     np.random.seed(42)
     logZ2, grad2 = lvm.objective_function(
-        params2, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+        params2, N_train, alpha=alpha, prop_mode=PROP_MC)
 
     dsf_i = (logZ1 - logZ2) / eps / 2
     print('%s computed=%.5f, numerical=%.5f, diff=%.5f'
@@ -3435,12 +3435,12 @@ def test_gpssm_gp_aep_gaussian_kink_MC():
             params1[name] = params1[name] + eps1
             np.random.seed(42)
             logZ1, grad1 = lvm.objective_function(
-                params1, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+                params1, N_train, alpha=alpha, prop_mode=PROP_MC)
             params2 = copy.deepcopy(params)
             params2[name] = params2[name] - eps1
             np.random.seed(42)
             logZ2, grad2 = lvm.objective_function(
-                params2, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+                params2, N_train, alpha=alpha, prop_mode=PROP_MC)
 
             dzu_id = (logZ1 - logZ2) / eps / 2
             print('%s m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
@@ -3455,12 +3455,12 @@ def test_gpssm_gp_aep_gaussian_kink_MC():
             params1[name][d][j, ] = params1[name][d][j, ] + eps
             np.random.seed(42)
             logZ1, grad1 = lvm.objective_function(
-                params1, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+                params1, N_train, alpha=alpha, prop_mode=PROP_MC)
             params2 = copy.deepcopy(params)
             params2[name][d][j, ] = params2[name][d][j, ] - eps
             np.random.seed(42)
             logZ2, grad2 = lvm.objective_function(
-                params2, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+                params2, N_train, alpha=alpha, prop_mode=PROP_MC)
 
             dR_id = (logZ1 - logZ2) / eps / 2
             print('%s d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
@@ -3474,12 +3474,12 @@ def test_gpssm_gp_aep_gaussian_kink_MC():
             params1[name][d][j, ] = params1[name][d][j, ] + eps
             np.random.seed(42)
             logZ1, grad1 = lvm.objective_function(
-                params1, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+                params1, N_train, alpha=alpha, prop_mode=PROP_MC)
             params2 = copy.deepcopy(params)
             params2[name][d][j, ] = params2[name][d][j, ] - eps
             np.random.seed(42)
             logZ2, grad2 = lvm.objective_function(
-                params2, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+                params2, N_train, alpha=alpha, prop_mode=PROP_MC)
 
             dR_id = (logZ1 - logZ2) / eps / 2
             print('%s d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
@@ -3495,12 +3495,12 @@ def test_gpssm_gp_aep_gaussian_kink_MC():
                 params1[key][n, d] = params1[key][n, d] + eps
                 np.random.seed(42)
                 logZ1, grad1 = lvm.objective_function(
-                    params1, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+                    params1, N_train, alpha=alpha, prop_mode=PROP_MC)
                 params2 = copy.deepcopy(params)
                 params2[key][n, d] = params2[key][n, d] - eps
                 np.random.seed(42)
                 logZ2, grad2 = lvm.objective_function(
-                    params2, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+                    params2, N_train, alpha=alpha, prop_mode=PROP_MC)
 
                 dx1_nd = (logZ1 - logZ2) / eps / 2
                 print('%s n=%d, d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
@@ -3513,12 +3513,12 @@ def test_gpssm_gp_aep_gaussian_kink_MC():
         params1[name] = params1[name] + eps
         np.random.seed(42)
         logZ1, grad1 = lvm.objective_function(
-            params1, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+            params1, N_train, alpha=alpha, prop_mode=PROP_MC)
         params2 = copy.deepcopy(params)
         params2[name] = params2[name] - eps
         np.random.seed(42)
         logZ2, grad2 = lvm.objective_function(
-            params2, N_train, alpha=alpha, prop_mode=aep.PROP_MC)
+            params2, N_train, alpha=alpha, prop_mode=PROP_MC)
 
         dsn_i = (logZ1 - logZ2) / eps / 2
         print('sn %s computed=%.5f, numerical=%.5f, diff=%.5f'

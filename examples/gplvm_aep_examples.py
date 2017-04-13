@@ -4,13 +4,14 @@ import pdb
 import matplotlib.pylab as plt
 from scipy import special
 
-# from .context import aep
+from .context import aep
+from .context import PROP_MC
 
-import sys
-import os
-sys.path.insert(0, os.path.abspath(
-    os.path.join(os.path.dirname(__file__), '..')))
-import geepee.aep_models as aep
+# import sys
+# import os
+# sys.path.insert(0, os.path.abspath(
+#     os.path.join(os.path.dirname(__file__), '..')))
+# import geepee.aep_models as aep
 
 np.random.seed(42)
 
@@ -81,7 +82,7 @@ def run_cluster_MC():
     alpha = 1.0
     lvm = aep.SGPLVM(Y, D, M, lik='Gaussian')
     lvm.optimise(method='adam', adam_lr=0.05, maxiter=2000,
-                 alpha=alpha, prop_mode=aep.PROP_MC)
+                 alpha=alpha, prop_mode=PROP_MC)
 
     ls = np.exp(lvm.sgp_layer.ls)
     print ls

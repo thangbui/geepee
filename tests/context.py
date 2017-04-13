@@ -7,3 +7,4 @@ sys.path.insert(0, os.path.abspath(
 import geepee.aep_models as aep
 import geepee.vfe_models as vfe
 from geepee.utils import flatten_dict, unflatten_dict
+from geepee.config import *
