@@ -3,6 +3,7 @@
 - [ ] make sure that GPSSMs init and learning is robust on many simple 1-D problems
 - [ ] cleaned up GPSSM examples
 - [ ] stochastic optimisation for GPSSMs and GPLVMs
+- [ ] figure out why the gradients of eta2 is twice what should be on the kink task
 
 ## GOALS
 

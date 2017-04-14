@@ -394,7 +394,8 @@ class SGP_Layer(object):
         M_all = 0.5 * (scale_prior * self.Dout * Kuuinv +
                        np.dot(Kuuinv, np.dot(Minner, Kuuinv)))
         dhyp = d_trace_MKzz_dhypers(
-            2 * self.ls, 2 * self.sf, self.zu, M_all, self.Kuu)
+            2 * self.ls, 2 * self.sf, self.zu, M_all, 
+            self.Kuu-np.diag(JITTER * np.ones(self.M)))
 
         dzu += dhyp[2]
         dls += 2 * dhyp[1]
@@ -499,7 +500,8 @@ class SGP_Layer(object):
         M_all = 0.5 * (scale_prior * self.Dout * Kuuinv +
                        np.dot(Kuuinv, np.dot(Minner, Kuuinv)))
         dhyp = d_trace_MKzz_dhypers(
-            2 * self.ls, 2 * self.sf, self.zu, M_all, self.Kuu)
+            2 * self.ls, 2 * self.sf, self.zu, M_all, 
+            self.Kuu-np.diag(JITTER * np.ones(self.M)))
 
         dzu += dhyp[2]
         dls += 2 * dhyp[1]
@@ -619,7 +621,8 @@ class SGP_Layer(object):
         M_all = 0.5 * (scale_prior * self.Dout * Kuuinv +
                        np.dot(Kuuinv, np.dot(Minner, Kuuinv)))
         dhyp = d_trace_MKzz_dhypers(
-            2 * self.ls, 2 * self.sf, self.zu, M_all, self.Kuu)
+            2 * self.ls, 2 * self.sf, self.zu, M_all, 
+            self.Kuu-np.diag(JITTER * np.ones(self.M)))
 
         dzu += dhyp[2]
         dls += 2 * dhyp[1]
@@ -1231,7 +1234,7 @@ class AEP_Model(object):
     def optimise(
             self, method='L-BFGS-B', tol=None, reinit_hypers=True,
             callback=None, maxfun=100000, maxiter=1000, alpha=0.5,
-            mb_size=None, adam_lr=0.001, prop_mode=PROP_MM, **kargs):
+            mb_size=None, adam_lr=0.001, prop_mode=PROP_MM, disp=True, **kargs):
         """Summary
         
         Args:
@@ -1271,7 +1274,7 @@ class AEP_Model(object):
                 final_params = results
             else:
                 options = {'maxfun': maxfun, 'maxiter': maxiter,
-                           'disp': True, 'gtol': 1e-8}
+                           'disp': disp, 'gtol': 1e-8}
                 results = minimize(
                     fun=objective_wrapper,
                     x0=init_params_vec,
@@ -3734,7 +3737,8 @@ class SGPSSM(AEP_Model):
         # update model with new hypers
         self.update_hypers(params)
         dyn_layer.compute_cavity(alpha)
-        emi_layer.compute_cavity(alpha)
+        if self.gp_emi:
+            emi_layer.compute_cavity(alpha)
         cav_m, cav_v, cav_1, cav_2 = self.compute_cavity_x(alpha)
         # compute cavity factors for the latent variables
         idxs_prev = np.arange(1, self.N)
@@ -4173,7 +4177,7 @@ class SGPSSM(AEP_Model):
             self.updated = True
         mf, vf = self.dyn_layer.forward_prop_thru_post(inputs)
         if self.gp_emi:
-            mg, vf = self.emi_layer.forward_prop_thru_post(mf, vf)
+            mg, vg = self.emi_layer.forward_prop_thru_post(mf, vf)
             my, vy = self.lik_layer.output_probabilistic(mg, vg)
         else:
             my, _, vy = self.emi_layer.output_probabilistic(mf, vf)
@@ -4241,9 +4245,10 @@ class SGPSSM(AEP_Model):
         s.info_E_step()
         post_m = s.smoothed_mus
         # post_v = np.diagonal(s.smoothed_sigmas, axis1=1, axis2=2)
-        scale = np.std(post_m, axis=0)
-        post_m = (post_m - np.mean(post_m, axis=0)) / scale
-        post_v = 0.01 * np.ones_like(post_m)
+        # scale = np.std(post_m, axis=0)
+        # post_m = (post_m - np.mean(post_m, axis=0)) / scale
+        post_m = post_m
+        post_v = 0.1 * np.ones_like(post_m)
         post_2 = 1.0 / post_v
         post_1 = post_2 * post_m
         ssm_params = {'sn': np.log(0.01)}
@@ -4259,7 +4264,7 @@ class SGPSSM(AEP_Model):
         reg = SGPR(x, y, self.M, 'Gaussian')
         reg.set_fixed_params(['sn', 'sf', 'ls', 'zu'])
         # reg.set_fixed_params(['sn', 'sf'])
-        reg.optimise(method='L-BFGS-B', alpha=0.5, maxiter=500)
+        reg.optimise(method='L-BFGS-B', alpha=0.5, maxiter=500, disp=False)
         dyn_params = reg.sgp_layer.get_hypers(key_suffix='_dynamic')
         # dyn_params['ls_dynamic'] -= np.log(5)
         # dyn_params['ls_dynamic'][self.Din:] = np.log(1)
@@ -4274,16 +4279,17 @@ class SGPSSM(AEP_Model):
             # TODO: deal with different likelihood here
             reg = SGPR(x, y, self.M, 'Gaussian')
             reg.set_fixed_params(['sn', 'sf', 'ls', 'zu'])
-            # reg.set_fixed_params(['sn', 'sf'])
-            reg.optimise(method='L-BFGS-B', alpha=0.5, maxiter=500)
+            reg.optimise(method='L-BFGS-B', alpha=0.5, maxiter=5000, disp=True)
             emi_params = reg.sgp_layer.get_hypers(key_suffix='_emission')
             # emi_params['ls_emission'] -= np.log(5)
             lik_params = self.lik_layer.init_hypers(key_suffix='_emission')
         else:
-            emi_params = self.emi_layer.init_hypers()
+            emi_params = self.emi_layer.init_hypers(key_suffix='_emission')
             if isinstance(self.emi_layer, Gauss_Emis):
-                emi_params['C'] = np.dot(
-                    s.C, np.diag(np.hstack((scale, np.ones(self.Dcon_emi)))))
+                # emi_params['C_emission'] = np.dot(
+                    # s.C, np.diag(np.hstack((scale, np.ones(self.Dcon_emi)))))
+                emi_params['C_emission'] = s.C
+                # pdb.set_trace()
         init_params = dict(dyn_params)
         init_params.update(emi_params)
         if self.gp_emi:
