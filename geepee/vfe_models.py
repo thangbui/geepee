@@ -1,7 +1,5 @@
 """Summary
 
-Attributes:
-    jitter (float): Description
 """
 import numpy as np
 from scipy.optimize import minimize
@@ -10,9 +8,7 @@ from scipy.cluster.vq import kmeans2
 
 from utils import *
 from kernels import *
-
-# ideally these should be moved to some config file
-jitter = 1e-4
+from config import *
 
 
 class VI_Model(object):
@@ -209,7 +205,7 @@ class SGPR(VI_Model):
         # compute the approximate log marginal likelihood
         Kuu_noiseless = compute_kernel(
             2 * self.ls, 2 * self.sf, self.zu, self.zu)
-        Kuu = Kuu_noiseless + np.diag(jitter * np.ones((M, )))
+        Kuu = Kuu_noiseless + np.diag(JITTER * np.ones((M, )))
         Lu = np.linalg.cholesky(Kuu)
         Kuf = compute_kernel(2 * self.ls, 2 * self.sf, self.zu, x)
         V = np.linalg.solve(Lu, Kuf)
@@ -280,7 +276,7 @@ class SGPR(VI_Model):
         # compute the approximate log marginal likelihood
         Kuu_noiseless = compute_kernel(
             2 * self.ls, 2 * self.sf, self.zu, self.zu)
-        Kuu = Kuu_noiseless + np.diag(jitter * np.ones((M, )))
+        Kuu = Kuu_noiseless + np.diag(JITTER * np.ones((M, )))
         Lu = np.linalg.cholesky(Kuu)
         Kuf = compute_kernel(2 * self.ls, 2 * self.sf, self.zu, x)
         Kut = compute_kernel(2 * self.ls, 2 * self.sf, self.zu, inputs)
@@ -303,7 +299,7 @@ class SGPR(VI_Model):
             vf = np.exp(2 * self.sf) - np.sum(KtuW * Kut.T, axis=1)
         else:
             Ktt = compute_kernel(2 * self.ls, 2 * self.sf, inputs, inputs)
-            Ktt += np.diag(jitter * np.ones((inputs.shape[0], )))
+            Ktt += np.diag(JITTER * np.ones((inputs.shape[0], )))
             vf = Ktt - np.dot(KtuW, Kut)
         return mf, vf
 
