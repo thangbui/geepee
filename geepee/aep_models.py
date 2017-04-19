@@ -1143,40 +1143,90 @@ class Probit_Layer(Lik_Layer):
             TYPE: Description
         """
         # binary data probit likelihood
-        if alpha == 1.0:
-            t = y * mout / np.sqrt(1 + vout)
-            Z = 0.5 * (1 + special.erf(t / np.sqrt(2)))
-            eps = 1e-16
-            logZ = np.sum(np.log(Z + eps))
+        if mout.ndim == 2:
+            if alpha == 1.0:
+                t = y * mout / np.sqrt(1 + vout)
+                Z = 0.5 * (1 + special.erf(t / np.sqrt(2)))
+                eps = 1e-16
+                logZ = np.sum(np.log(Z + eps))
 
-            dlogZ_dt = 1 / (Z + eps) * 1 / np.sqrt(2 *
-                                                   np.pi) * np.exp(-t**2.0 / 2)
-            dt_dm = y / np.sqrt(1 + vout)
-            dt_dv = -0.5 * y * mout / (1 + vout)**1.5
-            dlogZ_dm = dlogZ_dt * dt_dm
-            dlogZ_dv = dlogZ_dt * dt_dv
+                dlogZ_dt = 1 / (Z + eps) * 1 / np.sqrt(2 *
+                                                       np.pi) * np.exp(-t**2.0 / 2)
+                dt_dm = y / np.sqrt(1 + vout)
+                dt_dv = -0.5 * y * mout / (1 + vout)**1.5
+                dlogZ_dm = dlogZ_dt * dt_dm
+                dlogZ_dv = dlogZ_dt * dt_dv
+            else:
+                gh_x, gh_w = self._gh_points(GH_DEGREE)
+                gh_x = gh_x[:, np.newaxis, np.newaxis]
+                gh_w = gh_w[:, np.newaxis, np.newaxis]
 
+                ts = gh_x * \
+                    np.sqrt(2 * vout[np.newaxis, :, :]) + mout[np.newaxis, :, :]
+                eps = 1e-8
+                pdfs = 0.5 * (1 + special.erf(y * ts / np.sqrt(2))) + eps
+                Ztilted = np.sum(pdfs**alpha * gh_w, axis=0) / np.sqrt(np.pi)
+                logZ = np.sum(np.log(Ztilted))
+
+                a = pdfs**(alpha - 1.0) * np.exp(-ts**2 / 2)
+                dZdm = np.sum(gh_w * a, axis=0) * y * alpha / np.pi / np.sqrt(2)
+                dlogZ_dm = dZdm / Ztilted + eps
+
+                dZdv = np.sum(gh_w * (a * gh_x), axis=0) * y * \
+                    alpha / np.pi / np.sqrt(2) / np.sqrt(2 * vout)
+                dlogZ_dv = dZdv / Ztilted + eps
+        elif mout.ndim == 3:
+            if alpha == 1.0:
+                t = y * mout / np.sqrt(1 + vout)
+                Z = 0.5 * (1 + special.erf(t / np.sqrt(2)))
+                eps = 1e-16
+                logZ_term = np.log(Z + eps)
+                logZ_max = np.max(logZ_term, axis=0)
+                exp_term = np.exp(logZ_term - logZ_max)
+                sumexp = np.sum(exp_term, axis=0)
+                logZ_lse = logZ_max + np.log(sumexp)
+                logZ_lse -= np.log(mout.shape[0])
+                logZ = np.sum(logZ_lse)
+                dlogZ = exp_term / sumexp
+                dlogZ_dt = 1 / (Z + eps) * 1 / np.sqrt(2 *
+                                                       np.pi) * np.exp(-t**2.0 / 2)
+                dt_dm = y / np.sqrt(1 + vout)
+                dt_dv = -0.5 * y * mout / (1 + vout)**1.5
+                dlogZ_dm = dlogZ * dlogZ_dt * dt_dm
+                dlogZ_dv = dlogZ * dlogZ_dt * dt_dv
+            else:
+                gh_x, gh_w = self._gh_points(GH_DEGREE)
+                gh_x = gh_x[:, np.newaxis, np.newaxis, np.newaxis]
+                gh_w = gh_w[:, np.newaxis, np.newaxis, np.newaxis]
+
+                ts = gh_x * np.sqrt(2 * vout) + mout
+                eps = 1e-16
+                pdfs = 0.5 * (1 + special.erf(y * ts / np.sqrt(2))) + eps
+                Ztilted = np.sum(pdfs**alpha * gh_w, axis=0) / np.sqrt(np.pi)
+                # logZ = np.sum(np.log(Ztilted))
+                logZ_term = np.log(Ztilted)
+                logZ_max = np.max(logZ_term, axis=0)
+                exp_term = np.exp(logZ_term - logZ_max)
+                sumexp = np.sum(exp_term, axis=0)
+                logZ_lse = logZ_max + np.log(sumexp)
+                logZ_lse -= np.log(mout.shape[0])
+                logZ = np.sum(logZ_lse)
+                dlogZ = exp_term / sumexp
+                
+                a = pdfs**(alpha - 1.0) * np.exp(-ts**2 / 2)
+                dZdm = np.sum(gh_w * a, axis=0) * y * alpha / np.pi / np.sqrt(2)
+                dlogZ_dm = dlogZ * dZdm / Ztilted + eps
+
+                dZdv = np.sum(gh_w * (a * gh_x), axis=0) * y * \
+                    alpha / np.pi / np.sqrt(2) / np.sqrt(2 * vout)
+                dlogZ_dv = dlogZ * dZdv / Ztilted + eps
         else:
-            gh_x, gh_w = self._gh_points(GH_DEGREE)
-            gh_x = gh_x[:, np.newaxis, np.newaxis]
-            gh_w = gh_w[:, np.newaxis, np.newaxis]
-
-            ts = gh_x * \
-                np.sqrt(2 * vout[np.newaxis, :, :]) + mout[np.newaxis, :, :]
-            eps = 1e-8
-            pdfs = 0.5 * (1 + special.erf(y * ts / np.sqrt(2))) + eps
-            Ztilted = np.sum(pdfs**alpha * gh_w, axis=0) / np.sqrt(np.pi)
-            logZ = np.sum(np.log(Ztilted))
-
-            a = pdfs**(alpha - 1.0) * np.exp(-ts**2 / 2)
-            dZdm = np.sum(gh_w * a, axis=0) * y * alpha / np.pi / np.sqrt(2)
-            dlogZ_dm = dZdm / Ztilted + eps
-
-            dZdv = np.sum(gh_w * (a * gh_x), axis=0) * y * \
-                alpha / np.pi / np.sqrt(2) / np.sqrt(2 * vout)
-            dlogZ_dv = dZdv / Ztilted + eps
+            raise RuntimeError('invalid ndim, ndim=%d' % mout.ndim)
 
         return logZ, dlogZ_dm, dlogZ_dv
+
+    def output_probabilistic(self, mf, vf, alpha=1.0):
+        raise NotImplementedError('TODO: return probablity of y=1')
 
 
 class AEP_Model(object):
