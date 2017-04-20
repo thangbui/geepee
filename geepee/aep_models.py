@@ -1,4 +1,9 @@
-"""Summary
+"""Sparse approximations for Gaussian process models
+
+Models implemented include GP Gaussian regression/Probit classification,
+GP latent variable model, GP state space model and Deep GPs
+
+Inference and learning using approximate EP (or Black-box alpha)
 
 """
 import sys
@@ -23,9 +28,10 @@ from kernels import *
 # alternative would be
 # idxs = np.random.permutation(N)[:mb_size]
 
+
 class SGP_Layer(object):
-    """Summary
-    
+    """Sparse Gaussian process layer
+
     Attributes:
         A (TYPE): Description
         Ahat (TYPE): Description
@@ -57,13 +63,13 @@ class SGP_Layer(object):
     """
 
     def __init__(self, no_train, input_size, output_size, no_pseudo):
-        """Summary
-        
+        """Initialisation
+
         Args:
-            no_train (TYPE): Description
-            input_size (TYPE): Description
-            output_size (TYPE): Description
-            no_pseudo (TYPE): Description
+            no_train (int): Number of training points
+            input_size (int): Number of input dimensions
+            output_size (int): Number of output dimensions
+            no_pseudo (int): Number of pseudo-points
         """
         self.Din = Din = input_size
         self.Dout = Dout = output_size
@@ -107,20 +113,20 @@ class SGP_Layer(object):
         self.B_sto = np.zeros([Dout, M, M])
 
     def compute_phi_prior(self):
-        """Summary
-        
+        """Compute the log-partition of the prior p(u)
+
         Returns:
-            TYPE: Description
+            float: log-partition
         """
         (sign, logdet) = np.linalg.slogdet(self.Kuu)
         logZ_prior = self.Dout * 0.5 * logdet
         return logZ_prior
 
     def compute_phi_posterior(self):
-        """Summary
-        
+        """Compute the log-partition of the posterior q(u)
+
         Returns:
-            TYPE: Description
+            float: log-partition
         """
         (sign, logdet) = np.linalg.slogdet(self.Su)
         phi_posterior = 0.5 * np.sum(logdet)
@@ -129,10 +135,10 @@ class SGP_Layer(object):
         return phi_posterior
 
     def compute_phi_cavity(self):
-        """Summary
-        
+        """Compute the log-partition of the cavity distribution
+
         Returns:
-            TYPE: Description
+            float: log-partition
         """
         logZ_posterior = 0
         (sign, logdet) = np.linalg.slogdet(self.Suhat)
@@ -142,13 +148,13 @@ class SGP_Layer(object):
         return phi_cavity
 
     def compute_phi(self, alpha=1.0):
-        """Summary
-        
+        """Compute the weighted sum of the log-partitions of prior, post and cav  
+
         Args:
-            alpha (float, optional): Description
-        
+            alpha (float, optional): power parameter
+
         Returns:
-            TYPE: Description
+            float: weighted sum of the log-partitions in the PEP energy
         """
         N = self.N
         scale_post = N * 1.0 / alpha - 1.0
@@ -161,18 +167,18 @@ class SGP_Layer(object):
         return phi
 
     def forward_prop_thru_cav(self, mx, vx=None, mode=PROP_MM):
-        """Summary
-        
+        """Propagate input distributions through the cavity non-linearity
+
         Args:
-            mx (TYPE): Description
-            vx (None, optional): Description
-            mode (TYPE, optional): Description
-        
+            mx (float): means of the input distributions, size K x Din
+            vx (float, optional): variances (if uncertain inputs), size K x Din
+            mode (config param, optional): propagation mode (see config)
+
         Returns:
-            TYPE: Description
-        
+            specific results depend on the propagation mode provided
+
         Raises:
-            NotImplementedError: Description
+            NotImplementedError: Unknown propagation mode
         """
         if vx is None:
             return self._forward_prop_deterministic_thru_cav(mx)
@@ -187,13 +193,15 @@ class SGP_Layer(object):
                 raise NotImplementedError('unknown propagation mode')
 
     def _forward_prop_deterministic_thru_cav(self, x):
-        """Summary
-        
+        """Propagate deterministic inputs thru cavity
+
         Args:
-            x (TYPE): Description
-        
+            x (float): input values, size K x Din
+
         Returns:
-            TYPE: Description
+            float, size K x Dout: output means
+            float, size K x Dout: output variances
+            float, size K x M: cross covariance matrix
         """
         kff = np.exp(2 * self.sf)
         kfu = compute_kernel(2 * self.ls, 2 * self.sf, x, self.zu)
@@ -203,14 +211,14 @@ class SGP_Layer(object):
         return mout, vout, kfu
 
     def _forward_prop_random_thru_cav_mc(self, mx, vx):
-        """Summary
-        
+        """Propagate uncertain inputs thru cavity, using simple Monte Carlo
+
         Args:
-            mx (TYPE): Description
-            vx (TYPE): Description
-        
+            mx (float): input means, size K x Din
+            vx (TYPE): input variances, size K x Din
+
         Returns:
-            TYPE: Description
+            output means and variances, and intermediate info for backprop
         """
         batch_size = mx.shape[0]
         eps = np.random.randn(MC_NO_SAMPLES, batch_size, self.Din)
@@ -226,14 +234,14 @@ class SGP_Layer(object):
 
     @profile
     def _forward_prop_random_thru_cav_mm(self, mx, vx):
-        """Summary
-        
+        """Propagate uncertain inputs thru cavity, using simple Moment Matching
+
         Args:
-            mx (TYPE): Description
-            vx (TYPE): Description
-        
+            mx (float): input means, size K x Din
+            vx (TYPE): input variances, size K x Din
+
         Returns:
-            TYPE: Description
+            output means and variances, and intermediate info for backprop
         """
         psi0 = np.exp(2 * self.sf)
         psi1, psi2 = compute_psi_weave(
@@ -244,18 +252,18 @@ class SGP_Layer(object):
         return mout, vout, psi1, psi2
 
     def forward_prop_thru_post(self, mx, vx=None, mode=PROP_MM):
-        """Summary
-        
+        """Propagate input distributions through the posterior non-linearity
+
         Args:
-            mx (TYPE): Description
-            vx (None, optional): Description
-            mode (TYPE, optional): Description
-        
+            mx (float): means of the input distributions, size K x Din
+            vx (float, optional): variances (if uncertain inputs), size K x Din
+            mode (config param, optional): propagation mode (see config)
+
         Returns:
-            TYPE: Description
-        
+            specific results depend on the propagation mode provided
+
         Raises:
-            NotImplementedError: Description
+            NotImplementedError: Unknown propagation mode
         """
         if vx is None:
             return self._forward_prop_deterministic_thru_post(mx)
@@ -270,13 +278,14 @@ class SGP_Layer(object):
                 raise NotImplementedError('unknown propagation mode')
 
     def _forward_prop_deterministic_thru_post(self, x):
-        """Summary
-        
+        """Propagate deterministic inputs thru posterior
+
         Args:
-            x (TYPE): Description
-        
+            x (float): input values, size K x Din
+
         Returns:
-            TYPE: Description
+            float, size K x Dout: output means
+            float, size K x Dout: output variances
         """
         psi0 = np.exp(2 * self.sf)
         psi1 = compute_kernel(2 * self.ls, 2 * self.sf, x, self.zu)
@@ -286,14 +295,15 @@ class SGP_Layer(object):
         return mout, vout
 
     def _forward_prop_random_thru_post_mm(self, mx, vx):
-        """Summary
-        
+        """Propagate uncertain inputs thru cavity, using Moment Matching
+
         Args:
-            mx (TYPE): Description
-            vx (TYPE): Description
-        
+            mx (float): input means, size K x Din
+            vx (TYPE): input variances, size K x Din
+
         Returns:
-            TYPE: Description
+            float, size K x Dout: output means
+            float, size K x Dout: output variances
         """
         psi0 = np.exp(2.0 * self.sf)
         psi1, psi2 = compute_psi_weave(
@@ -306,7 +316,7 @@ class SGP_Layer(object):
     @profile
     def backprop_grads_lvm_mm(self, m, v, dm, dv, psi1, psi2, mx, vx, alpha=1.0):
         """Summary
-        
+
         Args:
             m (TYPE): Description
             v (TYPE): Description
@@ -317,7 +327,7 @@ class SGP_Layer(object):
             mx (TYPE): Description
             vx (TYPE): Description
             alpha (float, optional): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -394,8 +404,8 @@ class SGP_Layer(object):
         M_all = 0.5 * (scale_prior * self.Dout * Kuuinv +
                        np.dot(Kuuinv, np.dot(Minner, Kuuinv)))
         dhyp = d_trace_MKzz_dhypers(
-            2 * self.ls, 2 * self.sf, self.zu, M_all, 
-            self.Kuu-np.diag(JITTER * np.ones(self.M)))
+            2 * self.ls, 2 * self.sf, self.zu, M_all,
+            self.Kuu - np.diag(JITTER * np.ones(self.M)))
 
         dzu += dhyp[2]
         dls += 2 * dhyp[1]
@@ -411,7 +421,7 @@ class SGP_Layer(object):
     @profile
     def backprop_grads_lvm_mc(self, m, v, dm, dv, kfu, x, alpha=1.0):
         """Summary
-        
+
         Args:
             m (TYPE): Description
             v (TYPE): Description
@@ -420,7 +430,7 @@ class SGP_Layer(object):
             kfu (TYPE): Description
             x (TYPE): Description
             alpha (float, optional): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -500,8 +510,8 @@ class SGP_Layer(object):
         M_all = 0.5 * (scale_prior * self.Dout * Kuuinv +
                        np.dot(Kuuinv, np.dot(Minner, Kuuinv)))
         dhyp = d_trace_MKzz_dhypers(
-            2 * self.ls, 2 * self.sf, self.zu, M_all, 
-            self.Kuu-np.diag(JITTER * np.ones(self.M)))
+            2 * self.ls, 2 * self.sf, self.zu, M_all,
+            self.Kuu - np.diag(JITTER * np.ones(self.M)))
 
         dzu += dhyp[2]
         dls += 2 * dhyp[1]
@@ -516,13 +526,13 @@ class SGP_Layer(object):
 
     def backprop_grads_reparam(self, dx, m, v, eps):
         """Summary
-        
+
         Args:
             dx (TYPE): Description
             m (TYPE): Description
             v (TYPE): Description
             eps (TYPE): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -534,7 +544,7 @@ class SGP_Layer(object):
     @profile
     def backprop_grads_reg(self, m, v, dm, dv, kfu, x, alpha=1.0):
         """Summary
-        
+
         Args:
             m (TYPE): Description
             v (TYPE): Description
@@ -543,7 +553,7 @@ class SGP_Layer(object):
             kfu (TYPE): Description
             x (TYPE): Description
             alpha (float, optional): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -621,8 +631,8 @@ class SGP_Layer(object):
         M_all = 0.5 * (scale_prior * self.Dout * Kuuinv +
                        np.dot(Kuuinv, np.dot(Minner, Kuuinv)))
         dhyp = d_trace_MKzz_dhypers(
-            2 * self.ls, 2 * self.sf, self.zu, M_all, 
-            self.Kuu-np.diag(JITTER * np.ones(self.M)))
+            2 * self.ls, 2 * self.sf, self.zu, M_all,
+            self.Kuu - np.diag(JITTER * np.ones(self.M)))
 
         dzu += dhyp[2]
         dls += 2 * dhyp[1]
@@ -637,10 +647,10 @@ class SGP_Layer(object):
 
     def sample(self, x):
         """Summary
-        
+
         Args:
             x (TYPE): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -663,7 +673,7 @@ class SGP_Layer(object):
 
     def compute_kuu(self):
         """Summary
-        
+
         Returns:
             TYPE: Description
         """
@@ -680,10 +690,10 @@ class SGP_Layer(object):
 
     def compute_cavity(self, alpha=1.0):
         """Summary
-        
+
         Args:
             alpha (float, optional): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -709,7 +719,7 @@ class SGP_Layer(object):
 
     def update_posterior(self):
         """Summary
-        
+
         Returns:
             TYPE: Description
         """
@@ -728,7 +738,7 @@ class SGP_Layer(object):
 
     def update_posterior_for_prediction(self):
         """Summary
-        
+
         Returns:
             TYPE: Description
         """
@@ -751,11 +761,11 @@ class SGP_Layer(object):
 
     def init_hypers(self, x_train=None, key_suffix=''):
         """Summary
-        
+
         Args:
             x_train (None, optional): Description
             key_suffix (str, optional): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -829,10 +839,10 @@ class SGP_Layer(object):
 
     def get_hypers(self, key_suffix=''):
         """Summary
-        
+
         Args:
             key_suffix (str, optional): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -860,11 +870,11 @@ class SGP_Layer(object):
 
     def update_hypers(self, params, key_suffix=''):
         """Summary
-        
+
         Args:
             params (TYPE): Description
             key_suffix (str, optional): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -896,7 +906,7 @@ class SGP_Layer(object):
 
 class Lik_Layer(object):
     """Summary
-    
+
     Attributes:
         D (TYPE): Description
         N (TYPE): Description
@@ -904,7 +914,7 @@ class Lik_Layer(object):
 
     def __init__(self, N, D):
         """Summary
-        
+
         Args:
             N (TYPE): Description
             D (TYPE): Description
@@ -914,13 +924,13 @@ class Lik_Layer(object):
 
     def compute_log_Z(self, mout, vout, y, alpha=1.0):
         """Summary
-        
+
         Args:
             mout (TYPE): Description
             vout (TYPE): Description
             y (TYPE): Description
             alpha (float, optional): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -928,7 +938,7 @@ class Lik_Layer(object):
 
     def backprop_grads(self, mout, vout, dmout, dvout, alpha=1.0, scale=1.0):
         """Summary
-        
+
         Args:
             mout (TYPE): Description
             vout (TYPE): Description
@@ -936,7 +946,7 @@ class Lik_Layer(object):
             dvout (TYPE): Description
             alpha (float, optional): Description
             scale (float, optional): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -944,7 +954,7 @@ class Lik_Layer(object):
 
     def init_hypers(self):
         """Summary
-        
+
         Returns:
             TYPE: Description
         """
@@ -952,7 +962,7 @@ class Lik_Layer(object):
 
     def get_hypers(self):
         """Summary
-        
+
         Returns:
             TYPE: Description
         """
@@ -960,10 +970,10 @@ class Lik_Layer(object):
 
     def update_hypers(self, params):
         """Summary
-        
+
         Args:
             params (TYPE): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -972,14 +982,14 @@ class Lik_Layer(object):
 
 class Gauss_Layer(Lik_Layer):
     """Summary
-    
+
     Attributes:
         sn (int): Description
     """
 
     def __init__(self, N, D):
         """Summary
-        
+
         Args:
             N (TYPE): Description
             D (TYPE): Description
@@ -989,16 +999,16 @@ class Gauss_Layer(Lik_Layer):
 
     def compute_log_Z(self, mout, vout, y, alpha=1.0):
         """Summary
-        
+
         Args:
             mout (TYPE): Description
             vout (TYPE): Description
             y (TYPE): Description
             alpha (float, optional): Description
-        
+
         Returns:
             TYPE: Description
-        
+
         Raises:
             RuntimeError: Description
         """
@@ -1036,7 +1046,7 @@ class Gauss_Layer(Lik_Layer):
 
     def backprop_grads(self, mout, vout, dmout, dvout, alpha=1.0, scale=1.0):
         """Summary
-        
+
         Args:
             mout (TYPE): Description
             vout (TYPE): Description
@@ -1044,10 +1054,10 @@ class Gauss_Layer(Lik_Layer):
             dvout (TYPE): Description
             alpha (float, optional): Description
             scale (float, optional): Description
-        
+
         Returns:
             TYPE: Description
-        
+
         Raises:
             RuntimeError: Description
         """
@@ -1065,12 +1075,12 @@ class Gauss_Layer(Lik_Layer):
 
     def output_probabilistic(self, mf, vf, alpha=1.0):
         """Summary
-        
+
         Args:
             mf (TYPE): Description
             vf (TYPE): Description
             alpha (float, optional): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -1078,10 +1088,10 @@ class Gauss_Layer(Lik_Layer):
 
     def init_hypers(self, key_suffix=''):
         """Summary
-        
+
         Args:
             key_suffix (str, optional): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -1090,10 +1100,10 @@ class Gauss_Layer(Lik_Layer):
 
     def get_hypers(self, key_suffix=''):
         """Summary
-        
+
         Args:
             key_suffix (str, optional): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -1101,11 +1111,11 @@ class Gauss_Layer(Lik_Layer):
 
     def update_hypers(self, params, key_suffix=''):
         """Summary
-        
+
         Args:
             params (TYPE): Description
             key_suffix (str, optional): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -1119,10 +1129,10 @@ class Probit_Layer(Lik_Layer):
 
     def _gh_points(self, T=20):
         """Summary
-        
+
         Args:
             T (int, optional): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -1132,15 +1142,18 @@ class Probit_Layer(Lik_Layer):
 
     def compute_log_Z(self, mout, vout, y, alpha=1.0):
         """Summary
-        
+
         Args:
             mout (TYPE): Description
             vout (TYPE): Description
             y (TYPE): Description
             alpha (float, optional): Description
-        
+
         Returns:
             TYPE: Description
+
+        Raises:
+            RuntimeError: Description
         """
         # binary data probit likelihood
         if mout.ndim == 2:
@@ -1162,14 +1175,16 @@ class Probit_Layer(Lik_Layer):
                 gh_w = gh_w[:, np.newaxis, np.newaxis]
 
                 ts = gh_x * \
-                    np.sqrt(2 * vout[np.newaxis, :, :]) + mout[np.newaxis, :, :]
+                    np.sqrt(2 * vout[np.newaxis, :, :]) + \
+                    mout[np.newaxis, :, :]
                 eps = 1e-8
                 pdfs = 0.5 * (1 + special.erf(y * ts / np.sqrt(2))) + eps
                 Ztilted = np.sum(pdfs**alpha * gh_w, axis=0) / np.sqrt(np.pi)
                 logZ = np.sum(np.log(Ztilted))
 
                 a = pdfs**(alpha - 1.0) * np.exp(-ts**2 / 2)
-                dZdm = np.sum(gh_w * a, axis=0) * y * alpha / np.pi / np.sqrt(2)
+                dZdm = np.sum(gh_w * a, axis=0) * y * \
+                    alpha / np.pi / np.sqrt(2)
                 dlogZ_dm = dZdm / Ztilted + eps
 
                 dZdv = np.sum(gh_w * (a * gh_x), axis=0) * y * \
@@ -1212,9 +1227,10 @@ class Probit_Layer(Lik_Layer):
                 logZ_lse -= np.log(mout.shape[0])
                 logZ = np.sum(logZ_lse)
                 dlogZ = exp_term / sumexp
-                
+
                 a = pdfs**(alpha - 1.0) * np.exp(-ts**2 / 2)
-                dZdm = np.sum(gh_w * a, axis=0) * y * alpha / np.pi / np.sqrt(2)
+                dZdm = np.sum(gh_w * a, axis=0) * y * \
+                    alpha / np.pi / np.sqrt(2)
                 dlogZ_dm = dlogZ * dZdm / Ztilted + eps
 
                 dZdv = np.sum(gh_w * (a * gh_x), axis=0) * y * \
@@ -1226,12 +1242,25 @@ class Probit_Layer(Lik_Layer):
         return logZ, dlogZ_dm, dlogZ_dv
 
     def output_probabilistic(self, mf, vf, alpha=1.0):
+        """Summary
+
+        Args:
+            mf (TYPE): Description
+            vf (TYPE): Description
+            alpha (float, optional): Description
+
+        Returns:
+            TYPE: Description
+
+        Raises:
+            NotImplementedError: Description
+        """
         raise NotImplementedError('TODO: return probablity of y=1')
 
 
 class AEP_Model(object):
     """Summary
-    
+
     Attributes:
         fixed_params (list): Description
         N (TYPE): Description
@@ -1241,7 +1270,7 @@ class AEP_Model(object):
 
     def __init__(self, y_train):
         """Summary
-        
+
         Args:
             y_train (TYPE): Description
         """
@@ -1252,11 +1281,11 @@ class AEP_Model(object):
 
     def init_hypers(self, y_train, x_train=None):
         """Summary
-        
+
         Args:
             y_train (TYPE): Description
             x_train (None, optional): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -1264,7 +1293,7 @@ class AEP_Model(object):
 
     def get_hypers(self):
         """Summary
-        
+
         Returns:
             TYPE: Description
         """
@@ -1272,10 +1301,10 @@ class AEP_Model(object):
 
     def update_hypers(self, params):
         """Summary
-        
+
         Args:
             params (TYPE): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -1286,7 +1315,7 @@ class AEP_Model(object):
             callback=None, maxfun=100000, maxiter=1000, alpha=0.5,
             mb_size=None, adam_lr=0.001, prop_mode=PROP_MM, disp=True, **kargs):
         """Summary
-        
+
         Args:
             method (str, optional): Description
             tol (None, optional): Description
@@ -1298,8 +1327,9 @@ class AEP_Model(object):
             mb_size (None, optional): Description
             adam_lr (float, optional): Description
             prop_mode (TYPE, optional): Description
+            disp (bool, optional): Description
             **kargs: Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -1348,10 +1378,10 @@ class AEP_Model(object):
 
     def set_fixed_params(self, params):
         """Summary
-        
+
         Args:
             params (TYPE): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -1364,10 +1394,10 @@ class AEP_Model(object):
 
     def save_model(self, fname='/tmp/model.pickle'):
         """Summary
-        
+
         Args:
             fname (str, optional): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -1376,10 +1406,10 @@ class AEP_Model(object):
 
     def load_model(self, fname='/tmp/model.pickle'):
         """Summary
-        
+
         Args:
             fname (str, optional): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -1389,7 +1419,7 @@ class AEP_Model(object):
 
 class SGPLVM(AEP_Model):
     """Summary
-    
+
     Attributes:
         Din (TYPE): Description
         Dout (TYPE): Description
@@ -1409,7 +1439,7 @@ class SGPLVM(AEP_Model):
     def __init__(self, y_train, hidden_size, no_pseudo,
                  lik='Gaussian', prior_mean=0, prior_var=1):
         """Summary
-        
+
         Args:
             y_train (TYPE): Description
             hidden_size (TYPE): Description
@@ -1417,7 +1447,7 @@ class SGPLVM(AEP_Model):
             lik (str, optional): Description
             prior_mean (int, optional): Description
             prior_var (int, optional): Description
-        
+
         Raises:
             NotImplementedError: Description
         """
@@ -1448,16 +1478,16 @@ class SGPLVM(AEP_Model):
     @profile
     def objective_function(self, params, mb_size, alpha=1.0, prop_mode=PROP_MM):
         """Summary
-        
+
         Args:
             params (TYPE): Description
             mb_size (TYPE): Description
             alpha (float, optional): Description
             prop_mode (TYPE, optional): Description
-        
+
         Returns:
             TYPE: Description
-        
+
         Raises:
             NotImplementedError: Description
         """
@@ -1572,10 +1602,10 @@ class SGPLVM(AEP_Model):
 
     def compute_phi_prior_x(self, idxs):
         """Summary
-        
+
         Args:
             idxs (TYPE): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -1588,10 +1618,10 @@ class SGPLVM(AEP_Model):
 
     def compute_phi_posterior_x(self, idxs):
         """Summary
-        
+
         Args:
             idxs (TYPE): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -1607,11 +1637,11 @@ class SGPLVM(AEP_Model):
 
     def compute_phi_cavity_x(self, idxs, alpha=1.0):
         """Summary
-        
+
         Args:
             idxs (TYPE): Description
             alpha (float, optional): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -1627,10 +1657,10 @@ class SGPLVM(AEP_Model):
 
     def predict_f(self, inputs):
         """Summary
-        
+
         Args:
             inputs (TYPE): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -1642,10 +1672,10 @@ class SGPLVM(AEP_Model):
 
     def predict_y(self, inputs):
         """Summary
-        
+
         Args:
             inputs (TYPE): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -1658,7 +1688,7 @@ class SGPLVM(AEP_Model):
 
     def get_posterior_x(self):
         """Summary
-        
+
         Returns:
             TYPE: Description
         """
@@ -1670,14 +1700,14 @@ class SGPLVM(AEP_Model):
 
     def impute_missing(self, y, missing_mask, alpha=0.5, no_iters=10, add_noise=False):
         """Summary
-        
+
         Args:
             y (TYPE): Description
             missing_mask (TYPE): Description
             alpha (float, optional): Description
             no_iters (int, optional): Description
             add_noise (bool, optional): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -1732,10 +1762,10 @@ class SGPLVM(AEP_Model):
 
     def init_hypers_old(self, y_train):
         """Summary
-        
+
         Args:
             y_train (TYPE): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -1760,10 +1790,10 @@ class SGPLVM(AEP_Model):
 
     def init_hypers(self, y_train):
         """Summary
-        
+
         Args:
             y_train (TYPE): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -1794,7 +1824,7 @@ class SGPLVM(AEP_Model):
 
     def get_hypers(self):
         """Summary
-        
+
         Returns:
             TYPE: Description
         """
@@ -1811,10 +1841,10 @@ class SGPLVM(AEP_Model):
 
     def update_hypers(self, params):
         """Summary
-        
+
         Args:
             params (TYPE): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -1826,7 +1856,7 @@ class SGPLVM(AEP_Model):
 
 class SGPR(AEP_Model):
     """Summary
-    
+
     Attributes:
         Din (TYPE): Description
         Dout (TYPE): Description
@@ -1840,13 +1870,13 @@ class SGPR(AEP_Model):
 
     def __init__(self, x_train, y_train, no_pseudo, lik='Gaussian'):
         """Summary
-        
+
         Args:
             x_train (TYPE): Description
             y_train (TYPE): Description
             no_pseudo (TYPE): Description
             lik (str, optional): Description
-        
+
         Raises:
             NotImplementedError: Description
         """
@@ -1868,13 +1898,13 @@ class SGPR(AEP_Model):
     @profile
     def objective_function(self, params, mb_size, alpha=1.0, prop_mode=PROP_MM):
         """Summary
-        
+
         Args:
             params (TYPE): Description
             mb_size (TYPE): Description
             alpha (float, optional): Description
             prop_mode (TYPE, optional): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -1926,10 +1956,10 @@ class SGPR(AEP_Model):
 
     def predict_f(self, inputs):
         """Summary
-        
+
         Args:
             inputs (TYPE): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -1941,11 +1971,11 @@ class SGPR(AEP_Model):
 
     def sample_f(self, inputs, no_samples=1):
         """Summary
-        
+
         Args:
             inputs (TYPE): Description
             no_samples (int, optional): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -1961,10 +1991,10 @@ class SGPR(AEP_Model):
 
     def predict_y(self, inputs):
         """Summary
-        
+
         Args:
             inputs (TYPE): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -1977,10 +2007,10 @@ class SGPR(AEP_Model):
 
     def init_hypers(self, y_train):
         """Summary
-        
+
         Args:
             y_train (TYPE): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -1992,7 +2022,7 @@ class SGPR(AEP_Model):
 
     def get_hypers(self):
         """Summary
-        
+
         Returns:
             TYPE: Description
         """
@@ -2004,10 +2034,10 @@ class SGPR(AEP_Model):
 
     def update_hypers(self, params):
         """Summary
-        
+
         Args:
             params (TYPE): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -2017,7 +2047,7 @@ class SGPR(AEP_Model):
 
 class SDGPR(AEP_Model):
     """Summary
-    
+
     Attributes:
         Din (TYPE): Description
         Dout (TYPE): Description
@@ -2033,14 +2063,14 @@ class SDGPR(AEP_Model):
 
     def __init__(self, x_train, y_train, no_pseudos, hidden_sizes, lik='Gaussian'):
         """Summary
-        
+
         Args:
             x_train (TYPE): Description
             y_train (TYPE): Description
             no_pseudos (TYPE): Description
             hidden_sizes (TYPE): Description
             lik (str, optional): Description
-        
+
         Raises:
             NotImplementedError: Description
         """
@@ -2072,13 +2102,13 @@ class SDGPR(AEP_Model):
 
     def objective_function(self, params, mb_size, alpha=1.0, prop_mode=PROP_MM):
         """Summary
-        
+
         Args:
             params (TYPE): Description
             mb_size (TYPE): Description
             alpha (float, optional): Description
             prop_mode (TYPE, optional): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -2163,10 +2193,10 @@ class SDGPR(AEP_Model):
 
     def predict_f(self, inputs):
         """Summary
-        
+
         Args:
             inputs (TYPE): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -2183,11 +2213,11 @@ class SDGPR(AEP_Model):
 
     def sample_f(self, inputs, no_samples=1):
         """Summary
-        
+
         Args:
             inputs (TYPE): Description
             no_samples (int, optional): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -2208,10 +2238,10 @@ class SDGPR(AEP_Model):
 
     def predict_y(self, inputs):
         """Summary
-        
+
         Args:
             inputs (TYPE): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -2221,10 +2251,10 @@ class SDGPR(AEP_Model):
 
     def init_hypers(self, y_train):
         """Summary
-        
+
         Args:
             y_train (TYPE): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -2245,7 +2275,7 @@ class SDGPR(AEP_Model):
 
     def get_hypers(self):
         """Summary
-        
+
         Returns:
             TYPE: Description
         """
@@ -2259,10 +2289,10 @@ class SDGPR(AEP_Model):
 
     def update_hypers(self, params):
         """Summary
-        
+
         Args:
             params (TYPE): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -2273,7 +2303,7 @@ class SDGPR(AEP_Model):
 
 class Gauss_Emis():
     """Summary
-    
+
     Attributes:
         C (TYPE): Description
         Din (TYPE): Description
@@ -2285,7 +2315,7 @@ class Gauss_Emis():
 
     def __init__(self, y, Dout, Din):
         """Summary
-        
+
         Args:
             y (TYPE): Description
             Dout (TYPE): Description
@@ -2300,10 +2330,11 @@ class Gauss_Emis():
 
     def update_hypers(self, params, key_suffix=''):
         """Summary
-        
+
         Args:
             params (TYPE): Description
-        
+            key_suffix (str, optional): Description
+
         Returns:
             TYPE: Description
         """
@@ -2312,34 +2343,41 @@ class Gauss_Emis():
 
     def init_hypers(self, key_suffix=''):
         """Summary
-        
+
         Returns:
             TYPE: Description
+
+        Args:
+            key_suffix (str, optional): Description
         """
         params = {}
-        params['C' + key_suffix] = np.ones((self.Dout, self.Din)) / (self.Dout * self.Din)
+        params[
+            'C' + key_suffix] = np.ones((self.Dout, self.Din)) / (self.Dout * self.Din)
         params['R' + key_suffix] = np.log(0.01) * np.ones(self.Dout)
         return params
 
     def get_hypers(self, key_suffix=''):
         """Summary
-        
+
         Returns:
             TYPE: Description
+
+        Args:
+            key_suffix (str, optional): Description
         """
         params = {
-            'C' + key_suffix: self.C, 
+            'C' + key_suffix: self.C,
             'R' + key_suffix: 0.5 * np.log(self.R)}
         return params
 
     def compute_factor(self, x_cav_m, x_cav_v, alpha):
         """Summary
-        
+
         Args:
             x_cav_m (TYPE): Description
             x_cav_v (TYPE): Description
             alpha (TYPE): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -2353,11 +2391,11 @@ class Gauss_Emis():
 
     def output_probabilistic(self, mf, vf):
         """Summary
-        
+
         Args:
             mf (TYPE): Description
             vf (TYPE): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -2368,13 +2406,14 @@ class Gauss_Emis():
 
     def compute_emission_tilted(self, mx, vx, alpha, scale, idxs=None):
         """Summary
-        
+
         Args:
             mx (TYPE): Description
             vx (TYPE): Description
             alpha (TYPE): Description
             scale (TYPE): Description
-        
+            idxs (None, optional): Description
+
         Returns:
             TYPE: Description
         """
@@ -2422,7 +2461,7 @@ class Gauss_Emis():
 # TODO: prediction and more robust init
 class SGPSSM(AEP_Model):
     """Summary
-    
+
     Attributes:
         Dcon_dyn (TYPE): Description
         Dcon_emi (TYPE): Description
@@ -2430,6 +2469,7 @@ class SGPSSM(AEP_Model):
         Dout (TYPE): Description
         dyn_layer (TYPE): Description
         emi_layer (TYPE): Description
+        gp_emi (TYPE): Description
         lik_layer (TYPE): Description
         M (TYPE): Description
         N (TYPE): Description
@@ -2442,14 +2482,14 @@ class SGPSSM(AEP_Model):
         x_post_2 (TYPE): Description
         x_prior_1 (TYPE): Description
         x_prior_2 (TYPE): Description
-    
+
     """
 
     def __init__(self, y_train, hidden_size, no_pseudo,
                  lik='Gaussian', prior_mean=0, prior_var=1,
                  x_control=None, gp_emi=False, control_to_emi=True):
         """Summary
-        
+
         Args:
             y_train (TYPE): Description
             hidden_size (TYPE): Description
@@ -2458,10 +2498,14 @@ class SGPSSM(AEP_Model):
             prior_mean (int, optional): Description
             prior_var (int, optional): Description
             x_control (None, optional): Description
-            control_emi (bool, optional): Description
-        
+            gp_emi (bool, optional): Description
+            control_to_emi (bool, optional): Description
+
         Raises:
             NotImplementedError: Description
+
+        Deleted Parameters:
+            control_emi (bool, optional): Description
         """
         super(SGPSSM, self).__init__(y_train)
         if x_control is not None:
@@ -2510,16 +2554,16 @@ class SGPSSM(AEP_Model):
     @profile
     def objective_function(self, params, mb_size, alpha=1.0, prop_mode=PROP_MM):
         """Summary
-        
+
         Args:
             params (TYPE): Description
             mb_size (TYPE): Description
             alpha (float, optional): Description
             prop_mode (TYPE, optional): Description
-        
+
         Returns:
             TYPE: Description
-        
+
         Raises:
             NotImplementedError: Description
         """
@@ -2530,16 +2574,16 @@ class SGPSSM(AEP_Model):
             lik_layer = self.lik_layer
         # TODO: deal with minibatch here
         if mb_size >= N:
-            dyn_idxs = np.arange(0, N-1)
+            dyn_idxs = np.arange(0, N - 1)
             emi_idxs = np.arange(0, N)
             yb = self.y_train
         else:
-            start_idx = np.random.randint(0, N-mb_size)
+            start_idx = np.random.randint(0, N - mb_size)
             # start_idx = 0
             # start_idx = N-mb_size-1
             end_idx = start_idx + mb_size
             emi_idxs = np.arange(start_idx, end_idx)
-            dyn_idxs = np.arange(start_idx, end_idx-1)
+            dyn_idxs = np.arange(start_idx, end_idx - 1)
             yb = self.y_train[emi_idxs, :]
         batch_size_dyn = dyn_idxs.shape[0]
         scale_logZ_dyn = - (N - 1) * 1.0 / batch_size_dyn / alpha
@@ -2691,10 +2735,10 @@ class SGPSSM(AEP_Model):
 
     def compute_posterior_grad_x(self, alpha):
         """Summary
-        
+
         Args:
             alpha (TYPE): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -2716,10 +2760,10 @@ class SGPSSM(AEP_Model):
         return grads
 
     def compute_logZ_grad_x(
-            self, alpha, cav_1, cav_2, dmcav_up, dvcav_up, 
+            self, alpha, cav_1, cav_2, dmcav_up, dvcav_up,
             dmcav_prev, dvcav_prev, dmcav_next, dvcav_next, emi_idxs):
         """Summary
-        
+
         Args:
             alpha (TYPE): Description
             cav_1 (TYPE): Description
@@ -2730,7 +2774,8 @@ class SGPSSM(AEP_Model):
             dvcav_prev (TYPE): Description
             dmcav_next (TYPE): Description
             dvcav_next (TYPE): Description
-        
+            emi_idxs (TYPE): Description
+
         Returns:
             TYPE: Description
         """
@@ -2738,12 +2783,12 @@ class SGPSSM(AEP_Model):
         grads_x_2 = np.zeros_like(grads_x_1)
 
         grads_up_1 = dmcav_up / cav_2[emi_idxs, :]
-        grads_up_2 = (- dmcav_up * cav_1[emi_idxs, :] / cav_2[emi_idxs, :]**2 
+        grads_up_2 = (- dmcav_up * cav_1[emi_idxs, :] / cav_2[emi_idxs, :]**2
                       - dvcav_up / cav_2[emi_idxs, :]**2)
         grads_x_1[emi_idxs, :] = grads_up_1
         grads_x_2[emi_idxs, :] = grads_up_2
 
-        idxs = np.arange(emi_idxs[0]+1, emi_idxs[-1]+1)
+        idxs = np.arange(emi_idxs[0] + 1, emi_idxs[-1] + 1)
         grads_prev_1 = dmcav_prev / cav_2[idxs, :]
         grads_prev_2 = (- dmcav_prev * cav_1[idxs, :] / cav_2[idxs, :]**2
                         - dvcav_prev / cav_2[idxs, :]**2)
@@ -2769,12 +2814,12 @@ class SGPSSM(AEP_Model):
 
     def compute_cavity_grad_x(self, alpha, cav_1, cav_2):
         """Summary
-        
+
         Args:
             alpha (TYPE): Description
             cav_1 (TYPE): Description
             cav_2 (TYPE): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -2799,7 +2844,7 @@ class SGPSSM(AEP_Model):
 
     def compute_transition_tilted(self, m_prop, v_prop, m_t, v_t, alpha, scale):
         """Summary
-        
+
         Args:
             m_prop (TYPE): Description
             v_prop (TYPE): Description
@@ -2807,10 +2852,10 @@ class SGPSSM(AEP_Model):
             v_t (TYPE): Description
             alpha (TYPE): Description
             scale (TYPE): Description
-        
+
         Returns:
             TYPE: Description
-        
+
         Raises:
             RuntimeError: Description
         """
@@ -2855,10 +2900,10 @@ class SGPSSM(AEP_Model):
 
     def compute_cavity_x(self, alpha):
         """Summary
-        
+
         Args:
             alpha (TYPE): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -2868,7 +2913,7 @@ class SGPSSM(AEP_Model):
 
     def compute_phi_prior_x(self):
         """Summary
-        
+
         Returns:
             TYPE: Description
         """
@@ -2880,10 +2925,10 @@ class SGPSSM(AEP_Model):
 
     def compute_phi_posterior_x(self, alpha):
         """Summary
-        
+
         Args:
             alpha (TYPE): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -2897,10 +2942,10 @@ class SGPSSM(AEP_Model):
 
     def compute_phi_cavity_x(self, alpha):
         """Summary
-        
+
         Args:
             alpha (TYPE): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -2917,10 +2962,10 @@ class SGPSSM(AEP_Model):
 
     def predict_f(self, inputs):
         """Summary
-        
+
         Args:
             inputs (TYPE): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -2933,11 +2978,11 @@ class SGPSSM(AEP_Model):
 
     def predict_forward(self, T, x_control=None):
         """Summary
-        
+
         Args:
             T (TYPE): Description
             x_control (None, optional): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -2979,10 +3024,10 @@ class SGPSSM(AEP_Model):
 
     def predict_y(self, inputs):
         """Summary
-        
+
         Args:
             inputs (TYPE): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -3003,7 +3048,7 @@ class SGPSSM(AEP_Model):
 
     def get_posterior_x(self):
         """Summary
-        
+
         Returns:
             TYPE: Description
         """
@@ -3015,7 +3060,7 @@ class SGPSSM(AEP_Model):
 
     def get_posterior_y(self):
         """Summary
-        
+
         Returns:
             TYPE: Description
         """
@@ -3039,10 +3084,10 @@ class SGPSSM(AEP_Model):
 
     def init_hypers(self, y_train):
         """Summary
-        
+
         Args:
             y_train (TYPE): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -3116,7 +3161,7 @@ class SGPSSM(AEP_Model):
 
     def get_hypers(self):
         """Summary
-        
+
         Returns:
             TYPE: Description
         """
@@ -3136,10 +3181,10 @@ class SGPSSM(AEP_Model):
 
     def update_hypers(self, params):
         """Summary
-        
+
         Args:
             params (TYPE): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -3161,9 +3206,11 @@ class SGPSSM(AEP_Model):
 # TODO: try mean and variance parameterisation instead of natural params
 
 # deep GP regression with hidden variables
+
+
 class SDGPR_H(AEP_Model):
     """Summary
-    
+
     Attributes:
         Din (TYPE): Description
         Dout (TYPE): Description
@@ -3182,14 +3229,14 @@ class SDGPR_H(AEP_Model):
 
     def __init__(self, x_train, y_train, no_pseudos, hidden_sizes, lik='Gaussian'):
         """Summary
-        
+
         Args:
             x_train (TYPE): Description
             y_train (TYPE): Description
             no_pseudos (TYPE): Description
             hidden_sizes (TYPE): Description
             lik (str, optional): Description
-        
+
         Raises:
             NotImplementedError: Description
         """
@@ -3229,13 +3276,13 @@ class SDGPR_H(AEP_Model):
 
     def objective_function(self, params, mb_size, alpha=1.0, prop_mode=PROP_MM):
         """Summary
-        
+
         Args:
             params (TYPE): Description
             mb_size (TYPE): Description
             alpha (float, optional): Description
             prop_mode (TYPE, optional): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -3337,12 +3384,12 @@ class SDGPR_H(AEP_Model):
 
     def compute_grads_hidden(self, dmcav_logZ, dvcav_logZ, alpha):
         """Summary
-        
+
         Args:
             dmcav_logZ (TYPE): Description
             dvcav_logZ (TYPE): Description
             alpha (TYPE): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -3373,10 +3420,10 @@ class SDGPR_H(AEP_Model):
 
     def compute_phi_cavity_h(self, alpha):
         """Summary
-        
+
         Args:
             alpha (TYPE): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -3391,10 +3438,10 @@ class SDGPR_H(AEP_Model):
 
     def compute_phi_posterior_h(self, alpha):
         """Summary
-        
+
         Args:
             alpha (TYPE): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -3410,7 +3457,7 @@ class SDGPR_H(AEP_Model):
     def compute_transition_tilted(self, m_prop, v_prop, m_t, v_t, alpha,
                                   layer_ind, scale):
         """Summary
-        
+
         Args:
             m_prop (TYPE): Description
             v_prop (TYPE): Description
@@ -3419,7 +3466,7 @@ class SDGPR_H(AEP_Model):
             alpha (TYPE): Description
             layer_ind (TYPE): Description
             scale (TYPE): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -3445,11 +3492,11 @@ class SDGPR_H(AEP_Model):
 
     def compute_cavity_h(self, idxs, alpha):
         """Summary
-        
+
         Args:
             idxs (TYPE): Description
             alpha (TYPE): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -3465,10 +3512,10 @@ class SDGPR_H(AEP_Model):
 
     def predict_f(self, inputs):
         """Summary
-        
+
         Args:
             inputs (TYPE): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -3485,11 +3532,11 @@ class SDGPR_H(AEP_Model):
 
     def sample_f(self, inputs, no_samples=1):
         """Summary
-        
+
         Args:
             inputs (TYPE): Description
             no_samples (int, optional): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -3510,10 +3557,10 @@ class SDGPR_H(AEP_Model):
 
     def predict_y(self, inputs):
         """Summary
-        
+
         Args:
             inputs (TYPE): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -3523,10 +3570,10 @@ class SDGPR_H(AEP_Model):
 
     def init_hypers(self, y_train):
         """Summary
-        
+
         Args:
             y_train (TYPE): Description
-        
+
         Returns:
             TYPE: Description
         """
@@ -3552,7 +3599,7 @@ class SDGPR_H(AEP_Model):
 
     def get_hypers(self):
         """Summary
-        
+
         Returns:
             TYPE: Description
         """
@@ -3570,10 +3617,10 @@ class SDGPR_H(AEP_Model):
 
     def update_hypers(self, params):
         """Summary
-        
+
         Args:
             params (TYPE): Description
-        
+
         Returns:
             TYPE: Description
         """
