@@ -1,3 +1,5 @@
+import matplotlib
+matplotlib.use('Agg')
 print "importing stuff..."
 import numpy as np
 import pdb
@@ -5,7 +7,7 @@ import matplotlib.pylab as plt
 from scipy import special
 
 from .context import aep
-from .context import PROP_MC
+from .context import config
 
 # import sys
 # import os
@@ -40,7 +42,7 @@ def run_cluster_MM():
     print "inference ..."
     M = 30
     D = 5
-    alpha = 1.0
+    alpha = 0.5
     lvm = aep.SGPLVM(Y, D, M, lik='Gaussian')
     lvm.optimise(method='L-BFGS-B', alpha=alpha, maxiter=2000)
 
@@ -79,10 +81,10 @@ def run_cluster_MC():
     print "inference ..."
     M = 30
     D = 5
-    alpha = 1.0
+    alpha = 0.5
     lvm = aep.SGPLVM(Y, D, M, lik='Gaussian')
     lvm.optimise(method='adam', adam_lr=0.05, maxiter=2000,
-                 alpha=alpha, prop_mode=PROP_MC)
+                 alpha=alpha, prop_mode=config.PROP_MC)
 
     ls = np.exp(lvm.sgp_layer.ls)
     print ls
@@ -91,8 +93,9 @@ def run_cluster_MC():
     mx, vx = lvm.get_posterior_x()
     plt.scatter(mx[:, inds[0]], mx[:, inds[1]], c=labels)
     zu = lvm.sgp_layer.zu
-    plt.plot(zu[:, inds[0]], zu[:, inds[1]], 'ko')
-    plt.show()
+    # plt.plot(zu[:, inds[0]], zu[:, inds[1]], 'ko')
+    # plt.show()
+    plt.savefig('/tmp/gplvm_cluster.pdf')
 
 
 def run_mnist():
@@ -412,8 +415,8 @@ def run_frey():
     plt.show()
 
 if __name__ == '__main__':
-    run_cluster_MM()
-    # run_cluster_MC()
+    # run_cluster_MM()
+    run_cluster_MC()
     # run_semicircle()
     # run_pinwheel()
     # run_xor()
