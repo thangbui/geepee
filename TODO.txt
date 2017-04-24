@@ -1,0 +1,90 @@
+## daily todos
+- [X] merge GPSSMs with Linear emission and GP emission
+- [ ] make sure that GPSSMs init and learning is robust on many simple 1-D problems
+- [X] cleaned up GPSSM examples
+- [X] stochastic optimisation for GPSSMs and GPLVMs
+- [ ] figure out why the gradients of eta2 is twice what should be on the kink task
+- [ ] simple Monte Carlo for EP modules
+- [ ] merge JMLR code (PEP for GPR/C) into this package
+- [ ] linearisation
+- [ ] GPSSM experiments
+- [ ] re-run deep GPR experiments
+
+## GOALS
+
+GP regression/classification
++----------+-------+------+----------+
+| Method   | Batch | Stoc | Examples |
++----------+-------+------+----------+
+| BB-alpha |       |      |          |
++----------+-------+------+----------+
+| PEP      |       |      |          |
++----------+-------+------+----------+
+| VFE      |       |      |          |
++----------+-------+------+----------+
+
+GP LVM
++----------+-------+------+-----------------+-----------+---------------+----------+
+| Method   | Batch | Stoc | Moment-matching | Simple MC | Linearisation | Examples |
++----------+-------+------+-----------------+-----------+---------------+----------+
+| BB-alpha |       |      |                 |           |               |          |
++----------+-------+------+-----------------+-----------+---------------+----------+
+| PEP      |       |      |                 |           |               |          |
++----------+-------+------+-----------------+-----------+---------------+----------+
+| VFE      |       |      |                 |           |               |          |
++----------+-------+------+-----------------+-----------+---------------+----------+
+
+GP SSM
++----------+-------+------+----+-----------+-----+---------+--------+---------------+----------+
+| Method   | Batch | Stoc | MM | Simple MC | Lin | Lin emi | GP emi | Non-Gauss emi | Examples |
++----------+-------+------+----+-----------+-----+---------+--------+---------------+----------+
+| BB-alpha |       |      |    |           |     |         |        |               |          |
++----------+-------+------+----+-----------+-----+---------+--------+---------------+----------+
+| PEP      |       |      |    |           |     |         |        |               |          |
++----------+-------+------+----+-----------+-----+---------+--------+---------------+----------+
+| VFE      |       |      |    |           |     |         |        |               |          |
++----------+-------+------+----+-----------+-----+---------+--------+---------------+----------+
+
+Deep GPs should handle everything above
+
+## General
+
+- [x] save/load models: is saving parameters enough?
+- [x] remove for loops in aep_models update_posterior, compute_cavity
+- [ ] separate parameters for different output dimensions
+- [ ] stochastic optimisations for all models, 
+check that gradients are correct and bias is small
+- [ ] moment matching vs linearisation vs quadrature/MC
+
+## AEP (BB-alpha) modules
+
+- [x] sparse GPLVM
+- [x] sparse GP regression and classification: make sure that the gradients of logZ 
+are the same with sparse GPLVM when variance = 0
+- [x] sparse Deep GP regression and classification
+- [ ] sparse Deep GP latent variable models
+- [ ] sparse Deep GP with hidden variables
+- [x] sparse GP state space models
+- [ ] for sparse Deep GP with no hidden variables: alpha = 1.0 do moment matching, 
+for other alphas, what do we do?
+
+## EP modules
+- [ ] numerical instability/invalid updates
+- [x] sparse GPR/C inference
+- [ ] sparse GPR/C learning
+- [x] GPLVM inference
+- [ ] GPLVM learning, half-ticked, could use AEP learning insteard
+- [ ] Deep-GP inference
+- [ ] Deep-GP learning
+- [x] GP SSM inference
+- [ ] GP SSM learning, half-ticked, could use AEP learning instead
+- [ ] GP SSM inference and learning with control signal
+- [ ] should work with all alphas
+
+## VI modules
+
+- [x] Titsias's VI for GPR/C
+- [ ] Titsias's VI for GPLVM (collapsed bound)
+- [ ] Frigola's VI for GPSSM
+- [ ] Hensman's VI compression for Deep GPR/C, LVM
+- [ ] make sure that these converge to AEP/EP modules when alpha -> 0
