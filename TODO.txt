@@ -1,6 +1,5 @@
 ## daily todos
 - [X] merge GPSSMs with Linear emission and GP emission
-- [ ] make sure that GPSSMs init and learning is robust on many simple 1-D problems
 - [X] cleaned up GPSSM examples
 - [X] stochastic optimisation for GPSSMs and GPLVMs
 - [ ] figure out why the gradients of eta2 is twice what should be on the kink task
@@ -9,6 +8,8 @@
 - [ ] linearisation
 - [ ] GPSSM experiments
 - [ ] re-run deep GPR experiments
+- [ ] GPSSM - VFE
+- [ ] make sure that GPSSMs init and learning is robust on many simple 1-D problems
 
 ## GOALS
 
@@ -54,7 +55,9 @@ Deep GPs should handle everything above
 - [ ] separate parameters for different output dimensions
 - [ ] stochastic optimisations for all models, 
 check that gradients are correct and bias is small
-- [ ] moment matching vs linearisation vs quadrature/MC
+- [ ] linearisation 
+- [ ] quadrature/MC
+- [ ] a comparison of LIN vs MM vs MC
 
 ## AEP (BB-alpha) modules
 
@@ -83,8 +86,10 @@ for other alphas, what do we do?
 
 ## VI modules
 
-- [x] Titsias's VI for GPR/C
+- [x] Titsias's VI for GPR/C (collapsed)
+- [ ] Titsias's VI for GPR/C (uncollapsed)
 - [ ] Titsias's VI for GPLVM (collapsed bound)
-- [ ] Frigola's VI for GPSSM
+- [ ] Titsias's VI for GPLVM (uncollapsed bound)
+- [ ] Frigola's VI for GPSSM (mean field and tridiagonal precision (Markov))
 - [ ] Hensman's VI compression for Deep GPR/C, LVM
 - [ ] make sure that these converge to AEP/EP modules when alpha -> 0
