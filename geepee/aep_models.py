@@ -787,14 +787,14 @@ class SGP_Layer(object):
                 centroids = x_train[randind[0:M], :]
             zu = centroids
 
-            if N < 10000:
+            if N < 1000:
                 X1 = np.copy(x_train)
             else:
                 randind = np.random.permutation(N)
-                X1 = X[randind[:5000], :]
+                X1 = x_train[randind[:1000], :]
 
             x_dist = cdist(X1, X1, 'euclidean')
-            triu_ind = np.triu_indices(N)
+            triu_ind = np.triu_indices(X1.shape[0])
             ls = np.zeros((Din, ))
             d2imed = np.median(x_dist[triu_ind])
             for i in range(Din):
