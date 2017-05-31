@@ -2246,7 +2246,7 @@ class SDGPR(AEP_Model):
             TYPE: Description
         """
         mf, vf = self.predict_f(inputs)
-        my, vy = self.lik_layer.forward_prop_thru_post(mf, vf)
+        my, vy = self.lik_layer.output_probabilistic(mf, vf)
         return my, vy
 
     def init_hypers(self, y_train):
@@ -3565,7 +3565,7 @@ class SDGPR_H(AEP_Model):
             TYPE: Description
         """
         mf, vf = self.predict_f(inputs)
-        my, vy = self.lik_layer.forward_prop_thru_post(mf, vf)
+        my, vy = self.lik_layer.output_probabilistic(mf, vf)
         return my, vy
 
     def init_hypers(self, y_train):
