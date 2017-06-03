@@ -38,7 +38,7 @@ def test_gpr_vfe_gaussian():
     y_train = np.random.randn(N_train, Q)
     x_train = np.random.randn(N_train, D)
     # params  tied
-    model = vfe.SGPR(x_train, y_train, M)
+    model = vfe.SGPR_collapsed(x_train, y_train, M)
 
     # init hypers, inducing points and q(u) params
     init_params = model.init_hypers()
@@ -128,7 +128,7 @@ def test_gpr_vfe_gaussian_scipy():
     x_train = np.random.randn(N_train, D)
     y_train = np.random.randn(N_train, Q)
     # params  tied
-    model = vfe.SGPR(x_train, y_train, M)
+    model = vfe.SGPR_collapsed(x_train, y_train, M)
 
     # init hypers, inducing points and q(u) params
     init_params_dict = model.init_hypers()

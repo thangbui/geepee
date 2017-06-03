@@ -2211,6 +2211,55 @@ class SDGPR(AEP_Model):
                 mf, vf = layer.forward_prop_thru_post(mf, vf)
         return mf, vf
 
+    def predict_f_with_input_grad(self, inputs):
+        if not self.updated:
+            for layer in self.sgp_layers:
+                layer.update_posterior_for_prediction()
+            self.updated = True
+        for i, layer in enumerate(self.sgp_layers):
+            if i == 0:
+                mf, vf = layer.forward_prop_thru_post(inputs)
+            else:
+                mf, vf = layer.forward_prop_thru_post(mf, vf)
+
+        # propagate inputs forward
+        mout, vout, psi1, psi2 = [], [], [], []
+        for i in range(0, self.L):
+            layer = self.sgp_layers[i]
+            if i == 0:
+                # first layer
+                m0, v0, kfu0 = layer.forward_prop_thru_post(inputs)
+                mout.append(m0)
+                vout.append(v0)
+                psi1.append(kfu0)
+                psi2.append(None)
+            else:
+                mi, vi, psi1i, psi2i = layer.forward_prop_thru_post(
+                    mout[i - 1], vout[i - 1])
+                mout.append(mi)
+                vout.append(vi)
+                psi1.append(psi1i)
+                psi2.append(psi2i)
+
+        # compute logZ and gradients
+        logZ, dm, dv = self.lik_layer.compute_log_Z(
+            mout[-1], vout[-1], yb, alpha)
+        logZ_scale = scale_logZ * logZ
+        dmi = scale_logZ * dm
+        dvi = scale_logZ * dv
+        grad_list = []
+        for i in range(self.L - 1, -1, -1):
+            layer = self.sgp_layers[i]
+            if i == 0:
+                grad_hyper = layer.backprop_grads_reg(
+                    mout[i], vout[i], dmi, dvi, psi1[i], xb, alpha)
+            else:
+                grad_hyper, grad_input = layer.backprop_grads_lvm_mm(
+                    mout[i], vout[i], dmi, dvi, psi1[i], psi2[i],
+                    mout[i - 1], vout[i - 1], alpha)
+                dmi, dvi = grad_input['mx'], grad_input['vx']
+            grad_list.insert(0, grad_hyper)
+
     def sample_f(self, inputs, no_samples=1):
         """Summary
 
@@ -3206,7 +3255,6 @@ class SGPSSM(AEP_Model):
 # TODO: try mean and variance parameterisation instead of natural params
 
 # deep GP regression with hidden variables
-
 
 class SDGPR_H(AEP_Model):
     """Summary

@@ -61,7 +61,7 @@ class VI_Model(object):
 
     def optimise(
             self, method='L-BFGS-B', tol=None, reinit_hypers=True,
-            callback=None, maxfun=100000, maxiter=1000, alpha=0.5,
+            callback=None, maxfun=100000, maxiter=1000,
             mb_size=None, adam_lr=0.001, **kargs):
         """Summary
 
@@ -97,7 +97,7 @@ class VI_Model(object):
                 results = adam(objective_wrapper, init_params_vec,
                                step_size=adam_lr,
                                maxiter=maxiter,
-                               args=(params_args, self, mb_size, alpha, None))
+                               args=(params_args, self, mb_size, None))
                 final_params = results
             else:
                 options = {'maxfun': maxfun, 'maxiter': maxiter,
@@ -105,7 +105,7 @@ class VI_Model(object):
                 results = minimize(
                     fun=objective_wrapper,
                     x0=init_params_vec,
-                    args=(params_args, self, self.N, alpha, None),
+                    args=(params_args, self, self.N, None),
                     method=method,
                     jac=True,
                     tol=tol,
@@ -139,8 +139,32 @@ class VI_Model(object):
         else:
             self.fixed_params.append(params)
 
+    def save_model(self, fname='/tmp/model.pickle'):
+        """Summary
 
-class SGPR(VI_Model):
+        Args:
+            fname (str, optional): Description
+
+        Returns:
+            TYPE: Description
+        """
+        params = self.get_hypers()
+        pickle.dump(params, open(fname, "wb"))
+
+    def load_model(self, fname='/tmp/model.pickle'):
+        """Summary
+
+        Args:
+            fname (str, optional): Description
+
+        Returns:
+            TYPE: Description
+        """
+        params = pickle.load(open(fname, "rb"))
+        self.update_hypers(params)
+
+
+class SGPR_collapsed(VI_Model):
     """Summary
 
     Attributes:
@@ -167,7 +191,7 @@ class SGPR(VI_Model):
 
         '''
 
-        super(SGPR, self).__init__(y_train)
+        super(SGPR_collapsed, self).__init__(y_train)
         self.N = N = y_train.shape[0]
         self.Dout = Dout = y_train.shape[1]
         self.Din = Din = x_train.shape[1]
@@ -180,13 +204,12 @@ class SGPR(VI_Model):
         self.sf = 0
         self.sn = 0
 
-    def objective_function(self, params, idxs=None, alpha=1.0, prop_mode=None):
+    def objective_function(self, params, idxs=None, prop_mode=None):
         """Summary
 
         Args:
             params (TYPE): Description
             idxs (None, optional): Description
-            alpha (float, optional): Description
             prop_mode (None, optional): Description
 
         Returns:
@@ -254,12 +277,11 @@ class SGPR(VI_Model):
 
         return energy, grad_all
 
-    def predict_f(self, inputs, alpha=1.0, marginal=True):
+    def predict_f(self, inputs, marginal=True):
         """Summary
 
         Args:
             inputs (TYPE): Description
-            alpha (float, optional): Description
             marginal (bool, optional): Description
 
         Returns:
@@ -314,7 +336,7 @@ class SGPR(VI_Model):
             TYPE: Description
         """
         if not self.updated:
-            self.sgp_layer.update_posterior_for_prediction()
+            self.sgp_layer.update_posterior()
             self.updated = True
         K = no_samples
         fs = np.zeros((inputs.shape[0], self.Dout, K))
@@ -333,7 +355,7 @@ class SGPR(VI_Model):
             TYPE: Description
         """
         if not self.updated:
-            self.sgp_layer.update_posterior_for_prediction()
+            self.sgp_layer.update_posterior()
             self.updated = True
         mf, vf = self.sgp_layer.output_probabilistic(inputs)
         my, vy = self.lik_layer.output_probabilistic(mf, vf)
@@ -405,3 +427,935 @@ class SGPR(VI_Model):
         self.sf = params['sf']
         self.zu = params['zu']
         self.sn = params['sn']
+
+
+class SGP_Layer(object):
+    """Sparse Gaussian process layer
+    """
+
+    def __init__(self, no_train, input_size, output_size, no_pseudo):
+        """Initialisation
+
+        Args:
+            no_train (int): Number of training points
+            input_size (int): Number of input dimensions
+            output_size (int): Number of output dimensions
+            no_pseudo (int): Number of pseudo-points
+        """
+        self.Din = Din = input_size
+        self.Dout = Dout = output_size
+        self.M = M = no_pseudo
+        self.N = N = no_train
+
+        self.ones_M = np.ones(M)
+        self.ones_Din = np.ones(Din)
+
+        # variables for the mean and covariance of q(u)
+        self.mu = np.zeros([Dout, M, ])
+        self.Su = np.zeros([Dout, M, M])
+        self.Splusmm = np.zeros([Dout, M, M])
+
+        # numpy variable for inducing points, Kuuinv, Kuu and its gradients
+        self.zu = np.zeros([M, Din])
+        self.Kuu = np.zeros([M, M])
+        self.Kuuinv = np.zeros([M, M])
+
+        # variables for the hyperparameters
+        self.ls = np.zeros([Din, ])
+        self.sf = 0
+
+        # and natural parameters
+        self.theta_1_R = np.zeros([Dout, M, M])
+        self.theta_2 = np.zeros([Dout, M, ])
+        self.theta_1 = np.zeros([Dout, M, M])
+
+        # terms that are common to all datapoints in each minibatch
+        self.A = np.zeros([Dout, M, ])
+        self.B_det = np.zeros([Dout, M, M])
+        self.B_sto = np.zeros([Dout, M, M])
+
+    def compute_phi_prior(self):
+        """Compute the log-partition of the prior p(u)
+
+        Returns:
+            float: log-partition
+        """
+        (sign, logdet) = np.linalg.slogdet(self.Kuu)
+        logZ_prior = self.Dout * 0.5 * logdet
+        return logZ_prior
+
+    def compute_phi_posterior(self):
+        """Compute the log-partition of the posterior q(u)
+
+        Returns:
+            float: log-partition
+        """
+        (sign, logdet) = np.linalg.slogdet(self.Su)
+        phi_posterior = 0.5 * np.sum(logdet)
+        phi_posterior += 0.5 * np.sum(self.mu * np.linalg.solve(
+            self.Su, self.mu))
+        return phi_posterior
+
+    def compute_phi_cavity(self):
+        """Compute the log-partition of the cavity distribution
+
+        Returns:
+            float: log-partition
+        """
+        logZ_posterior = 0
+        (sign, logdet) = np.linalg.slogdet(self.Suhat)
+        phi_cavity = 0.5 * np.sum(logdet)
+        phi_cavity += 0.5 * np.sum(self.muhat * np.linalg.solve(
+            self.Suhat, self.muhat))
+        return phi_cavity
+
+    def compute_phi(self, alpha=1.0):
+        """Compute the weighted sum of the log-partitions of prior, post and cav  
+
+        Args:
+            alpha (float, optional): power parameter
+
+        Returns:
+            float: weighted sum of the log-partitions in the PEP energy
+        """
+        N = self.N
+        scale_post = N * 1.0 / alpha - 1.0
+        scale_cav = - N * 1.0 / alpha
+        scale_prior = 1
+        phi_prior = self.compute_phi_prior()
+        phi_post = self.compute_phi_posterior()
+        phi_cav = self.compute_phi_cavity()
+        phi = scale_prior * phi_prior + scale_post * phi_post + scale_cav * phi_cav
+        return phi
+
+    def forward_prop_thru_post(self, mx, vx=None, mode=PROP_MM):
+        """Propagate input distributions through the  non-linearity
+
+        Args:
+            mx (float): means of the input distributions, size K x Din
+            vx (float, optional): variances (if uncertain inputs), size K x Din
+            mode (config param, optional): propagation mode (see config)
+
+        Returns:
+            specific results depend on the propagation mode provided
+
+        Raises:
+            NotImplementedError: Unknown propagation mode
+        """
+        if vx is None:
+            return self._forward_prop_deterministic_thru_post(mx)
+        else:
+            if mode == PROP_MM:
+                return self._forward_prop_random_thru_post_mm(mx, vx)
+            elif mode == PROP_LIN:
+                return self._forward_prop_random_thru_post_lin(mx, vx)
+            elif mode == PROP_MC:
+                return self._forward_prop_random_thru_post_mc(mx, vx)
+            else:
+                raise NotImplementedError('unknown propagation mode')
+
+    def _forward_prop_deterministic_thru_post(self, x):
+        """Propagate deterministic inputs thru cavity
+
+        Args:
+            x (float): input values, size K x Din
+
+        Returns:
+            float, size K x Dout: output means
+            float, size K x Dout: output variances
+            float, size K x M: cross covariance matrix
+        """
+        kff = np.exp(2 * self.sf)
+        kfu = compute_kernel(2 * self.ls, 2 * self.sf, x, self.zu)
+        mout = np.einsum('nm,dm->nd', kfu, self.A)
+        Bkfukuf = np.einsum('dab,na,nb->nd', self.B_det, kfu, kfu)
+        vout = kff + Bkfukuf
+        return mout, vout, kfu
+
+    def _forward_prop_random_thru_post_mc(self, mx, vx):
+        """Propagate uncertain inputs thru cavity, using simple Monte Carlo
+
+        Args:
+            mx (float): input means, size K x Din
+            vx (TYPE): input variances, size K x Din
+
+        Returns:
+            output means and variances, and intermediate info for backprop
+        """
+        batch_size = mx.shape[0]
+        eps = np.random.randn(MC_NO_SAMPLES, batch_size, self.Din)
+        x = eps * np.sqrt(vx) + mx
+        x_stk = np.reshape(x, [MC_NO_SAMPLES * batch_size, self.Din])
+        e_stk = np.reshape(eps, [MC_NO_SAMPLES * batch_size, self.Din])
+        m_stk, v_stk, kfu_stk = self._forward_prop_deterministic_thru_post(
+            x_stk)
+        mout = m_stk.reshape([MC_NO_SAMPLES, batch_size, self.Dout])
+        vout = v_stk.reshape([MC_NO_SAMPLES, batch_size, self.Dout])
+        kfu = kfu_stk.reshape([MC_NO_SAMPLES, batch_size, self.M])
+        return (mout, vout, kfu, x, eps), (m_stk, v_stk, kfu_stk, x_stk, e_stk)
+
+    @profile
+    def _forward_prop_random_thru_cav_mm(self, mx, vx):
+        """Propagate uncertain inputs thru cavity, using simple Moment Matching
+
+        Args:
+            mx (float): input means, size K x Din
+            vx (TYPE): input variances, size K x Din
+
+        Returns:
+            output means and variances, and intermediate info for backprop
+        """
+        psi0 = np.exp(2 * self.sf)
+        psi1, psi2 = compute_psi_weave(
+            2 * self.ls, 2 * self.sf, mx, vx, self.zu)
+        mout = np.einsum('nm,dm->nd', psi1, self.A)
+        Bhatpsi2 = np.einsum('dab,nab->nd', self.B_sto, psi2)
+        vout = psi0 + Bhatpsi2 - mout**2
+        return mout, vout, psi1, psi2
+
+    #TODO
+    @profile
+    def backprop_grads_lvm_mm(self, m, v, dm, dv, psi1, psi2, mx, vx, alpha=1.0):
+        """Summary
+
+        Args:
+            m (TYPE): Description
+            v (TYPE): Description
+            dm (TYPE): Description
+            dv (TYPE): Description
+            psi1 (TYPE): Description
+            psi2 (TYPE): Description
+            mx (TYPE): Description
+            vx (TYPE): Description
+            alpha (float, optional): Description
+
+        Returns:
+            TYPE: Description
+        """
+        N = self.N
+        M = self.M
+        ls = np.exp(self.ls)
+        sf2 = np.exp(2 * self.sf)
+        triu_ind = np.triu_indices(M)
+        diag_ind = np.diag_indices(M)
+        mu = self.mu
+        Su = self.Su
+        Spmm = self.Splusmm
+        muhat = self.muhat
+        Suhat = self.Suhat
+        Spmmhat = self.Splusmmhat
+        Kuuinv = self.Kuuinv
+
+        beta = (N - alpha) * 1.0 / N
+        scale_poste = N * 1.0 / alpha - 1.0
+        scale_cav = - N * 1.0 / alpha
+        scale_prior = 1
+        # compute grads wrt Ahat and Bhat
+        dm_all = dm - 2 * dv * m
+        dAhat = np.einsum('nd,nm->dm', dm_all, psi1)
+        dBhat = np.einsum('nd,nab->dab', dv, psi2)
+        # compute grads wrt psi1 and psi2
+        dpsi1 = np.einsum('nd,dm->nm', dm_all, self.Ahat)
+        dpsi2 = np.einsum('nd,dab->nab', dv, self.Bhat_sto)
+        dsf2, dls, dzu, dmx, dvx = compute_psi_derivatives(
+            dpsi1, psi1, dpsi2, psi2, ls, sf2, mx, vx, self.zu)
+
+        dv_sum = np.sum(dv)
+        dls *= ls
+        dsf2 += dv_sum
+        dsf = 2 * sf2 * dsf2
+
+        dvcav = np.einsum('ab,dbc,ce->dae', Kuuinv, dBhat, Kuuinv)
+        dmcav = 2 * np.einsum('dab,db->da', dvcav, muhat) \
+            + np.einsum('ab,db->da', Kuuinv, dAhat)
+
+        dvcav_via_mcav = beta * np.einsum('da,db->dab', dmcav, self.theta_2)
+        dvcav += dvcav_via_mcav
+        dvcavinv = - np.einsum('dab,dbc,dce->dae', Suhat, dvcav, Suhat)
+        dtheta1 = beta * dvcavinv
+        dtheta2 = beta * np.einsum('dab,db->da', Suhat, dmcav)
+        dKuuinv_via_vcav = np.sum(dvcavinv, axis=0)
+
+        # get contribution of Ahat and Bhat to Kuu and add to Minner
+        dKuuinv_via_Ahat = np.einsum('da,db->ab', dAhat, muhat)
+        KuuinvSmmd = np.einsum('ab,dbc->dac', Kuuinv, Spmmhat)
+        dKuuinv_via_Bhat = 2 * np.einsum('dab,dac->bc', KuuinvSmmd, dBhat) \
+            - np.sum(dBhat, axis=0)
+        dKuuinv = dKuuinv_via_Ahat + dKuuinv_via_Bhat + dKuuinv_via_vcav
+        Minner = scale_poste * np.sum(Spmm, axis=0) + scale_cav * \
+            np.sum(Spmmhat, axis=0) - 2.0 * dKuuinv
+
+        dtheta1 = -0.5 * scale_poste * Spmm - 0.5 * scale_cav * beta * Spmmhat + dtheta1
+        dtheta2 = scale_poste * mu + scale_cav * beta * muhat + dtheta2
+        dtheta1T = np.transpose(dtheta1, [0, 2, 1])
+        dtheta1_R = np.einsum(
+            'dab,dbc->dac', self.theta_1_R, dtheta1 + dtheta1T)
+
+        deta1_R = np.zeros([self.Dout, M * (M + 1) / 2])
+        deta2 = dtheta2
+        for d in range(self.Dout):
+            dtheta1_R_d = dtheta1_R[d, :, :]
+            theta1_R_d = self.theta_1_R[d, :, :]
+            dtheta1_R_d[diag_ind] = dtheta1_R_d[
+                diag_ind] * theta1_R_d[diag_ind]
+            dtheta1_R_d = dtheta1_R_d[triu_ind]
+            deta1_R[d, :] = dtheta1_R_d.reshape(
+                (dtheta1_R_d.shape[0], ))
+
+        M_all = 0.5 * (scale_prior * self.Dout * Kuuinv +
+                       np.dot(Kuuinv, np.dot(Minner, Kuuinv)))
+        dhyp = d_trace_MKzz_dhypers(
+            2 * self.ls, 2 * self.sf, self.zu, M_all,
+            self.Kuu - np.diag(JITTER * np.ones(self.M)))
+
+        dzu += dhyp[2]
+        dls += 2 * dhyp[1]
+        dsf += 2 * dhyp[0]
+
+        grad_hyper = {
+            'sf': dsf, 'ls': dls, 'zu': dzu,
+            'eta1_R': deta1_R, 'eta2': deta2}
+        grad_input = {'mx': dmx, 'vx': dvx}
+
+        return grad_hyper, grad_input
+
+    #TODO
+    @profile
+    def backprop_grads_lvm_mc(self, m, v, dm, dv, kfu, x, alpha=1.0):
+        """Summary
+
+        Args:
+            m (TYPE): Description
+            v (TYPE): Description
+            dm (TYPE): Description
+            dv (TYPE): Description
+            kfu (TYPE): Description
+            x (TYPE): Description
+            alpha (float, optional): Description
+
+        Returns:
+            TYPE: Description
+        """
+        N = self.N
+        M = self.M
+        ls = np.exp(self.ls)
+        sf2 = np.exp(2 * self.sf)
+        triu_ind = np.triu_indices(M)
+        diag_ind = np.diag_indices(M)
+        mu = self.mu
+        Su = self.Su
+        Spmm = self.Splusmm
+        muhat = self.muhat
+        Suhat = self.Suhat
+        Spmmhat = self.Splusmmhat
+        Kuuinv = self.Kuuinv
+        Kuu = self.Kuu
+        kfuKuuinv = np.dot(kfu, Kuuinv)
+        dm = dm.reshape(m.shape)
+        dv = dv.reshape(v.shape)
+
+        beta = (N - alpha) * 1.0 / N
+        scale_poste = N * 1.0 / alpha - 1.0
+        scale_cav = - N * 1.0 / alpha
+        scale_prior = 1
+
+        # compute grads wrt kfu
+        dkfu_m = np.einsum('nd,dm->nm', dm, self.Ahat)
+        dkfu_v = 2 * np.einsum('nd,dab,na->nb', dv, self.Bhat_det, kfu)
+        dkfu = dkfu_m + dkfu_v
+        dsf2, dls, dzu, dx = compute_kfu_derivatives(
+            dkfu, kfu, ls, sf2, x, self.zu, grad_x=True)
+        dv_sum = np.sum(dv)
+        dls *= ls
+        dsf2 += dv_sum
+        dsf = 2 * sf2 * dsf2
+
+        # compute grads wrt theta1 and theta2
+        SKuuinvKuf = np.einsum('dab,nb->nda', Suhat, kfuKuuinv)
+        dSinv_via_v = - np.einsum('nda,nd,ndb->dab',
+                                  SKuuinvKuf, dv, SKuuinvKuf)
+        dSinv_via_m = - np.einsum('nda,nd,db->dab', SKuuinvKuf, dm, muhat)
+        dSinv = dSinv_via_m + dSinv_via_v
+        dSinvM = np.einsum('nda,nd->da', SKuuinvKuf, dm)
+        dtheta1 = beta * dSinv
+        dtheta2 = beta * dSinvM
+
+        dtheta1 = -0.5 * scale_poste * Spmm - 0.5 * scale_cav * beta * Spmmhat + dtheta1
+        dtheta2 = scale_poste * mu + scale_cav * beta * muhat + dtheta2
+        dtheta1T = np.transpose(dtheta1, [0, 2, 1])
+        dtheta1_R = np.einsum(
+            'dab,dbc->dac', self.theta_1_R, dtheta1 + dtheta1T)
+
+        deta1_R = np.zeros([self.Dout, M * (M + 1) / 2])
+        deta2 = dtheta2
+        for d in range(self.Dout):
+            dtheta1_R_d = dtheta1_R[d, :, :]
+            theta1_R_d = self.theta_1_R[d, :, :]
+            dtheta1_R_d[diag_ind] = dtheta1_R_d[
+                diag_ind] * theta1_R_d[diag_ind]
+            dtheta1_R_d = dtheta1_R_d[triu_ind]
+            deta1_R[d, :] = dtheta1_R_d.reshape(
+                (dtheta1_R_d.shape[0], ))
+
+        # get contribution of Ahat and Bhat to Kuu and add to Minner
+        dAhat = np.einsum('nd,nm->dm', dm, kfu)
+        dKuuinv_m = np.einsum('da,db->ab', dAhat, muhat)
+        KuuinvSmmd = np.einsum('ab,dbc->dac', Kuuinv, Suhat)
+        dBhat = np.einsum('nd,na,nb->dab', dv, kfu, kfu)
+        dKuuinv_v_1 = 2 * np.einsum('dab,dac->bc', KuuinvSmmd, dBhat) \
+            - np.sum(dBhat, axis=0)
+        dKuuinv_v_2 = np.sum(dSinv, axis=0)
+        dKuuinv = dKuuinv_m + dKuuinv_v_1 + dKuuinv_v_2
+
+        Minner = scale_poste * np.sum(Spmm, axis=0) + scale_cav * \
+            np.sum(Spmmhat, axis=0) - 2.0 * dKuuinv
+        M_all = 0.5 * (scale_prior * self.Dout * Kuuinv +
+                       np.dot(Kuuinv, np.dot(Minner, Kuuinv)))
+        dhyp = d_trace_MKzz_dhypers(
+            2 * self.ls, 2 * self.sf, self.zu, M_all,
+            self.Kuu - np.diag(JITTER * np.ones(self.M)))
+
+        dzu += dhyp[2]
+        dls += 2 * dhyp[1]
+        dsf += 2 * dhyp[0]
+
+        grad_hyper = {
+            'sf': dsf, 'ls': dls, 'zu': dzu,
+            'eta1_R': deta1_R, 'eta2': deta2
+        }
+
+        return grad_hyper, dx
+
+    def backprop_grads_reparam(self, dx, m, v, eps):
+        """Summary
+
+        Args:
+            dx (TYPE): Description
+            m (TYPE): Description
+            v (TYPE): Description
+            eps (TYPE): Description
+
+        Returns:
+            TYPE: Description
+        """
+        dx = dx.reshape(eps.shape)
+        dm = np.sum(dx, axis=0)
+        dv = np.sum(dx * eps, axis=0) / (2 * np.sqrt(v))
+        return {'mx': dm, 'vx': dv}
+
+    @profile
+    def backprop_grads_reg(self, m, v, dm, dv, kfu, x, alpha=1.0):
+        """Summary
+
+        Args:
+            m (TYPE): Description
+            v (TYPE): Description
+            dm (TYPE): Description
+            dv (TYPE): Description
+            kfu (TYPE): Description
+            x (TYPE): Description
+            alpha (float, optional): Description
+
+        Returns:
+            TYPE: Description
+        """
+        N = self.N
+        M = self.M
+        ls = np.exp(self.ls)
+        sf2 = np.exp(2 * self.sf)
+        triu_ind = np.triu_indices(M)
+        diag_ind = np.diag_indices(M)
+        mu = self.mu
+        Su = self.Su
+        Spmm = self.Splusmm
+        muhat = self.muhat
+        Suhat = self.Suhat
+        Spmmhat = self.Splusmmhat
+        Kuuinv = self.Kuuinv
+        Kuu = self.Kuu
+        kfuKuuinv = np.dot(kfu, Kuuinv)
+
+        beta = (N - alpha) * 1.0 / N
+        scale_poste = N * 1.0 / alpha - 1.0
+        scale_cav = - N * 1.0 / alpha
+        scale_prior = 1
+
+        # compute grads wrt kfu
+        dkfu_m = np.einsum('nd,dm->nm', dm, self.Ahat)
+        dkfu_v = 2 * np.einsum('nd,dab,na->nb', dv, self.Bhat_det, kfu)
+        dkfu = dkfu_m + dkfu_v
+        dsf2, dls, dzu = compute_kfu_derivatives(
+            dkfu, kfu, ls, sf2, x, self.zu)
+        dv_sum = np.sum(dv)
+        dls *= ls
+        dsf2 += dv_sum
+        dsf = 2 * sf2 * dsf2
+
+        # compute grads wrt theta1 and theta2
+        SKuuinvKuf = np.einsum('dab,nb->nda', Suhat, kfuKuuinv)
+        dSinv_via_v = - np.einsum('nda,nd,ndb->dab',
+                                  SKuuinvKuf, dv, SKuuinvKuf)
+        dSinv_via_m = - np.einsum('nda,nd,db->dab', SKuuinvKuf, dm, muhat)
+        dSinv = dSinv_via_m + dSinv_via_v
+        dSinvM = np.einsum('nda,nd->da', SKuuinvKuf, dm)
+        dtheta1 = beta * dSinv
+        dtheta2 = beta * dSinvM
+
+        dtheta1 = -0.5 * scale_poste * Spmm - 0.5 * scale_cav * beta * Spmmhat + dtheta1
+        dtheta2 = scale_poste * mu + scale_cav * beta * muhat + dtheta2
+        dtheta1T = np.transpose(dtheta1, [0, 2, 1])
+        dtheta1_R = np.einsum(
+            'dab,dbc->dac', self.theta_1_R, dtheta1 + dtheta1T)
+
+        deta1_R = np.zeros([self.Dout, M * (M + 1) / 2])
+        deta2 = dtheta2
+        for d in range(self.Dout):
+            dtheta1_R_d = dtheta1_R[d, :, :]
+            theta1_R_d = self.theta_1_R[d, :, :]
+            dtheta1_R_d[diag_ind] = dtheta1_R_d[
+                diag_ind] * theta1_R_d[diag_ind]
+            dtheta1_R_d = dtheta1_R_d[triu_ind]
+            deta1_R[d, :] = dtheta1_R_d.reshape(
+                (dtheta1_R_d.shape[0], ))
+
+        # get contribution of Ahat and Bhat to Kuu and add to Minner
+        dAhat = np.einsum('nd,nm->dm', dm, kfu)
+        dKuuinv_m = np.einsum('da,db->ab', dAhat, muhat)
+        KuuinvSmmd = np.einsum('ab,dbc->dac', Kuuinv, Suhat)
+        dBhat = np.einsum('nd,na,nb->dab', dv, kfu, kfu)
+        dKuuinv_v_1 = 2 * np.einsum('dab,dac->bc', KuuinvSmmd, dBhat) \
+            - np.sum(dBhat, axis=0)
+        dKuuinv_v_2 = np.sum(dSinv, axis=0)
+        dKuuinv = dKuuinv_m + dKuuinv_v_1 + dKuuinv_v_2
+
+        Minner = scale_poste * np.sum(Spmm, axis=0) + scale_cav * \
+            np.sum(Spmmhat, axis=0) - 2.0 * dKuuinv
+        M_all = 0.5 * (scale_prior * self.Dout * Kuuinv +
+                       np.dot(Kuuinv, np.dot(Minner, Kuuinv)))
+        dhyp = d_trace_MKzz_dhypers(
+            2 * self.ls, 2 * self.sf, self.zu, M_all,
+            self.Kuu - np.diag(JITTER * np.ones(self.M)))
+
+        dzu += dhyp[2]
+        dls += 2 * dhyp[1]
+        dsf += 2 * dhyp[0]
+
+        grad_hyper = {
+            'sf': dsf, 'ls': dls, 'zu': dzu,
+            'eta1_R': deta1_R, 'eta2': deta2
+        }
+
+        return grad_hyper
+
+    def sample(self, x):
+        """Summary
+
+        Args:
+            x (TYPE): Description
+
+        Returns:
+            TYPE: Description
+        """
+        Su = self.Su
+        mu = self.mu
+        Lu = np.linalg.cholesky(Su)
+        epsilon = np.random.randn(self.Dout, self.M)
+        u_sample = mu + np.einsum('dab,db->da', Lu, epsilon)
+
+        kff = compute_kernel(2 * self.ls, 2 * self.sf, x, x)
+        kff += np.diag(JITTER * np.ones(x.shape[0]))
+        kfu = compute_kernel(2 * self.ls, 2 * self.sf, x, self.zu)
+        qfu = np.dot(kfu, self.Kuuinv)
+        mf = np.einsum('nm,dm->nd', qfu, u_sample)
+        vf = kff - np.dot(qfu, kfu.T)
+        Lf = np.linalg.cholesky(vf)
+        epsilon = np.random.randn(x.shape[0], self.Dout)
+        f_sample = mf + np.einsum('ab,bd->ad', Lf, epsilon)
+        return f_sample
+
+    def compute_kuu(self):
+        """Summary
+
+        Returns:
+            TYPE: Description
+        """
+        # update kuu and kuuinv
+        ls = self.ls
+        sf = self.sf
+        Dout = self.Dout
+        M = self.M
+        zu = self.zu
+        self.Kuu = compute_kernel(2 * ls, 2 * sf, zu, zu)
+        self.Kuu += np.diag(JITTER * np.ones((M, )))
+        # self.Kuuinv = matrixInverse(self.Kuu)
+        self.Kuuinv = np.linalg.inv(self.Kuu)
+
+    def compute_cavity(self, alpha=1.0):
+        """Summary
+
+        Args:
+            alpha (float, optional): Description
+
+        Returns:
+            TYPE: Description
+        """
+        # compute the leave one out moments
+        beta = (self.N - alpha) * 1.0 / self.N
+        Dout = self.Dout
+        Kuu = self.Kuu
+        Kuuinv = self.Kuuinv
+        self.Suhatinv = Kuuinv + beta * self.theta_1
+        self.Suhat = np.linalg.inv(self.Suhatinv)
+        self.muhat = np.einsum('dab,db->da', self.Suhat, beta * self.theta_2)
+        self.Ahat = np.einsum('ab,db->da', Kuuinv, self.muhat)
+        Smm = self.Suhat + np.einsum('da,db->dab', self.muhat, self.muhat)
+        self.Splusmmhat = Smm
+        self.Bhat_sto = - Kuuinv + np.einsum(
+            'ab,dbc->dac',
+            Kuuinv,
+            np.einsum('dab,bc->dac', Smm, Kuuinv))
+        self.Bhat_det = - Kuuinv + np.einsum(
+            'ab,dbc->dac',
+            Kuuinv,
+            np.einsum('dab,bc->dac', self.Suhat, Kuuinv))
+
+    def update_posterior(self):
+        """Summary
+
+        Returns:
+            TYPE: Description
+        """
+        # compute the posterior approximation
+        Sinv = self.Kuuinv + self.theta_1
+        self.Su = np.linalg.inv(Sinv)
+        self.mu = np.einsum('dab,db->da', self.Su, self.theta_2)
+        self.Splusmm = self.Su + np.einsum('da,db->dab', self.mu, self.mu)
+        self.A = np.einsum('ab,db->da', self.Kuuinv, self.mu)
+        self.B_sto = - self.Kuuinv + np.einsum(
+            'ab,dbc->dac',
+            self.Kuuinv,
+            np.einsum('dab,bc->dac', self.Splusmm, self.Kuuinv))
+        self.B_det = - self.Kuuinv + np.einsum(
+            'ab,dbc->dac',
+            self.Kuuinv,
+            np.einsum('dab,bc->dac', self.Su, self.Kuuinv))
+
+
+    def init_hypers(self, x_train=None, key_suffix=''):
+        """Summary
+
+        Args:
+            x_train (None, optional): Description
+            key_suffix (str, optional): Description
+
+        Returns:
+            TYPE: Description
+        """
+        N = self.N
+        M = self.M
+        Din = self.Din
+        Dout = self.Dout
+
+        if x_train is None:
+            ls = np.log(np.ones((Din, )) + 0.1 * np.random.rand(Din, ))
+            sf = np.log(np.array([1]))
+            zu = np.tile(np.linspace(-1, 1, M).reshape((M, 1)), (1, Din))
+            # zu += 0.01 * np.random.randn(zu.shape[0], zu.shape[1])
+        else:
+            if N < 10000:
+                centroids, label = kmeans2(x_train, M, minit='points')
+            else:
+                randind = np.random.permutation(N)
+                centroids = x_train[randind[0:M], :]
+            zu = centroids
+
+            if N < 1000:
+                X1 = np.copy(x_train)
+            else:
+                randind = np.random.permutation(N)
+                X1 = x_train[randind[:1000], :]
+
+            x_dist = cdist(X1, X1, 'euclidean')
+            triu_ind = np.triu_indices(X1.shape[0])
+            ls = np.zeros((Din, ))
+            d2imed = np.median(x_dist[triu_ind])
+            for i in range(Din):
+                ls[i] = np.log(d2imed / 2 + 1e-16)
+            sf = np.log(np.array([0.5]))
+
+        Kuu = compute_kernel(2 * ls, 2 * sf, zu, zu)
+        Kuu += np.diag(JITTER * np.ones((M, )))
+        Kuuinv = matrixInverse(Kuu)
+
+        eta1_R = np.zeros((Dout, M * (M + 1) / 2))
+        eta2 = np.zeros((Dout, M))
+        for d in range(Dout):
+            mu = np.linspace(-1, 1, M).reshape((M, 1))
+            # mu += 0.01 * np.random.randn(M, 1)
+            alpha = 0.5 * np.random.rand(M)
+            # alpha = 0.01 * np.ones(M)
+            Su = np.diag(alpha)
+            Suinv = np.diag(1 / alpha)
+
+            theta2 = np.dot(Suinv, mu)
+            theta1 = Suinv
+            R = np.linalg.cholesky(theta1).T
+
+            triu_ind = np.triu_indices(M)
+            diag_ind = np.diag_indices(M)
+            R[diag_ind] = np.log(R[diag_ind])
+            np.log(R[diag_ind])
+            eta1_d = R[triu_ind].reshape((M * (M + 1) / 2,))
+            eta2_d = theta2.reshape((M,))
+            eta1_R[d, :] = eta1_d
+            eta2[d, :] = eta2_d
+
+        params = dict()
+        params['sf' + key_suffix] = sf
+        params['ls' + key_suffix] = ls
+        params['zu' + key_suffix] = zu
+        params['eta1_R' + key_suffix] = eta1_R
+        params['eta2' + key_suffix] = eta2
+
+        return params
+
+    def get_hypers(self, key_suffix=''):
+        """Summary
+
+        Args:
+            key_suffix (str, optional): Description
+
+        Returns:
+            TYPE: Description
+        """
+        params = {}
+        M = self.M
+        Din = self.Din
+        Dout = self.Dout
+        params['ls' + key_suffix] = self.ls
+        params['sf' + key_suffix] = self.sf
+        triu_ind = np.triu_indices(M)
+        diag_ind = np.diag_indices(M)
+        params_eta2 = self.theta_2
+        params_eta1_R = np.zeros((Dout, M * (M + 1) / 2))
+        params_zu_i = self.zu
+
+        for d in range(Dout):
+            Rd = self.theta_1_R[d, :, :]
+            Rd[diag_ind] = np.log(Rd[diag_ind])
+            params_eta1_R[d, :] = Rd[triu_ind]
+
+        params['zu' + key_suffix] = self.zu
+        params['eta1_R' + key_suffix] = params_eta1_R
+        params['eta2' + key_suffix] = params_eta2
+        return params
+
+    def update_hypers(self, params, key_suffix=''):
+        """Summary
+
+        Args:
+            params (TYPE): Description
+            key_suffix (str, optional): Description
+
+        Returns:
+            TYPE: Description
+        """
+        M = self.M
+        self.ls = params['ls' + key_suffix]
+        self.sf = params['sf' + key_suffix]
+        triu_ind = np.triu_indices(M)
+        diag_ind = np.diag_indices(M)
+        zu = params['zu' + key_suffix]
+        self.zu = zu
+
+        for d in range(self.Dout):
+            theta_m_d = params['eta2' + key_suffix][d, :]
+            theta_R_d = params['eta1_R' + key_suffix][d, :]
+            R = np.zeros((M, M))
+            R[triu_ind] = theta_R_d.reshape(theta_R_d.shape[0], )
+            R[diag_ind] = np.exp(R[diag_ind])
+            self.theta_1_R[d, :, :] = R
+            self.theta_1[d, :, :] = np.dot(R.T, R)
+            self.theta_2[d, :] = theta_m_d
+
+        # update Kuu given new hypers
+        self.compute_kuu()
+        # compute mu and Su for each layer
+        self.update_posterior()
+
+
+# TODO
+class SGPR(VI_Model):
+    """Uncollapsed sparse Gaussian process approximations
+    """
+
+    def __init__(self, x_train, y_train, no_pseudo, lik='Gaussian'):
+        """Summary
+
+        Args:
+            x_train (TYPE): Description
+            y_train (TYPE): Description
+            no_pseudo (TYPE): Description
+            lik (str, optional): Description
+
+        Raises:
+            NotImplementedError: Description
+        """
+        super(SGPR, self).__init__(y_train)
+        self.N = N = y_train.shape[0]
+        self.Dout = Dout = y_train.shape[1]
+        self.Din = Din = x_train.shape[1]
+        self.M = M = no_pseudo
+        self.x_train = x_train
+
+        self.sgp_layer = SGP_Layer(N, Din, Dout, M)
+        if lik.lower() == 'gaussian':
+            self.lik_layer = Gauss_Layer(N, Dout)
+        elif lik.lower() == 'probit':
+            self.lik_layer = Probit_Layer(N, Dout)
+        else:
+            raise NotImplementedError('likelihood not implemented')
+
+    @profile
+    def objective_function(self, params, mb_size, prop_mode=PROP_MM):
+        """Summary
+
+        Args:
+            params (TYPE): Description
+            mb_size (TYPE): Description
+            prop_mode (TYPE, optional): Description
+
+        Returns:
+            TYPE: Description
+        """
+        N = self.N
+        if mb_size >= N:
+            xb = self.x_train
+            yb = self.y_train
+        else:
+            idxs = np.random.randint(0, N, size=mb_size)
+            xb = self.x_train[idxs, :]
+            yb = self.y_train[idxs, :]
+        batch_size = yb.shape[0]
+        scale_loglik = - N * 1.0 / batch_size
+
+        # update model with new hypers
+        self.update_hypers(params)
+
+        # propagate x cavity forward
+        mout, vout, kfu = self.sgp_layer.forward_prop_thru_post(xb)
+        # compute logZ and gradients
+        logZ, dm, dv = self.lik_layer.compute_log_lik_exp(mout, vout, yb)
+        logZ_scale = scale_logZ * logZ
+        dm_scale = scale_logZ * dm
+        dv_scale = scale_logZ * dv
+        sgp_grad_hyper = self.sgp_layer.backprop_grads_reg(
+            mout, vout, dm_scale, dv_scale, kfu, xb)
+        lik_grad_hyper = self.lik_layer.backprop_grads(
+            mout, vout, dm, dv, scale_logZ)
+
+        grad_all = {}
+        for key in sgp_grad_hyper.keys():
+            grad_all[key] = sgp_grad_hyper[key]
+
+        for key in lik_grad_hyper.keys():
+            grad_all[key] = lik_grad_hyper[key]
+
+        # compute objective
+        sgp_contrib = self.sgp_layer.compute_KL()
+        energy = logZ_scale + sgp_contrib
+
+        for p in self.fixed_params:
+            grad_all[p] = np.zeros_like(grad_all[p])
+
+        return energy, grad_all
+
+    def predict_f(self, inputs):
+        """Summary
+
+        Args:
+            inputs (TYPE): Description
+
+        Returns:
+            TYPE: Description
+        """
+        if not self.updated:
+            self.sgp_layer.update_posterior()
+            self.updated = True
+        mf, vf = self.sgp_layer.forward_prop_thru_post(inputs)
+        return mf, vf
+
+    def sample_f(self, inputs, no_samples=1):
+        """Summary
+
+        Args:
+            inputs (TYPE): Description
+            no_samples (int, optional): Description
+
+        Returns:
+            TYPE: Description
+        """
+        if not self.updated:
+            self.sgp_layer.update_posterior()
+            self.updated = True
+        K = no_samples
+        fs = np.zeros((inputs.shape[0], self.Dout, K))
+        # TODO: remove for loop here
+        for k in range(K):
+            fs[:, :, k] = self.sgp_layer.sample(inputs)
+        return fs
+
+    def predict_y(self, inputs):
+        """Summary
+
+        Args:
+            inputs (TYPE): Description
+
+        Returns:
+            TYPE: Description
+        """
+        if not self.updated:
+            self.sgp_layer.update_posterior()
+            self.updated = True
+        mf, vf = self.sgp_layer.forward_prop_thru_post(inputs)
+        my, vy = self.lik_layer.output_probabilistic(mf, vf)
+        return my, vy
+
+    def init_hypers(self, y_train):
+        """Summary
+
+        Args:
+            y_train (TYPE): Description
+
+        Returns:
+            TYPE: Description
+        """
+        sgp_params = self.sgp_layer.init_hypers(self.x_train)
+        lik_params = self.lik_layer.init_hypers()
+        init_params = dict(sgp_params)
+        init_params.update(lik_params)
+        return init_params
+
+    def get_hypers(self):
+        """Summary
+
+        Returns:
+            TYPE: Description
+        """
+        sgp_params = self.sgp_layer.get_hypers()
+        lik_params = self.lik_layer.get_hypers()
+        params = dict(sgp_params)
+        params.update(lik_params)
+        return params
+
+    def update_hypers(self, params):
+        """Summary
+
+        Args:
+            params (TYPE): Description
+
+        Returns:
+            TYPE: Description
+        """
+        self.sgp_layer.update_hypers(params)
+        self.lik_layer.update_hypers(params)
