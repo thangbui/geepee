@@ -826,6 +826,7 @@ class SGP_Layer(object):
     def update_posterior_for_prediction(self):
         """update the posterior
         """
+        Kuuinv = self.Kuuinv
         for d in range(self.Dout):
             Sinv = Kuuinv + self.theta_1[d, :, :]
             SinvM = self.theta_2[d, :]
