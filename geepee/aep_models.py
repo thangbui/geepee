@@ -251,13 +251,14 @@ class SGP_Layer(object):
         vout = psi0 + Bhatpsi2 - mout**2
         return mout, vout, psi1, psi2
 
-    def forward_prop_thru_post(self, mx, vx=None, mode=PROP_MM):
+    def forward_prop_thru_post(self, mx, vx=None, mode=PROP_MM, return_info=False):
         """Propagate input distributions through the posterior non-linearity
 
         Args:
             mx (float): means of the input distributions, size K x Din
             vx (float, optional): variances (if uncertain inputs), size K x Din
             mode (config param, optional): propagation mode (see config)
+            return_info (bool, optional): Description
 
         Returns:
             specific results depend on the propagation mode provided
@@ -266,22 +267,29 @@ class SGP_Layer(object):
             NotImplementedError: Unknown propagation mode
         """
         if vx is None:
-            return self._forward_prop_deterministic_thru_post(mx)
+            return self._forward_prop_deterministic_thru_post(mx, return_info)
         else:
             if mode == PROP_MM:
-                return self._forward_prop_random_thru_post_mm(mx, vx)
+                return self._forward_prop_random_thru_post_mm(mx, vx, return_info)
             elif mode == PROP_LIN:
-                return self._forward_prop_random_thru_post_lin(mx, vx)
+                raise NotImplementedError(
+                    'Prediction with linearisation not implemented')
+                # return self._forward_prop_random_thru_post_lin(mx, vx,
+                # return_info)
             elif mode == PROP_MC:
-                return self._forward_prop_random_thru_post_mc(mx, vx)
+                raise NotImplementedError(
+                    'Prediction with sampling not implemented')
+                # return self._forward_prop_random_thru_post_mc(mx, vx,
+                # return_info)
             else:
                 raise NotImplementedError('unknown propagation mode')
 
-    def _forward_prop_deterministic_thru_post(self, x):
+    def _forward_prop_deterministic_thru_post(self, x, return_info=False):
         """Propagate deterministic inputs thru posterior
 
         Args:
             x (float): input values, size K x Din
+            return_info (bool, optional): Description
 
         Returns:
             float, size K x Dout: output means
@@ -292,14 +300,18 @@ class SGP_Layer(object):
         mout = np.einsum('nm,dm->nd', psi1, self.A)
         Bpsi2 = np.einsum('dab,na,nb->nd', self.B_det, psi1, psi1)
         vout = psi0 + Bpsi2
-        return mout, vout
+        if return_info:
+            return mout, vout, psi1
+        else:
+            return mout, vout
 
-    def _forward_prop_random_thru_post_mm(self, mx, vx):
+    def _forward_prop_random_thru_post_mm(self, mx, vx, return_info=False):
         """Propagate uncertain inputs thru cavity, using Moment Matching
 
         Args:
             mx (float): input means, size K x Din
             vx (TYPE): input variances, size K x Din
+            return_info (bool, optional): Description
 
         Returns:
             float, size K x Dout: output means
@@ -311,7 +323,10 @@ class SGP_Layer(object):
         mout = np.einsum('nm,dm->nd', psi1, self.A)
         Bpsi2 = np.einsum('dab,nab->nd', self.B_sto, psi2)
         vout = psi0 + Bpsi2 - mout**2
-        return mout, vout
+        if return_info:
+            return mout, vout, psi1, psi2
+        else:
+            return mout, vout
 
     @profile
     def backprop_grads_lvm_mm(self, m, v, dm, dv, psi1, psi2, mx, vx, alpha=1.0):
@@ -417,6 +432,48 @@ class SGP_Layer(object):
         grad_input = {'mx': dmx, 'vx': dvx}
 
         return grad_hyper, grad_input
+
+    @profile
+    def backprop_predictive_grads_lvm_mm(self, m, v, dm_dm, dm_dv, dv_dm, dv_dv,
+                                         psi1, psi2, mx, vx):
+        """Summary
+
+        Args:
+            m (TYPE): Description
+            v (TYPE): Description
+            dm_dm (TYPE): Description
+            dm_dv (TYPE): Description
+            dv_dm (TYPE): Description
+            dv_dv (TYPE): Description
+            psi1 (TYPE): Description
+            psi2 (TYPE): Description
+            mx (TYPE): Description
+            vx (TYPE): Description
+
+        Returns:
+            TYPE: Description
+
+        Deleted Parameters:
+            alpha (float, optional): Description
+        """
+        N = self.N
+        M = self.M
+        ls = np.exp(self.ls)
+        sf2 = np.exp(2 * self.sf)
+
+        dm_all_m = dm_dm - 2 * dm_dv * m
+        dpsi1 = np.einsum('nd,dm->nm', dm_all_m, self.A)
+        dpsi2 = np.einsum('nd,dab->nab', dm_dv, self.B_sto)
+        _, _, _, dm_dmx, dm_dvx = compute_psi_derivatives(
+            dpsi1, psi1, dpsi2, psi2, ls, sf2, mx, vx, self.zu)
+
+        dm_all_v = dv_dm - 2 * dv_dv * m
+        dpsi1 = np.einsum('nd,dm->nm', dm_all_v, self.A)
+        dpsi2 = np.einsum('nd,dab->nab', dv_dv, self.B_sto)
+        _, _, _, dv_dmx, dv_dvx = compute_psi_derivatives(
+            dpsi1, psi1, dpsi2, psi2, ls, sf2, mx, vx, self.zu)
+
+        return dm_dmx, dm_dvx, dv_dmx, dv_dvx
 
     @profile
     def backprop_grads_lvm_mc(self, m, v, dm, dv, kfu, x, alpha=1.0):
@@ -645,6 +702,47 @@ class SGP_Layer(object):
 
         return grad_hyper
 
+    @profile
+    def backprop_predictive_grads_reg(self, m, v, dm_dm, dm_dv, dv_dm, dv_dv,
+                                      kfu, x):
+        """Summary
+
+        Args:
+            m (TYPE): Description
+            v (TYPE): Description
+            dm_dm (TYPE): Description
+            dm_dv (TYPE): Description
+            dv_dm (TYPE): Description
+            dv_dv (TYPE): Description
+            kfu (TYPE): Description
+            x (TYPE): Description
+
+        Returns:
+            TYPE: Description
+
+        Deleted Parameters:
+            alpha (float, optional): Description
+        """
+        N = self.N
+        M = self.M
+        ls = np.exp(self.ls)
+        sf2 = np.exp(2 * self.sf)
+
+        # compute grads wrt kfu
+        dkfu_m_m = np.einsum('nd,dm->nm', dm_dm, self.A)
+        dkfu_m_v = 2 * np.einsum('nd,dab,na->nb', dm_dv, self.B_det, kfu)
+        dkfu_m = dkfu_m_m + dkfu_m_v
+        _, _, _, dm_dx = compute_kfu_derivatives(
+            dkfu_m, kfu, ls, sf2, x, self.zu, grad_x=True)
+
+        dkfu_v_m = np.einsum('nd,dm->nm', dv_dm, self.A)
+        dkfu_v_v = 2 * np.einsum('nd,dab,na->nb', dv_dv, self.B_det, kfu)
+        dkfu_v = dkfu_v_m + dkfu_v_v
+        _, _, _, dv_dx = compute_kfu_derivatives(
+            dkfu_m, kfu, ls, sf2, x, self.zu, grad_x=True)
+
+        return dm_dx, dv_dx
+
     def sample(self, x):
         """Summary
 
@@ -672,12 +770,8 @@ class SGP_Layer(object):
         return f_sample
 
     def compute_kuu(self):
-        """Summary
-
-        Returns:
-            TYPE: Description
+        """update kuu and kuuinv
         """
-        # update kuu and kuuinv
         ls = self.ls
         sf = self.sf
         Dout = self.Dout
@@ -689,15 +783,11 @@ class SGP_Layer(object):
         self.Kuuinv = np.linalg.inv(self.Kuu)
 
     def compute_cavity(self, alpha=1.0):
-        """Summary
+        """compute the leave one out moments and a few other things for training
 
         Args:
             alpha (float, optional): Description
-
-        Returns:
-            TYPE: Description
         """
-        # compute the leave one out moments
         beta = (self.N - alpha) * 1.0 / self.N
         Dout = self.Dout
         Kuu = self.Kuu
@@ -718,10 +808,7 @@ class SGP_Layer(object):
             np.einsum('dab,bc->dac', self.Suhat, Kuuinv))
 
     def update_posterior(self):
-        """Summary
-
-        Returns:
-            TYPE: Description
+        """update the posterior
         """
         # compute the posterior approximation
         for d in range(self.Dout):
@@ -737,13 +824,8 @@ class SGP_Layer(object):
             self.Splusmm[d, :, :] = Smm
 
     def update_posterior_for_prediction(self):
-        """Summary
-
-        Returns:
-            TYPE: Description
+        """update the posterior
         """
-        # compute the posterior approximation
-        Kuuinv = self.Kuuinv
         for d in range(self.Dout):
             Sinv = Kuuinv + self.theta_1[d, :, :]
             SinvM = self.theta_2[d, :]
@@ -874,9 +956,6 @@ class SGP_Layer(object):
         Args:
             params (TYPE): Description
             key_suffix (str, optional): Description
-
-        Returns:
-            TYPE: Description
         """
         M = self.M
         self.ls = params['ls' + key_suffix]
@@ -931,8 +1010,6 @@ class Lik_Layer(object):
             y (TYPE): Description
             alpha (float, optional): Description
 
-        Returns:
-            TYPE: Description
         """
         pass
 
@@ -974,8 +1051,6 @@ class Lik_Layer(object):
         Args:
             params (TYPE): Description
 
-        Returns:
-            TYPE: Description
         """
         pass
 
@@ -1116,8 +1191,6 @@ class Gauss_Layer(Lik_Layer):
             params (TYPE): Description
             key_suffix (str, optional): Description
 
-        Returns:
-            TYPE: Description
         """
         self.sn = params['sn' + key_suffix]
 
@@ -1249,11 +1322,9 @@ class Probit_Layer(Lik_Layer):
             vf (TYPE): Description
             alpha (float, optional): Description
 
-        Returns:
-            TYPE: Description
-
         Raises:
             NotImplementedError: Description
+
         """
         raise NotImplementedError('TODO: return probablity of y=1')
 
@@ -1286,16 +1357,11 @@ class AEP_Model(object):
             y_train (TYPE): Description
             x_train (None, optional): Description
 
-        Returns:
-            TYPE: Description
         """
         pass
 
     def get_hypers(self):
         """Summary
-
-        Returns:
-            TYPE: Description
         """
         pass
 
@@ -1304,9 +1370,6 @@ class AEP_Model(object):
 
         Args:
             params (TYPE): Description
-
-        Returns:
-            TYPE: Description
         """
         pass
 
@@ -1381,9 +1444,6 @@ class AEP_Model(object):
 
         Args:
             params (TYPE): Description
-
-        Returns:
-            TYPE: Description
         """
         if isinstance(params, (list)):
             for p in params:
@@ -1397,9 +1457,6 @@ class AEP_Model(object):
 
         Args:
             fname (str, optional): Description
-
-        Returns:
-            TYPE: Description
         """
         params = self.get_hypers()
         pickle.dump(params, open(fname, "wb"))
@@ -1409,9 +1466,6 @@ class AEP_Model(object):
 
         Args:
             fname (str, optional): Description
-
-        Returns:
-            TYPE: Description
         """
         params = pickle.load(open(fname, "rb"))
         self.update_hypers(params)
@@ -1844,9 +1898,6 @@ class SGPLVM(AEP_Model):
 
         Args:
             params (TYPE): Description
-
-        Returns:
-            TYPE: Description
         """
         self.sgp_layer.update_hypers(params)
         self.lik_layer.update_hypers(params)
@@ -2037,9 +2088,6 @@ class SGPR(AEP_Model):
 
         Args:
             params (TYPE): Description
-
-        Returns:
-            TYPE: Description
         """
         self.sgp_layer.update_hypers(params)
         self.lik_layer.update_hypers(params)
@@ -2084,6 +2132,7 @@ class SDGPR(AEP_Model):
             self.Ms = Ms = [no_pseudos for i in range(L)]
         else:
             self.Ms = Ms = no_pseudos
+
         self.x_train = x_train
 
         self.sgp_layers = []
@@ -2212,53 +2261,57 @@ class SDGPR(AEP_Model):
         return mf, vf
 
     def predict_f_with_input_grad(self, inputs):
+        """Summary
+
+        Args:
+            inputs (TYPE): Description
+
+        Returns:
+            TYPE: Description
+        """
         if not self.updated:
             for layer in self.sgp_layers:
                 layer.update_posterior_for_prediction()
             self.updated = True
-        for i, layer in enumerate(self.sgp_layers):
-            if i == 0:
-                mf, vf = layer.forward_prop_thru_post(inputs)
-            else:
-                mf, vf = layer.forward_prop_thru_post(mf, vf)
 
         # propagate inputs forward
         mout, vout, psi1, psi2 = [], [], [], []
-        for i in range(0, self.L):
-            layer = self.sgp_layers[i]
+        for i, layer in enumerate(self.sgp_layers):
             if i == 0:
                 # first layer
-                m0, v0, kfu0 = layer.forward_prop_thru_post(inputs)
+                m0, v0, kfu0 = layer.forward_prop_thru_post(
+                    inputs, return_info=True)
                 mout.append(m0)
                 vout.append(v0)
                 psi1.append(kfu0)
                 psi2.append(None)
             else:
                 mi, vi, psi1i, psi2i = layer.forward_prop_thru_post(
-                    mout[i - 1], vout[i - 1])
+                    mout[i - 1], vout[i - 1], return_info=True)
                 mout.append(mi)
                 vout.append(vi)
                 psi1.append(psi1i)
                 psi2.append(psi2i)
 
-        # compute logZ and gradients
-        logZ, dm, dv = self.lik_layer.compute_log_Z(
-            mout[-1], vout[-1], yb, alpha)
-        logZ_scale = scale_logZ * logZ
-        dmi = scale_logZ * dm
-        dvi = scale_logZ * dv
+        dm_dm = np.ones((1, 1))
+        dm_dv = np.zeros((1, 1))
+        dv_dm = np.zeros((1, 1))
+        dv_dv = np.ones((1, 1))
         grad_list = []
         for i in range(self.L - 1, -1, -1):
             layer = self.sgp_layers[i]
             if i == 0:
-                grad_hyper = layer.backprop_grads_reg(
-                    mout[i], vout[i], dmi, dvi, psi1[i], xb, alpha)
+                grad_input = layer.backprop_predictive_grads_reg(
+                    mout[i], vout[i], dm_dm, dm_dv, dv_dm, dv_dv, psi1[i], inputs)
             else:
-                grad_hyper, grad_input = layer.backprop_grads_lvm_mm(
-                    mout[i], vout[i], dmi, dvi, psi1[i], psi2[i],
-                    mout[i - 1], vout[i - 1], alpha)
-                dmi, dvi = grad_input['mx'], grad_input['vx']
-            grad_list.insert(0, grad_hyper)
+                grad_input = layer.backprop_predictive_grads_lvm_mm(
+                    mout[i], vout[i], dm_dm, dm_dv, dv_dm, dv_dv, psi1[
+                        i], psi2[i],
+                    mout[i - 1], vout[i - 1])
+                dm_dm, dm_dv, dv_dm, dv_dv = grad_input
+        dm_dx, dv_dx = grad_input
+
+        return mout[-1], vout[-1], dm_dx, dv_dx
 
     def sample_f(self, inputs, no_samples=1):
         """Summary
@@ -2297,6 +2350,19 @@ class SDGPR(AEP_Model):
         mf, vf = self.predict_f(inputs)
         my, vy = self.lik_layer.output_probabilistic(mf, vf)
         return my, vy
+
+    def predict_y_with_input_grad(self, inputs):
+        """Summary
+
+        Args:
+            inputs (TYPE): Description
+
+        Returns:
+            TYPE: Description
+        """
+        mf, vf, dm_dx, dv_dx = self.predict_f_with_input_grad(inputs)
+        my, vy = self.lik_layer.output_probabilistic(mf, vf)
+        return my, vy, dm_dx, dv_dx
 
     def init_hypers(self, y_train):
         """Summary
@@ -2341,9 +2407,6 @@ class SDGPR(AEP_Model):
 
         Args:
             params (TYPE): Description
-
-        Returns:
-            TYPE: Description
         """
         for i, layer in enumerate(self.sgp_layers):
             layer.update_hypers(params, key_suffix='_%d' % i)
@@ -2383,9 +2446,6 @@ class Gauss_Emis():
         Args:
             params (TYPE): Description
             key_suffix (str, optional): Description
-
-        Returns:
-            TYPE: Description
         """
         self.C = params['C' + key_suffix]
         self.R = np.exp(2 * params['R' + key_suffix])
@@ -3233,9 +3293,6 @@ class SGPSSM(AEP_Model):
 
         Args:
             params (TYPE): Description
-
-        Returns:
-            TYPE: Description
         """
         self.dyn_layer.update_hypers(params, key_suffix='_dynamic')
         self.emi_layer.update_hypers(params, key_suffix='_emission')
@@ -3255,6 +3312,7 @@ class SGPSSM(AEP_Model):
 # TODO: try mean and variance parameterisation instead of natural params
 
 # deep GP regression with hidden variables
+
 
 class SDGPR_H(AEP_Model):
     """Summary
@@ -3668,9 +3726,6 @@ class SDGPR_H(AEP_Model):
 
         Args:
             params (TYPE): Description
-
-        Returns:
-            TYPE: Description
         """
         for i in range(self.L):
             self.sgp_layers[i].update_hypers(params, key_suffix='_%d' % i)
