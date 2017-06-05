@@ -115,7 +115,7 @@ def run_regression_1D():
     print "create model and optimize ..."
     M = 20
     model = vfe.SGPR(X, Y, M, lik='Gaussian')
-    model.optimise(method='L-BFGS-B', maxiter=50000)
+    model.optimise(method='L-BFGS-B', maxiter=10000)
     plot(model)
     plt.show()
 
@@ -215,7 +215,7 @@ def run_regression_1D_stoc():
     # plt.plot(X, Y, 'kx', mew=2)
 
     def plot(m):
-        xx = np.linspace(-0.5, 1.5, 100)[:, None]
+        xx = np.linspace(-1.5, 2.5, 200)[:, None]
         mean, var = m.predict_f(xx)
         zu = m.sgp_layer.zu
         mean_u, var_u = m.predict_f(zu)
@@ -235,7 +235,7 @@ def run_regression_1D_stoc():
     M = 20
     model = vfe.SGPR(X, Y, M, lik='Gaussian')
     model.optimise(method='adam', 
-                   maxiter=100000, mb_size=2*M, adam_lr=0.001)
+                   maxiter=100000, mb_size=M, adam_lr=0.001)
     plot(model)
     plt.show()
     plt.savefig('/tmp/vfe_gpr_1D_stoc.pdf')

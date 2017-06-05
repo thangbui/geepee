@@ -1154,7 +1154,7 @@ class SGPR(VI_Model):
             xb = self.x_train
             yb = self.y_train
         else:
-            idxs = np.random.randint(0, N, size=mb_size)
+            idxs = np.random.choice(N, mb_size, replace=False)
             xb = self.x_train[idxs, :]
             yb = self.y_train[idxs, :]
         batch_size = yb.shape[0]

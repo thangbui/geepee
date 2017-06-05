@@ -1600,7 +1600,7 @@ class SGPLVM(AEP_Model):
             idxs = np.arange(N)
             yb = self.y_train
         else:
-            idxs = np.random.randint(0, N, size=mb_size)
+            idxs = np.random.choice(N, mb_size, replace=False)
             yb = self.y_train[idxs, :]
         batch_size = yb.shape[0]
         scale_logZ = - N * 1.0 / batch_size / alpha
@@ -2012,7 +2012,7 @@ class SGPR(AEP_Model):
             xb = self.x_train
             yb = self.y_train
         else:
-            idxs = np.random.randint(0, N, size=mb_size)
+            idxs = np.random.choice(N, mb_size, replace=False)
             xb = self.x_train[idxs, :]
             yb = self.y_train[idxs, :]
         batch_size = yb.shape[0]
@@ -2214,7 +2214,7 @@ class SDGPR(AEP_Model):
             xb = self.x_train
             yb = self.y_train
         else:
-            idxs = np.random.randint(0, N, mb_size)
+            idxs = np.random.choice(N, mb_size, replace=False)
             xb = self.x_train[idxs, :]
             yb = self.y_train[idxs, :]
         batch_size = yb.shape[0]
