@@ -1149,6 +1149,53 @@ class Gauss_Layer(Lik_Layer):
         dsn *= scale
         return {'sn': dsn}
 
+    def compute_log_lik_exp(self, mout, vout, y):
+        """Summary
+
+        Args:
+            mout (TYPE): Description
+            vout (TYPE): Description
+            y (TYPE): Description
+            alpha (float, optional): Description
+
+        Returns:
+            TYPE: Description
+
+        Raises:
+            RuntimeError: Description
+        """
+        # real valued data, gaussian lik
+        if mout.ndim == 2:
+            sn2 = np.exp(2.0 * self.sn)
+            term1 = -0.5 * np.log(2 * np.pi * sn2)
+            term2 = -0.5 / sn2 * (y**2 - 2 * y * mout + mout**2 + vout**2)
+            exptn = term1 + term2
+            exptn_sum = np.sum(exptn)
+
+            de_dm = 1.0 / sn2 * (y - mout)
+            de_dv = -vout / sn2
+            return exptn_sum, de_dm, de_dv
+        elif mout.ndim == 3:
+            # TODO
+            return logZ, dlogZ_dm, dlogZ_dv
+        else:
+            raise RuntimeError('invalid ndim, ndim=%d' % mout.ndim)
+
+    def backprop_grads_log_lik_exp(self, m, v, dm, dv, y, scale=1.0):
+        # real valued data, gaussian lik
+        if m.ndim == 2:
+            sn2 = np.exp(2.0 * self.sn)
+            term1 = -1
+            term2 = 1 / sn2 * (y**2 - 2 * y * m + m**2 + v**2)
+            dsn = term1 + term2
+            dsn = scale * np.sum(dsn)
+            return {'sn': dsn}
+        elif mout.ndim == 3:
+            # TODO
+            return logZ, dlogZ_dm, dlogZ_dv
+        else:
+            raise RuntimeError('invalid ndim, ndim=%d' % mout.ndim)
+
     def output_probabilistic(self, mf, vf, alpha=1.0):
         """Summary
 
