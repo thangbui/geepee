@@ -896,9 +896,19 @@ def test_gplvm_vfe_gaussian():
     Q = 3
     y_train = np.random.randn(N_train, Q)
     lvm = vfe.SGPLVM(y_train, D, M, lik='Gaussian')
-
     # init hypers, inducing points and q(u) params
     init_params = lvm.init_hypers(y_train)
+    
+    # pdb.set_trace()
+    # x = np.random.randn(N_train, D)
+    # init_params['x2'] = np.log(1e6*np.ones_like(init_params['x2'])) / 2
+    # init_params['x1'] = x * (1 + 1e6*np.ones_like(init_params['x2']))
+    # lvm = vfe.SGPLVM(y_train, D, M, lik='Gaussian', prior_mean=x, prior_var=0.000001)
+    # params = init_params.copy()
+    # logZ, grad_all = lvm.objective_function(params, N_train)
+    # reg = vfe.SGPR(x, y_train, M, lik='Gaussian')
+    # reg_logZ = reg.objective_function(init_params, N_train)
+    # pdb.set_trace()
 
     params = init_params.copy()
     logZ, grad_all = lvm.objective_function(
@@ -2150,8 +2160,8 @@ if __name__ == '__main__':
     # test_gpr_vfe_probit_stochastic()
     # plot_gpr_vfe_probit_stochastic()
 
-    # test_gplvm_vfe_gaussian()
-    test_gplvm_vfe_gaussian_cluster()
+    test_gplvm_vfe_gaussian()
+    # test_gplvm_vfe_gaussian_cluster()
     # test_gplvm_vfe_gaussian_scipy()
     # # test_gplvm_vfe_gaussian_MC()
     # test_gplvm_vfe_gaussian_stochastic()

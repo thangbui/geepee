@@ -42,9 +42,9 @@ def run_regression_1D_collapsed():
     alpha = 0.01
     model = vfe.SGPR_collapsed(X, Y, M)
     # model.update_hypers(params)
-    model.optimise(method='L-BFGS-B', alpha=alpha, maxiter=1000)
-    plot(model)
-    plt.show()
+    model.optimise(method='L-BFGS-B', alpha=alpha, maxiter=2000)
+    # plot(model)
+    # plt.show()
 
 
 def run_step_1D_collapsed():
@@ -116,8 +116,8 @@ def run_regression_1D():
     M = 20
     model = vfe.SGPR(X, Y, M, lik='Gaussian')
     model.optimise(method='L-BFGS-B', maxiter=10000)
-    plot(model)
-    plt.show()
+    # plot(model)
+    # plt.show()
 
 
 def run_step_1D():
@@ -235,10 +235,10 @@ def run_regression_1D_stoc():
     M = 20
     model = vfe.SGPR(X, Y, M, lik='Gaussian')
     model.optimise(method='adam', 
-                   maxiter=100000, mb_size=M, adam_lr=0.001)
-    plot(model)
-    plt.show()
-    plt.savefig('/tmp/vfe_gpr_1D_stoc.pdf')
+                   maxiter=100000, mb_size=N, adam_lr=0.001)
+    # plot(model)
+    # plt.show()
+    # plt.savefig('/tmp/vfe_gpr_1D_stoc.pdf')
 
 
 def run_banana_stoc():
@@ -287,10 +287,10 @@ def run_banana_stoc():
     plt.savefig('/tmp/vfe_gpc_banana_stoc.pdf')
 
 if __name__ == '__main__':
-    # run_regression_1D_collapsed()
+    run_regression_1D_collapsed()
     # run_step_1D_collapsed()
     
-    # run_regression_1D()
+    run_regression_1D()
     # run_step_1D()
     # run_banana()
 

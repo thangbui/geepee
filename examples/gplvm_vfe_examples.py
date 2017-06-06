@@ -1,5 +1,5 @@
-import matplotlib
-matplotlib.use('Agg')
+# import matplotlib
+# matplotlib.use('Agg')
 print "importing stuff..."
 import numpy as np
 import pdb
@@ -281,6 +281,7 @@ def run_semicircle():
     D = 2
     lvm = vfe.SGPLVM(Y, D, M, lik='Gaussian')
     lvm.optimise(method='L-BFGS-B', maxiter=2000)
+    # lvm.optimise(method='adam', maxiter=2000)
 
     plt.figure()
     plt.plot(Y[:, 0], Y[:, 1], 'sb')
@@ -378,7 +379,6 @@ def run_frey():
     M = 30
     D = 20
     lvm = vfe.SGPLVM(Y, D, M, lik='Gaussian')
-    # lvm.train(alpha=0.5, no_epochs=10, n_per_mb=100, lrate=0.1, fixed_params=['sn'])
     lvm.optimise(method='L-BFGS-B', maxiter=10)
     plt.figure()
     mx, vx = lvm.get_posterior_x()
@@ -407,7 +407,7 @@ def run_frey():
     plt.show()
 
 if __name__ == '__main__':
-    # run_cluster_MM()
+    run_cluster_MM()
     # run_cluster_MC()
     run_semicircle()
     # run_pinwheel()

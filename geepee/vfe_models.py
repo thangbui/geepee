@@ -1601,14 +1601,14 @@ class SGPLVM(VFE_Model):
             # propagate x cavity forward
             mout, vout, psi1, psi2 = sgp_layer.forward_prop_thru_post(mx, vx)
             # compute logZ and gradients
-            logZ, dm, dv = self.lik_layer.compute_log_lik_exp(mout, vout, yb, lvm=True)    
+            logZ, dm, dv = self.lik_layer.compute_log_lik_exp(mout, vout, yb)    
             logZ_scale = scale_log_lik * logZ
             dm_scale = scale_log_lik * dm
             dv_scale = scale_log_lik * dv
             sgp_grad_hyper, sgp_grad_input = sgp_layer.backprop_grads_lvm_mm(
                 mout, vout, dm_scale, dv_scale, psi1, psi2, mx, vx)
             lik_grad_hyper = self.lik_layer.backprop_grads_log_lik_exp(
-                mout, vout, dm, dv, yb, scale_log_lik, lvm=True)
+                mout, vout, dm, dv, yb, scale_log_lik)
         elif prop_mode == PROP_MC:
             # TODO
             # propagate x cavity forward
@@ -1681,7 +1681,7 @@ class SGPLVM(VFE_Model):
         if not self.updated:
             self.sgp_layer.update_posterior()
             self.updated = True
-        mf, vf = self.sgp_layer.forward_prop_thru_post(inputs)
+        mf, vf, _ = self.sgp_layer.forward_prop_thru_post(inputs)
         return mf, vf
 
     def predict_y(self, inputs):

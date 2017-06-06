@@ -1149,7 +1149,7 @@ class Gauss_Layer(Lik_Layer):
         dsn *= scale
         return {'sn': dsn}
 
-    def compute_log_lik_exp(self, mout, vout, y, lvm=False):
+    def compute_log_lik_exp(self, mout, vout, y):
         """Summary
 
         Args:
@@ -1168,15 +1168,9 @@ class Gauss_Layer(Lik_Layer):
         if mout.ndim == 2:
             sn2 = np.exp(2.0 * self.sn)
             term1 = -0.5 * np.log(2 * np.pi * sn2)
-            if lvm:
-                term2 = -0.5 / sn2 * (y**2 - 2 * y * mout + vout**2)
-                de_dm = 1.0 / sn2 * y
-                de_dv = -vout / sn2
-            else:
-                term2 = -0.5 / sn2 * (y**2 - 2 * y * mout + mout**2 + vout**2)
-                de_dm = 1.0 / sn2 * (y - mout)
-                de_dv = -vout / sn2
-            
+            term2 = -0.5 / sn2 * (y**2 - 2 * y * mout + mout**2 + vout)
+            de_dm = 1.0 / sn2 * (y - mout)
+            de_dv = -0.5 / sn2 * np.ones_like(vout)
             exptn = term1 + term2
             exptn_sum = np.sum(exptn)
 
@@ -1187,15 +1181,12 @@ class Gauss_Layer(Lik_Layer):
         else:
             raise RuntimeError('invalid ndim, ndim=%d' % mout.ndim)
 
-    def backprop_grads_log_lik_exp(self, m, v, dm, dv, y, scale=1.0, lvm=False):
+    def backprop_grads_log_lik_exp(self, m, v, dm, dv, y, scale=1.0):
         # real valued data, gaussian lik
         if m.ndim == 2:
             sn2 = np.exp(2.0 * self.sn)
             term1 = -1
-            if lvm:
-                term2 = 1 / sn2 * (y**2 - 2 * y * m + v**2)
-            else:
-                term2 = 1 / sn2 * (y**2 - 2 * y * m + m**2 + v**2)
+            term2 = 1 / sn2 * (y**2 - 2 * y * m + m**2 + v)
             dsn = term1 + term2
             dsn = scale * np.sum(dsn)
             return {'sn': dsn}
