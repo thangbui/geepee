@@ -1359,7 +1359,6 @@ def test_gpr_aep_gaussian_optimised():
                   % (d, j, grad_all['eta2'][d][j], dR_id, (grad_all['eta2'][d][j] - dR_id) / dR_id))
 
 
-
 def test_gpr_aep_probit():
 
     # generate some datapoints for testing
@@ -5250,8 +5249,9 @@ if __name__ == '__main__':
 
     # plot_gplvm_aep_probit_stochastic()
     # plot_gplvm_aep_gaussian_stochastic()
-    # test_gpr_aep_probit_stochastic()
-    # test_gpr_aep_gaussian_stochastic()
+
+    # test_gplvm_aep_probit_stochastic()
+    # test_gplvm_aep_gaussian_stochastic()
 
     test_gpr_aep_gaussian()
     # test_gpr_aep_gaussian_optimised()

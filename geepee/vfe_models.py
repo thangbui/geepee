@@ -12,7 +12,7 @@ from config import *
 from aep_models import Gauss_Layer, Probit_Layer
 
 
-class VI_Model(object):
+class VFE_Model(object):
     """Summary
 
     Attributes:
@@ -45,24 +45,21 @@ class VI_Model(object):
 
     def get_hypers(self):
         """Summary
-
-        Returns:
-            TYPE: Description
         """
         pass
 
-    def update_hypers(self):
+    def update_hypers(self, params):
         """Summary
 
-        Returns:
-            TYPE: Description
+        Args:
+            params (TYPE): Description
         """
         pass
 
     def optimise(
-            self, method='L-BFGS-B', alpha=0.01, tol=None, reinit_hypers=True,
-            callback=None, maxfun=100000, maxiter=1000,
-            mb_size=None, adam_lr=0.001, **kargs):
+            self, method='L-BFGS-B', tol=None, reinit_hypers=True,
+            callback=None, maxfun=100000, maxiter=1000, alpha=0.5,
+            mb_size=None, adam_lr=0.001, prop_mode=PROP_MM, disp=True, **kargs):
         """Summary
 
         Args:
@@ -75,6 +72,8 @@ class VI_Model(object):
             alpha (float, optional): Description
             mb_size (None, optional): Description
             adam_lr (float, optional): Description
+            prop_mode (TYPE, optional): Description
+            disp (bool, optional): Description
             **kargs: Description
 
         Returns:
@@ -86,7 +85,6 @@ class VI_Model(object):
             init_params_dict = self.init_hypers(self.y_train)
         else:
             init_params_dict = self.get_hypers()
-
         init_params_vec, params_args = flatten_dict(init_params_dict)
         objective_wrapper = ObjectiveWrapper()
 
@@ -94,18 +92,19 @@ class VI_Model(object):
             mb_size = self.N
         try:
             if method.lower() == 'adam':
-                results = adam(objective_wrapper, init_params_vec,
-                               step_size=adam_lr,
-                               maxiter=maxiter,
-                               args=(params_args, self, mb_size, alpha, None))
+                results = adam(
+                    objective_wrapper, init_params_vec,
+                    step_size=adam_lr,
+                    maxiter=maxiter,
+                    args=(params_args, self, mb_size, alpha, prop_mode))
                 final_params = results
             else:
                 options = {'maxfun': maxfun, 'maxiter': maxiter,
-                           'disp': True, 'gtol': 1e-8}
+                           'disp': disp, 'gtol': 1e-8}
                 results = minimize(
                     fun=objective_wrapper,
                     x0=init_params_vec,
-                    args=(params_args, self, self.N, alpha, None),
+                    args=(params_args, self, self.N, alpha, prop_mode),
                     method=method,
                     jac=True,
                     tol=tol,
@@ -128,9 +127,6 @@ class VI_Model(object):
 
         Args:
             params (TYPE): Description
-
-        Returns:
-            TYPE: Description
         """
         if isinstance(params, (list)):
             for p in params:
@@ -144,9 +140,6 @@ class VI_Model(object):
 
         Args:
             fname (str, optional): Description
-
-        Returns:
-            TYPE: Description
         """
         params = self.get_hypers()
         pickle.dump(params, open(fname, "wb"))
@@ -156,15 +149,165 @@ class VI_Model(object):
 
         Args:
             fname (str, optional): Description
-
-        Returns:
-            TYPE: Description
         """
         params = pickle.load(open(fname, "rb"))
         self.update_hypers(params)
 
 
-class SGPR_collapsed(VI_Model):
+
+# class VFE_Model(object):
+#     """Summary
+
+#     Attributes:
+#         fixed_params (list): Description
+#         N (TYPE): Description
+#         updated (bool): Description
+#         y_train (TYPE): Description
+#     """
+
+#     def __init__(self, y_train):
+#         """Summary
+
+#         Args:
+#             y_train (TYPE): Description
+#         """
+#         self.y_train = y_train
+#         self.N = y_train.shape[0]
+#         self.fixed_params = []
+#         self.updated = False
+
+#     def init_hypers(self, y_train, x_train=None):
+#         """Summary
+
+#         Args:
+#             y_train (TYPE): Description
+#             x_train (None, optional): Description
+
+#         """
+#         pass
+
+#     def get_hypers(self):
+#         """Summary
+
+#         Returns:
+#             TYPE: Description
+#         """
+#         pass
+
+#     def update_hypers(self):
+#         """Summary
+
+#         Returns:
+#             TYPE: Description
+#         """
+#         pass
+
+#     def optimise(
+#             self, method='L-BFGS-B', alpha=0.01, tol=None, reinit_hypers=True,
+#             callback=None, maxfun=100000, maxiter=1000,
+#             mb_size=None, adam_lr=0.001, **kargs):
+#         """Summary
+
+#         Args:
+#             method (str, optional): Description
+#             tol (None, optional): Description
+#             reinit_hypers (bool, optional): Description
+#             callback (None, optional): Description
+#             maxfun (int, optional): Description
+#             maxiter (int, optional): Description
+#             alpha (float, optional): Description
+#             mb_size (None, optional): Description
+#             adam_lr (float, optional): Description
+#             **kargs: Description
+
+#         Returns:
+#             TYPE: Description
+#         """
+#         self.updated = False
+
+#         if reinit_hypers:
+#             init_params_dict = self.init_hypers(self.y_train)
+#         else:
+#             init_params_dict = self.get_hypers()
+
+#         init_params_vec, params_args = flatten_dict(init_params_dict)
+#         objective_wrapper = ObjectiveWrapper()
+
+#         if mb_size is None:
+#             mb_size = self.N
+#         try:
+#             if method.lower() == 'adam':
+#                 results = adam(objective_wrapper, init_params_vec,
+#                                step_size=adam_lr,
+#                                maxiter=maxiter,
+#                                args=(params_args, self, mb_size, alpha, None))
+#                 final_params = results
+#             else:
+#                 options = {'maxfun': maxfun, 'maxiter': maxiter,
+#                            'disp': True, 'gtol': 1e-8}
+#                 results = minimize(
+#                     fun=objective_wrapper,
+#                     x0=init_params_vec,
+#                     args=(params_args, self, self.N, alpha, None),
+#                     method=method,
+#                     jac=True,
+#                     tol=tol,
+#                     callback=callback,
+#                     options=options)
+#                 final_params = results.x
+
+#         except KeyboardInterrupt:
+#             print 'Caught KeyboardInterrupt ...'
+#             final_params = objective_wrapper.previous_x
+#             # todo: deal with rresults here
+
+#         # results = self.get_hypers()
+#         final_params = unflatten_dict(final_params, params_args)
+#         self.update_hypers(final_params)
+#         return final_params
+
+#     def set_fixed_params(self, params):
+#         """Summary
+
+#         Args:
+#             params (TYPE): Description
+
+#         Returns:
+#             TYPE: Description
+#         """
+#         if isinstance(params, (list)):
+#             for p in params:
+#                 if p not in self.fixed_params:
+#                     self.fixed_params.append(p)
+#         else:
+#             self.fixed_params.append(params)
+
+#     def save_model(self, fname='/tmp/model.pickle'):
+#         """Summary
+
+#         Args:
+#             fname (str, optional): Description
+
+#         Returns:
+#             TYPE: Description
+#         """
+#         params = self.get_hypers()
+#         pickle.dump(params, open(fname, "wb"))
+
+#     def load_model(self, fname='/tmp/model.pickle'):
+#         """Summary
+
+#         Args:
+#             fname (str, optional): Description
+
+#         Returns:
+#             TYPE: Description
+#         """
+#         params = pickle.load(open(fname, "rb"))
+#         self.update_hypers(params)
+
+
+class SGPR_collapsed(VFE_Model):
     """Summary
 
     Attributes:
@@ -553,7 +696,7 @@ class SGP_Layer(object):
         return (mout, vout, kfu, x, eps), (m_stk, v_stk, kfu_stk, x_stk, e_stk)
 
     @profile
-    def _forward_prop_random_thru_cav_mm(self, mx, vx):
+    def _forward_prop_random_thru_post_mm(self, mx, vx):
         """Propagate uncertain inputs thru cavity, using simple Moment Matching
 
         Args:
@@ -571,9 +714,95 @@ class SGP_Layer(object):
         vout = psi0 + Bhatpsi2 - mout**2
         return mout, vout, psi1, psi2
 
+    def forward_prop_thru_cav(self, mx, vx=None, mode=PROP_MM):
+        """Propagate input distributions through the cavity non-linearity
+
+        Args:
+            mx (float): means of the input distributions, size K x Din
+            vx (float, optional): variances (if uncertain inputs), size K x Din
+            mode (config param, optional): propagation mode (see config)
+
+        Returns:
+            specific results depend on the propagation mode provided
+
+        Raises:
+            NotImplementedError: Unknown propagation mode
+        """
+        if vx is None:
+            return self._forward_prop_deterministic_thru_cav(mx)
+        else:
+            if mode == PROP_MM:
+                return self._forward_prop_random_thru_cav_mm(mx, vx)
+            elif mode == PROP_LIN:
+                return self._forward_prop_random_thru_cav_lin(mx, vx)
+            elif mode == PROP_MC:
+                return self._forward_prop_random_thru_cav_mc(mx, vx)
+            else:
+                raise NotImplementedError('unknown propagation mode')
+
+    def _forward_prop_deterministic_thru_cav(self, x):
+        """Propagate deterministic inputs thru cavity
+
+        Args:
+            x (float): input values, size K x Din
+
+        Returns:
+            float, size K x Dout: output means
+            float, size K x Dout: output variances
+            float, size K x M: cross covariance matrix
+        """
+        kff = np.exp(2 * self.sf)
+        kfu = compute_kernel(2 * self.ls, 2 * self.sf, x, self.zu)
+        mout = np.einsum('nm,dm->nd', kfu, self.Ahat)
+        Bkfukuf = np.einsum('dab,na,nb->nd', self.Bhat_det, kfu, kfu)
+        vout = kff + Bkfukuf
+        return mout, vout, kfu
+
+    def _forward_prop_random_thru_cav_mc(self, mx, vx):
+        """Propagate uncertain inputs thru cavity, using simple Monte Carlo
+
+        Args:
+            mx (float): input means, size K x Din
+            vx (TYPE): input variances, size K x Din
+
+        Returns:
+            output means and variances, and intermediate info for backprop
+        """
+        batch_size = mx.shape[0]
+        eps = np.random.randn(MC_NO_SAMPLES, batch_size, self.Din)
+        x = eps * np.sqrt(vx) + mx
+        x_stk = np.reshape(x, [MC_NO_SAMPLES * batch_size, self.Din])
+        e_stk = np.reshape(eps, [MC_NO_SAMPLES * batch_size, self.Din])
+        m_stk, v_stk, kfu_stk = self._forward_prop_deterministic_thru_cav(
+            x_stk)
+        mout = m_stk.reshape([MC_NO_SAMPLES, batch_size, self.Dout])
+        vout = v_stk.reshape([MC_NO_SAMPLES, batch_size, self.Dout])
+        kfu = kfu_stk.reshape([MC_NO_SAMPLES, batch_size, self.M])
+        return (mout, vout, kfu, x, eps), (m_stk, v_stk, kfu_stk, x_stk, e_stk)
+
+    @profile
+    def _forward_prop_random_thru_cav_mm(self, mx, vx):
+        """Propagate uncertain inputs thru cavity, using simple Moment Matching
+
+        Args:
+            mx (float): input means, size K x Din
+            vx (TYPE): input variances, size K x Din
+
+        Returns:
+            output means and variances, and intermediate info for backprop
+        """
+        psi0 = np.exp(2 * self.sf)
+        psi1, psi2 = compute_psi_weave(
+            2 * self.ls, 2 * self.sf, mx, vx, self.zu)
+        mout = np.einsum('nm,dm->nd', psi1, self.Ahat)
+        Bhatpsi2 = np.einsum('dab,nab->nd', self.Bhat_sto, psi2)
+        vout = psi0 + Bhatpsi2 - mout**2
+        return mout, vout, psi1, psi2
+
+
     #TODO
     @profile
-    def backprop_grads_lvm_mm(self, m, v, dm, dv, psi1, psi2, mx, vx, alpha=1.0):
+    def backprop_grads_lvm_mm(self, m, v, dm, dv, psi1, psi2, mx, vx):
         """Summary
 
         Args:
@@ -599,22 +828,13 @@ class SGP_Layer(object):
         mu = self.mu
         Su = self.Su
         Spmm = self.Splusmm
-        muhat = self.muhat
-        Suhat = self.Suhat
-        Spmmhat = self.Splusmmhat
         Kuuinv = self.Kuuinv
+        Kuu = self.Kuu
 
-        beta = (N - alpha) * 1.0 / N
-        scale_poste = N * 1.0 / alpha - 1.0
-        scale_cav = - N * 1.0 / alpha
-        scale_prior = 1
-        # compute grads wrt Ahat and Bhat
-        dm_all = dm - 2 * dv * m
-        dAhat = np.einsum('nd,nm->dm', dm_all, psi1)
-        dBhat = np.einsum('nd,nab->dab', dv, psi2)
         # compute grads wrt psi1 and psi2
-        dpsi1 = np.einsum('nd,dm->nm', dm_all, self.Ahat)
-        dpsi2 = np.einsum('nd,dab->nab', dv, self.Bhat_sto)
+        dm_all = dm - 2 * dv * m
+        dpsi1 = np.einsum('nd,dm->nm', dm_all, self.A)
+        dpsi2 = np.einsum('nd,dab->nab', dv, self.B_sto)
         dsf2, dls, dzu, dmx, dvx = compute_psi_derivatives(
             dpsi1, psi1, dpsi2, psi2, ls, sf2, mx, vx, self.zu)
 
@@ -623,28 +843,26 @@ class SGP_Layer(object):
         dsf2 += dv_sum
         dsf = 2 * sf2 * dsf2
 
-        dvcav = np.einsum('ab,dbc,ce->dae', Kuuinv, dBhat, Kuuinv)
-        dmcav = 2 * np.einsum('dab,db->da', dvcav, muhat) \
-            + np.einsum('ab,db->da', Kuuinv, dAhat)
+        # compute grads wrt theta1 and theta2 via log lik exp term
+        dA = np.einsum('nd,nm->dm', dm_all, psi1)
+        dB = np.einsum('nd,nab->dab', dv, psi2)
+        dSu_via_v = np.einsum('ab,dbc,ce->dae', Kuuinv, dB, Kuuinv)
+        dmu = 2 * np.einsum('dab,db->da', dSu_via_v, mu) \
+            + np.einsum('ab,db->da', Kuuinv, dA)
 
-        dvcav_via_mcav = beta * np.einsum('da,db->dab', dmcav, self.theta_2)
-        dvcav += dvcav_via_mcav
-        dvcavinv = - np.einsum('dab,dbc,dce->dae', Suhat, dvcav, Suhat)
-        dtheta1 = beta * dvcavinv
-        dtheta2 = beta * np.einsum('dab,db->da', Suhat, dmcav)
-        dKuuinv_via_vcav = np.sum(dvcavinv, axis=0)
-
-        # get contribution of Ahat and Bhat to Kuu and add to Minner
-        dKuuinv_via_Ahat = np.einsum('da,db->ab', dAhat, muhat)
-        KuuinvSmmd = np.einsum('ab,dbc->dac', Kuuinv, Spmmhat)
-        dKuuinv_via_Bhat = 2 * np.einsum('dab,dac->bc', KuuinvSmmd, dBhat) \
-            - np.sum(dBhat, axis=0)
-        dKuuinv = dKuuinv_via_Ahat + dKuuinv_via_Bhat + dKuuinv_via_vcav
-        Minner = scale_poste * np.sum(Spmm, axis=0) + scale_cav * \
-            np.sum(Spmmhat, axis=0) - 2.0 * dKuuinv
-
-        dtheta1 = -0.5 * scale_poste * Spmm - 0.5 * scale_cav * beta * Spmmhat + dtheta1
-        dtheta2 = scale_poste * mu + scale_cav * beta * muhat + dtheta2
+        dSu_via_m = np.einsum('da,db->dab', dmu, self.theta_2)
+        dSu = dSu_via_m + dSu_via_v
+        dSuinv = - np.einsum('dab,dbc,dce->dae', Su, dSu, Su)
+        dtheta1 = dSuinv
+        dtheta2 = np.einsum('dab,db->da', Su, dmu)
+        # add contrib from the KL term
+        dtheta2 += np.einsum('dab,bc,dc->da', Su, Kuuinv, mu)
+        dtheta1_1 = 0.5 * Su
+        SuKuuinv = np.einsum('dab,bc->dac', Su, Kuuinv)
+        dtheta1_2 = - 0.5 * np.einsum('dab,dbc->dac', SuKuuinv, Su)
+        mutheta2Su = np.einsum('da,db,dbc->dac', mu, self.theta_2, Su)
+        dtheta1_3 = - np.einsum('dab,dbc->dac', SuKuuinv, mutheta2Su)
+        dtheta1 += dtheta1_1 + dtheta1_2 + dtheta1_3
         dtheta1T = np.transpose(dtheta1, [0, 2, 1])
         dtheta1_R = np.einsum(
             'dab,dbc->dac', self.theta_1_R, dtheta1 + dtheta1T)
@@ -660,10 +878,17 @@ class SGP_Layer(object):
             deta1_R[d, :] = dtheta1_R_d.reshape(
                 (dtheta1_R_d.shape[0], ))
 
-        M_all = 0.5 * (scale_prior * self.Dout * Kuuinv +
-                       np.dot(Kuuinv, np.dot(Minner, Kuuinv)))
+        # grads wrt Kuu
+        dKuuinv_Su = np.sum(dtheta1, axis=0)
+        dKuuinv_KL = - 0.5 * self.Dout * Kuu + 0.5 * np.sum(Spmm, axis=0)
+        dKuuinv_A = np.einsum('da,db->ab', dA, mu)
+        KuuinvSmmd = np.einsum('ab,dbc->dac', Kuuinv, Spmm)
+        dKuuinv_B = 2 * np.einsum('dab,dac->bc', KuuinvSmmd, dB) \
+            - np.sum(dB, axis=0)
+        dKuuinv = dKuuinv_A + dKuuinv_B + dKuuinv_Su + dKuuinv_KL
+        M_inner = - np.dot(Kuuinv, np.dot(dKuuinv, Kuuinv))
         dhyp = d_trace_MKzz_dhypers(
-            2 * self.ls, 2 * self.sf, self.zu, M_all,
+            2 * self.ls, 2 * self.sf, self.zu, M_inner,
             self.Kuu - np.diag(JITTER * np.ones(self.M)))
 
         dzu += dhyp[2]
@@ -1105,8 +1330,8 @@ class SGP_Layer(object):
         self.update_posterior()
 
 
-# TODO
-class SGPR(VI_Model):
+# TODO probit
+class SGPR(VFE_Model):
     """Uncollapsed sparse Gaussian process approximations
     """
 
@@ -1138,7 +1363,7 @@ class SGPR(VI_Model):
             raise NotImplementedError('likelihood not implemented')
 
     @profile
-    def objective_function(self, params, mb_size, prop_mode=PROP_MM, alpha='not_used'):
+    def objective_function(self, params, mb_size, alpha='not_used', prop_mode='not_used'):
         """Summary
 
         Args:
@@ -1283,3 +1508,359 @@ class SGPR(VI_Model):
         """
         self.sgp_layer.update_hypers(params)
         self.lik_layer.update_hypers(params)
+
+
+class SGPLVM(VFE_Model):
+    """Summary
+
+    """
+
+    def __init__(self, y_train, hidden_size, no_pseudo,
+                 lik='Gaussian', prior_mean=0, prior_var=1):
+        """Summary
+
+        Args:
+            y_train (TYPE): Description
+            hidden_size (TYPE): Description
+            no_pseudo (TYPE): Description
+            lik (str, optional): Description
+            prior_mean (int, optional): Description
+            prior_var (int, optional): Description
+
+        Raises:
+            NotImplementedError: Description
+        """
+        super(SGPLVM, self).__init__(y_train)
+        self.N = N = y_train.shape[0]
+        self.Dout = Dout = y_train.shape[1]
+        self.Din = Din = hidden_size
+        self.M = M = no_pseudo
+
+        self.sgp_layer = SGP_Layer(N, Din, Dout, M)
+        if lik.lower() == 'gaussian':
+            self.lik_layer = Gauss_Layer(N, Dout)
+        elif lik.lower() == 'probit':
+            self.lik_layer = Probit_Layer(N, Dout)
+        else:
+            raise NotImplementedError('likelihood not implemented')
+
+        # natural params for latent variables
+        self.factor_x1 = np.zeros((N, Din))
+        self.factor_x2 = np.zeros((N, Din))
+
+        self.prior_mean = prior_mean
+        self.prior_var = prior_var
+        self.prior_x1 = prior_mean / prior_var
+        self.prior_x2 = 1.0 / prior_var
+
+        self.x_post_1 = np.zeros((N, Din))
+        self.x_post_2 = np.zeros((N, Din))
+
+    @profile
+    def objective_function(self, params, mb_size, alpha='not_used', prop_mode=PROP_MM):
+        """Summary
+
+        Args:
+            params (TYPE): Description
+            mb_size (TYPE): Description
+            alpha (float, optional): Description
+            prop_mode (TYPE, optional): Description
+
+        Returns:
+            TYPE: Description
+
+        Raises:
+            NotImplementedError: Description
+        """
+        N = self.N
+        sgp_layer = self.sgp_layer
+        lik_layer = self.lik_layer
+        if mb_size == N:
+            idxs = np.arange(N)
+            yb = self.y_train
+        else:
+            idxs = np.random.choice(N, mb_size, replace=False)
+            yb = self.y_train[idxs, :]
+        batch_size = yb.shape[0]
+        scale_log_lik = - N * 1.0 / batch_size
+
+        # update model with new hypers
+        self.update_hypers(params)
+
+        # compute cavity
+        t01 = self.prior_x1
+        t02 = self.prior_x2
+        t11 = self.factor_x1[idxs, :]
+        t12 = self.factor_x2[idxs, :]
+        post_t1 = t01 + t11
+        post_t2 = t02 + t12
+        vx = 1.0 / post_t2
+        mx = post_t1 / post_t2
+        if prop_mode == PROP_MM:
+            # propagate x cavity forward
+            mout, vout, psi1, psi2 = sgp_layer.forward_prop_thru_post(mx, vx)
+            # compute logZ and gradients
+            logZ, dm, dv = self.lik_layer.compute_log_lik_exp(mout, vout, yb, lvm=True)    
+            logZ_scale = scale_log_lik * logZ
+            dm_scale = scale_log_lik * dm
+            dv_scale = scale_log_lik * dv
+            sgp_grad_hyper, sgp_grad_input = sgp_layer.backprop_grads_lvm_mm(
+                mout, vout, dm_scale, dv_scale, psi1, psi2, mx, vx)
+            lik_grad_hyper = self.lik_layer.backprop_grads_log_lik_exp(
+                mout, vout, dm, dv, yb, scale_log_lik, lvm=True)
+        elif prop_mode == PROP_MC:
+            # TODO
+            # propagate x cavity forward
+            res, res_s = sgp_layer.forward_prop_thru_cav(mx, vx, PROP_MC)
+            m, v, kfu, x, eps = res[0], res[1], res[2], res[3], res[4]
+            m_s, v_s, kfu_s, x_s, eps_s = (
+                res_s[0], res_s[1], res_s[2], res_s[3], res_s[4])
+            # compute logZ and gradients
+            logZ, dm, dv = lik_layer.compute_log_Z(m, v, yb, alpha)
+            logZ_scale = scale_logZ * logZ
+            dm_scale = scale_logZ * dm
+            dv_scale = scale_logZ * dv
+            sgp_grad_hyper, dx = sgp_layer.backprop_grads_lvm_mc(
+                m_s, v_s, dm_scale, dv_scale, kfu_s, x_s, alpha)
+            sgp_grad_input = sgp_layer.backprop_grads_reparam(
+                dx, mx, vx, eps)
+            lik_grad_hyper = lik_layer.backprop_grads(
+                m, v, dm, dv, alpha, scale_logZ)
+        else:
+            raise NotImplementedError('propagation mode not implemented')
+
+        grad_all = {}
+        for key in sgp_grad_hyper.keys():
+            grad_all[key] = sgp_grad_hyper[key]
+
+        for key in lik_grad_hyper.keys():
+            grad_all[key] = lik_grad_hyper[key]
+
+        # compute grad wrt x params
+        dmx = sgp_grad_input['mx']
+        dvx = sgp_grad_input['vx']
+
+        x_KL_term, dkl_dmx, dkl_dvx = self.compute_KL_x(
+            mx, vx, self.prior_mean, self.prior_var)
+        scale_x = N * 1.0 / batch_size
+        dmx += scale_x * dkl_dmx
+        dvx += scale_x * dkl_dvx
+        grad_all['x1'] = np.zeros_like(self.factor_x1)
+        grad_all['x2'] = np.zeros_like(self.factor_x2)
+        grad_all['x1'][idxs, :] = dmx / post_t2
+        grad_all['x2'][idxs, :] = -dmx * post_t1 / post_t2**2 - dvx / post_t2**2
+        grad_all['x2'][idxs, :] *= 2 * t12
+
+        # compute objective
+        sgp_KL_term = self.sgp_layer.compute_KL()
+        x_KL_term = scale_x * x_KL_term
+        energy = logZ_scale + x_KL_term + sgp_KL_term
+
+        for p in self.fixed_params:
+            grad_all[p] = np.zeros_like(grad_all[p])
+
+        return energy, grad_all
+
+    def compute_KL_x(self, mx, vx, m0, v0):
+        kl = 0.5 * (np.log(v0) - np.log(vx) + (vx + (mx - m0)**2) / v0 - 1)
+        kl_sum = np.sum(kl)
+        dkl_dmx = (mx - m0) / v0
+        dkl_dvx = - 0.5 / vx - 1 / v0
+        return kl_sum, dkl_dmx, dkl_dvx
+
+    def predict_f(self, inputs):
+        """Summary
+
+        Args:
+            inputs (TYPE): Description
+
+        Returns:
+            TYPE: Description
+        """
+        if not self.updated:
+            self.sgp_layer.update_posterior()
+            self.updated = True
+        mf, vf = self.sgp_layer.forward_prop_thru_post(inputs)
+        return mf, vf
+
+    def predict_y(self, inputs):
+        """Summary
+
+        Args:
+            inputs (TYPE): Description
+
+        Returns:
+            TYPE: Description
+        """
+        if not self.updated:
+            self.sgp_layer.update_posterior()
+            self.updated = True
+        mf, vf = self.sgp_layer.forward_prop_thru_post(inputs)
+        my, vy = self.lik_layer.output_probabilistic(mf, vf)
+        return my, vy
+
+    def get_posterior_x(self):
+        """Summary
+
+        Returns:
+            TYPE: Description
+        """
+        post_1 = self.prior_x1 + self.factor_x1
+        post_2 = self.prior_x2 + self.factor_x2
+        vx = 1.0 / post_2
+        mx = post_1 / post_2
+        return mx, vx
+
+    def impute_missing(self, y, missing_mask, alpha=0.5, no_iters=10, add_noise=False):
+        """Summary
+
+        Args:
+            y (TYPE): Description
+            missing_mask (TYPE): Description
+            alpha (float, optional): Description
+            no_iters (int, optional): Description
+            add_noise (bool, optional): Description
+
+        Returns:
+            TYPE: Description
+        """
+        # TODO
+        # find latent conditioned on observed variables
+        if not self.updated:
+            self.sgp_layer.update_posterior_for_prediction()
+            self.updated = True
+
+        N_test = y.shape[0]
+        Q = self.Din
+        # np.zeros((N_test, Q))
+        factor_x1 = np.zeros((N_test, Q))
+        factor_x2 = np.zeros((N_test, Q))
+        for i in range(no_iters):
+            # compute cavity of x
+            cav_x1 = self.prior_x1 + (1 - alpha) * factor_x1
+            cav_x2 = self.prior_x2 + (1 - alpha) * factor_x2
+            cav_m = cav_x1 / cav_x2
+            cav_v = 1.0 / cav_x2
+
+            # propagate x through posterior and get gradients wrt mx and vx
+            logZ, m, v, dlogZ_dmx, dlogZ_dvx = \
+                self.sgp_layer.compute_logZ_and_gradients_imputation(
+                    cav_m, cav_v,
+                    y, missing_mask, alpha=alpha)
+
+            # compute new posterior
+            new_m = cav_m + cav_v * dlogZ_dmx
+            new_v = cav_v - cav_v**2 * (dlogZ_dmx**2 - 2 * dlogZ_dvx)
+
+            new_x2 = 1.0 / new_v
+            new_x1 = new_x2 * new_m
+            frac_x1 = new_x1 - cav_x1
+            frac_x2 = new_x2 - cav_x2
+
+            # update factor
+            factor_x1 = (1 - alpha) * factor_x1 + frac_x1
+            factor_x2 = (1 - alpha) * factor_x2 + frac_x2
+
+        # compute posterior of x
+        post_x1 = self.prior_x1 + factor_x1
+        post_x2 = self.prior_x2 + factor_x2
+        post_m = post_x1 / post_x2
+        post_v = 1.0 / post_x2
+
+        # propagate x forward to predict missing points
+        my, vy = self.sgp_layer.forward_prop_thru_post(
+            post_m, post_v, add_noise=add_noise)
+
+        return my, vy
+
+    def init_hypers_old(self, y_train):
+        """Summary
+
+        Args:
+            y_train (TYPE): Description
+
+        Returns:
+            TYPE: Description
+        """
+        sgp_params = self.sgp_layer.init_hypers()
+        lik_params = self.lik_layer.init_hypers()
+        # TODO: alternatitve method for non real-valued data
+        post_m = PCA_reduce(y_train, self.Din)
+        post_m_mean = np.mean(post_m, axis=0)
+        post_m_std = np.std(post_m, axis=0)
+        post_m = (post_m - post_m_mean) / post_m_std
+        post_v = 0.1 * np.ones_like(post_m)
+        post_2 = 1.0 / post_v
+        post_1 = post_2 * post_m
+        x_params = {}
+        x_params['x1'] = post_1
+        x_params['x2'] = np.log(post_2 - 1) / 2
+
+        init_params = dict(sgp_params)
+        init_params.update(lik_params)
+        init_params.update(x_params)
+        return init_params
+
+    def init_hypers(self, y_train):
+        """Summary
+
+        Args:
+            y_train (TYPE): Description
+
+        Returns:
+            TYPE: Description
+        """
+        # TODO: alternatitve method for non real-valued data
+        post_m = PCA_reduce(y_train, self.Din)
+        post_m_mean = np.mean(post_m, axis=0)
+        post_m_std = np.std(post_m, axis=0)
+        post_m = (post_m - post_m_mean) / post_m_std
+        post_v = 0.1 * np.ones_like(post_m)
+        post_2 = 1.0 / post_v
+        post_1 = post_2 * post_m
+        x_params = {}
+        x_params['x1'] = post_1
+        x_params['x2'] = np.log(post_2 - 1) / 2
+        # learnt a GP mapping between hidden states
+        print 'init latent function using GPR...'
+        x = post_m
+        y = y_train
+        reg = SGPR(x, y, self.M, 'Gaussian')
+        reg.set_fixed_params(['sn', 'sf', 'ls', 'zu'])
+        reg.optimise(method='L-BFGS-B', maxiter=100, disp=False)
+        sgp_params = reg.sgp_layer.get_hypers()
+        lik_params = self.lik_layer.init_hypers()
+        init_params = dict(sgp_params)
+        init_params.update(lik_params)
+        init_params.update(x_params)
+        return init_params
+
+    def get_hypers(self):
+        """Summary
+
+        Returns:
+            TYPE: Description
+        """
+        sgp_params = self.sgp_layer.get_hypers()
+        lik_params = self.lik_layer.get_hypers()
+        x_params = {}
+        x_params['x1'] = self.factor_x1
+        x_params['x2'] = np.log(self.factor_x2) / 2.0
+
+        params = dict(sgp_params)
+        params.update(lik_params)
+        params.update(x_params)
+        return params
+
+    def update_hypers(self, params):
+        """Summary
+
+        Args:
+            params (TYPE): Description
+        """
+        self.sgp_layer.update_hypers(params)
+        self.lik_layer.update_hypers(params)
+        self.factor_x1 = params['x1']
+        self.factor_x2 = np.exp(2 * params['x2'])
+
+
