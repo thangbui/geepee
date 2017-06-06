@@ -1471,7 +1471,8 @@ class AEP_Model(object):
                     step_size=adam_lr,
                     maxiter=maxiter,
                     args=(params_args, self, mb_size, alpha, prop_mode),
-                    disp=disp)
+                    disp=disp,
+                    callback=callback)
                 final_params = results
             else:
                 options = {'maxfun': maxfun, 'maxiter': maxiter,
