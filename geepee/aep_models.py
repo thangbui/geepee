@@ -1470,7 +1470,8 @@ class AEP_Model(object):
                     objective_wrapper, init_params_vec,
                     step_size=adam_lr,
                     maxiter=maxiter,
-                    args=(params_args, self, mb_size, alpha, prop_mode))
+                    args=(params_args, self, mb_size, alpha, prop_mode),
+                    disp=disp)
                 final_params = results
             else:
                 options = {'maxfun': maxfun, 'maxiter': maxiter,

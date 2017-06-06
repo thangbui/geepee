@@ -96,7 +96,8 @@ class VFE_Model(object):
                     objective_wrapper, init_params_vec,
                     step_size=adam_lr,
                     maxiter=maxiter,
-                    args=(params_args, self, mb_size, alpha, prop_mode))
+                    args=(params_args, self, mb_size, alpha, prop_mode),
+                    disp=disp)
                 final_params = results
             else:
                 options = {'maxfun': maxfun, 'maxiter': maxiter,
@@ -469,6 +470,7 @@ class SGPR_collapsed(VFE_Model):
         return mf, vf
 
     def sample_f(self, inputs, no_samples=1):
+        # TODO
         """Summary
 
         Args:
@@ -478,9 +480,6 @@ class SGPR_collapsed(VFE_Model):
         Returns:
             TYPE: Description
         """
-        if not self.updated:
-            self.sgp_layer.update_posterior()
-            self.updated = True
         K = no_samples
         fs = np.zeros((inputs.shape[0], self.Dout, K))
         # TODO: remove for loop here
@@ -488,7 +487,7 @@ class SGPR_collapsed(VFE_Model):
             fs[:, :, k] = self.sgp_layer.sample(inputs)
         return fs
 
-    def predict_y(self, inputs):
+    def predict_y(self, inputs, alpha=0.01, marginal=True):
         """Summary
 
         Args:
@@ -497,14 +496,14 @@ class SGPR_collapsed(VFE_Model):
         Returns:
             TYPE: Description
         """
-        if not self.updated:
-            self.sgp_layer.update_posterior()
-            self.updated = True
-        mf, vf = self.sgp_layer.output_probabilistic(inputs)
-        my, vy = self.lik_layer.output_probabilistic(mf, vf)
+        mf, vf = self.predict_f(inputs, alpha, marginal)
+        if marginal:
+            my, vy = mf, vf + np.exp(2 * self.sn)
+        else:
+            my, vy = mf, vf + np.exp(2 * self.sn) * np.eye(my.shape[0])
         return my, vy
 
-    def init_hypers(self):
+    def init_hypers(self, y_train):
         """Summary
 
         Returns:
@@ -1583,6 +1582,7 @@ class SGPLVM(VFE_Model):
             yb = self.y_train[idxs, :]
         batch_size = yb.shape[0]
         scale_log_lik = - N * 1.0 / batch_size
+        # scale_log_lik = 0
 
         # update model with new hypers
         self.update_hypers(params)
@@ -1665,7 +1665,7 @@ class SGPLVM(VFE_Model):
         kl = 0.5 * (np.log(v0) - np.log(vx) + (vx + (mx - m0)**2) / v0 - 1)
         kl_sum = np.sum(kl)
         dkl_dmx = (mx - m0) / v0
-        dkl_dvx = - 0.5 / vx - 1 / v0
+        dkl_dvx = - 0.5 / vx + 0.5 / v0
         return kl_sum, dkl_dmx, dkl_dvx
 
     def predict_f(self, inputs):

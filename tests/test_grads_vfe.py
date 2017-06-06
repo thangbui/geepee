@@ -1046,7 +1046,7 @@ def test_gplvm_vfe_gaussian_cluster():
     # generate some datapoints for testing
     import GPy
     print "creating dataset..."
-    N = 100
+    N = 20
     k1 = GPy.kern.RBF(5, variance=1, lengthscale=1. /
                       np.random.dirichlet(np.r_[10, 10, 10, 0.1, 0.1]), ARD=True)
     k2 = GPy.kern.RBF(5, variance=1, lengthscale=1. /
@@ -1062,9 +1062,9 @@ def test_gplvm_vfe_gaussian_cluster():
     labels = np.hstack((np.zeros(A.shape[0]), np.ones(
         B.shape[0]), np.ones(C.shape[0]) * 2))
 
-    N_train = N
-    M = 30
-    D = 5
+    N_train = Y.shape[0]
+    M = 20
+    D = 3
     y_train = Y
     lvm = vfe.SGPLVM(y_train, D, M, lik='Gaussian')
 
@@ -2150,8 +2150,8 @@ if __name__ == '__main__':
     # test_gpr_vfe_probit_stochastic()
     # plot_gpr_vfe_probit_stochastic()
 
-    test_gplvm_vfe_gaussian()
-    # test_gplvm_vfe_gaussian_cluster()
+    # test_gplvm_vfe_gaussian()
+    test_gplvm_vfe_gaussian_cluster()
     # test_gplvm_vfe_gaussian_scipy()
     # # test_gplvm_vfe_gaussian_MC()
     # test_gplvm_vfe_gaussian_stochastic()

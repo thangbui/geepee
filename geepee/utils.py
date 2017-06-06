@@ -91,14 +91,14 @@ def unflatten_dict(params, params_args):
 
 
 def adam(func, init_params, callback=None, maxiter=1000,
-         step_size=0.001, b1=0.9, b2=0.999, eps=1e-8, args=None):
+         step_size=0.001, b1=0.9, b2=0.999, eps=1e-8, args=None, disp=True):
     """Adam as described in http://arxiv.org/pdf/1412.6980.pdf."""
     x = init_params
     m = np.zeros_like(x)
     v = np.zeros_like(x)
     for i in range(maxiter):
         f, g = func(x, *args)
-        if i % 10 == 0:
+        if disp and i % 10 == 0:
             print 'iter %d \t obj %.3f' % (i, f)
         if callback:
             callback(x, i, g)
