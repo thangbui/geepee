@@ -9,14 +9,6 @@ from scipy import special
 from .datautils import step, spiral
 from .context import aep
 
-# import sys
-# import os
-# sys.path.insert(0, os.path.abspath(
-#     os.path.join(os.path.dirname(__file__), '..')))
-# import geepee.aep_models as aep
-# from datautils import step, spiral
-
-
 def run_regression_1D():
     np.random.seed(42)
 

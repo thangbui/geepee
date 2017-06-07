@@ -7,7 +7,6 @@ import pdb
 
 np.random.seed(42)
 
-
 def test_kink():
     def kink_true(x):
         fx = np.zeros(x.shape)

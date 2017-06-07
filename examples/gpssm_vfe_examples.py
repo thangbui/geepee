@@ -5,7 +5,7 @@ import scipy.stats
 import matplotlib.pylab as plt
 import os
 import sys
-from .context import aep
+from .context import vfe
 from .context import config
 import pdb
 
@@ -100,19 +100,18 @@ def test_kink_linear_MM():
     Dlatent = 1
     Dobs = 1
     M = 15
-    alpha = 0.5
-    # create AEP model
-    model_aep = aep.SGPSSM(y_train, Dlatent, M, 
+    # create vfe model
+    model_aep = vfe.SGPSSM(y_train, Dlatent, M, 
         lik='Gaussian', prior_mean=0, prior_var=1000, gp_emi=False)
     hypers = model_aep.init_hypers(y_train)
-    model_aep.update_hypers(hypers)
+    model_vfe.update_hypers(hypers)
     # optimise
-    # model_aep.optimise(
-    #     method='L-BFGS-B', alpha=alpha, maxiter=10000, reinit_hypers=False)
-    model_aep.optimise(
-        method='adam', alpha=alpha, maxiter=10000, adam_lr=0.01, reinit_hypers=False)
-    opt_hypers = model_aep.get_hypers()
-    plot_latent_kink(model_aep, y, 'AEP_MM_%.3f'%alpha)
+    # model_vfe.optimise(
+    #     method='L-BFGS-B', maxiter=10000, reinit_hypers=False)
+    model_vfe.optimise(
+        method='adam', maxiter=10000, adam_lr=0.01, reinit_hypers=False)
+    opt_hypers = model_vfe.get_hypers()
+    plot_latent_kink(model_vfe, y, 'VFE_MM_%.3f')
 
 
 def test_kink_linear_MC():
@@ -128,22 +127,22 @@ def test_kink_linear_MC():
     Dobs = 1
     M = 15
     alpha = 0.5
-    # create AEP model
-    model_aep = aep.SGPSSM(y_train, Dlatent, M, 
+    # create VFE model
+    model_VFE = vfe.SGPSSM(y_train, Dlatent, M, 
         lik='Gaussian', prior_mean=0, prior_var=1000, gp_emi=False)
-    hypers = model_aep.init_hypers(y_train)
-    model_aep.update_hypers(hypers)
+    hypers = model_vfe.init_hypers(y_train)
+    model_vfe.update_hypers(hypers)
     # optimise
-    # model_aep.optimise(
-    #     method='L-BFGS-B', alpha=alpha, maxiter=10000, 
+    # model_vfe.optimise(
+    #     method='L-BFGS-B', maxiter=10000, 
     #     reinit_hypers=False, prop_mode=config.PROP_MC)
-    model_aep.optimise(
-        method='adam', alpha=alpha, maxiter=10000, adam_lr=0.01, reinit_hypers=False, prop_mode=config.PROP_MC)
-    opt_hypers = model_aep.get_hypers()
-    plot_latent_kink(model_aep, y, 'AEP_MC_%.3f'%alpha)
+    model_vfe.optimise(
+        method='adam', maxiter=10000, adam_lr=0.01, reinit_hypers=False, prop_mode=config.PROP_MC)
+    opt_hypers = model_vfe.get_hypers()
+    plot_latent_kink(model_aep, y, 'VFE_MC_%.3f'%alpha)
 
 if __name__ == '__main__':
-    # np.random.seed(42)
-    # test_kink_linear_MM()
     np.random.seed(42)
-    test_kink_linear_MC()
+    test_kink_linear_MM()
+    # np.random.seed(42)
+    # test_kink_linear_MC()

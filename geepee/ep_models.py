@@ -14,7 +14,7 @@ from scipy.cluster.vq import kmeans2
 
 from utils import *
 from kernels import *
-from aep_models import Gauss_Layer, Probit_Layer, Gauss_Emis
+from lik_layers import Gauss_Layer, Probit_Layer, Gauss_Emis
 from config import *
 
 

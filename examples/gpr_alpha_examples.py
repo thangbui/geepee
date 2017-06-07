@@ -169,7 +169,7 @@ def run_regression_1D_aep_two_layers_stoc():
     alpha = 1 # other alpha is not valid here
     M = 20
     model = aep.SDGPR(Xtrain, ytrain, M, hidden_sizes=[2])
-    model.optimise(method='adam', alpha=1, maxiter=5000, disp=True)
+    model.optimise(method='adam', alpha=1, maxiter=5000, disp=False)
     my, vy = model.predict_y(Xtest)
     my = np.reshape(my, ytest.shape)
     vy = np.reshape(vy, ytest.shape)
@@ -185,13 +185,13 @@ def run_regression_1D_aep_two_layers_stoc():
 
 
 if __name__ == '__main__':
-    # # running batch Power-EP for regression
-    # run_regression_1D_collapsed()
-    # # running batch approximate Power-EP for regression
-    # run_regression_1D_aep() 
-    # # running batch one layer deep GP for regression (identical to aep.GPR) 
-    # run_regression_1D_aep_one_layer()
-    # # running deep regression - network size = [D 2 1]
-    # run_regression_1D_aep_two_layers()
+    # running batch Power-EP for regression
+    run_regression_1D_collapsed()
+    # running batch approximate Power-EP for regression
+    run_regression_1D_aep() 
+    # running batch one layer deep GP for regression (identical to aep.GPR) 
+    run_regression_1D_aep_one_layer()
+    # running deep regression - network size = [D 2 1]
+    run_regression_1D_aep_two_layers()
     # running deep regression with stoc. optimisation - network size = [D 2 1] 
     run_regression_1D_aep_two_layers_stoc()

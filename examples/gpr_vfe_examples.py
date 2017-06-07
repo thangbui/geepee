@@ -7,8 +7,6 @@ from scipy import special
 from .datautils import step, spiral
 from .context import vfe
 
-# import GPflow as gf
-
 
 def run_regression_1D_collapsed():
     np.random.seed(42)
