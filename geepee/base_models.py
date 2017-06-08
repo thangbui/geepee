@@ -730,20 +730,6 @@ class Base_SGPLVM(Base_Model):
         return mx, vx
 
     def impute_missing(self, y, missing_mask, alpha=0.5, no_iters=10, add_noise=False):
-        # TODO
-        """Summary
-        
-        Args:
-            y (TYPE): Description
-            missing_mask (TYPE): Description
-            alpha (float, optional): Description
-            no_iters (int, optional): Description
-            add_noise (bool, optional): Description
-        
-        Returns:
-            TYPE: Description
-        """
-        # TODO
         """Summary
 
         Args:
@@ -896,7 +882,6 @@ class Base_SGPLVM(Base_Model):
         grads['x1'] = grads_x_1
         grads['x2'] = grads_x_2
         return grads
-
 
 
 class Base_SGPR(Base_Model):

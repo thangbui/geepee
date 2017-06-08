@@ -32,7 +32,7 @@ def gradient(params, params_args, obj, idxs, alpha):
     return g
 
 
-def test_gplvm_aep_gaussian():
+def test_gplvm_aep_gaussian(nat_param=True):
 
     # generate some datapoints for testing
     N_train = 10
@@ -41,7 +41,7 @@ def test_gplvm_aep_gaussian():
     D = 2
     Q = 3
     y_train = np.random.randn(N_train, Q)
-    lvm = aep.SGPLVM(y_train, D, M, lik='Gaussian')
+    lvm = aep.SGPLVM(y_train, D, M, lik='Gaussian', nat_param=nat_param)
 
     # init hypers, inducing points and q(u) params
     init_params = lvm.init_hypers(y_train)
@@ -657,7 +657,7 @@ def test_gplvm_aep_probit_MC():
                   % (n, d, grad_all['x2'][n, d], dx2_nd, (grad_all['x2'][n, d] - dx2_nd) / dx2_nd))
 
 
-def test_gplvm_aep_gaussian_stochastic():
+def test_gplvm_aep_gaussian_stochastic(nat_param):
 
     # generate some datapoints for testing
     N_train = 10
@@ -667,7 +667,7 @@ def test_gplvm_aep_gaussian_stochastic():
     Q = 3
     mb_size = 3
     y_train = np.random.randn(N_train, Q)
-    lvm = aep.SGPLVM(y_train, D, M, lik='Gaussian')
+    lvm = aep.SGPLVM(y_train, D, M, lik='Gaussian', nat_param=nat_param)
 
     # init hypers, inducing points and q(u) params
     init_params = lvm.init_hypers(y_train)
@@ -5120,14 +5120,17 @@ def plot_gpssm_linear_aep_gaussian_stochastic():
 
 
 if __name__ == '__main__':
-    # test_gplvm_aep_gaussian()
+    test_gplvm_aep_gaussian(True)
+    test_gplvm_aep_gaussian(False)
     # test_gplvm_aep_probit()
     # test_gplvm_aep_gaussian_scipy()
     # test_gplvm_aep_probit_scipy()
     # test_gplvm_aep_gaussian_MC()
     # test_gplvm_aep_probit_MC()    
     # test_gplvm_aep_probit_stochastic()
-    # test_gplvm_aep_gaussian_stochastic()
+    test_gplvm_aep_gaussian_stochastic(True)
+    test_gplvm_aep_gaussian_stochastic(False)
+
 
     # plot_gplvm_aep_probit_stochastic()
     # plot_gplvm_aep_gaussian_stochastic()
@@ -5157,15 +5160,15 @@ if __name__ == '__main__':
     # test_dgprh_aep_gaussian_scipy()
     # test_dgprh_aep_probit_scipy()
 
-    test_gpssm_linear_aep_gaussian_kink_MM()
-    test_gpssm_linear_aep_gaussian_kink_MC()
-    test_gpssm_linear_aep_gaussian_kink_MM_scipy()
-    test_gpssm_gp_aep_gaussian_kink_MM()
-    test_gpssm_gp_aep_gaussian_kink_MC()
+    # test_gpssm_linear_aep_gaussian_kink_MM()
+    # test_gpssm_linear_aep_gaussian_kink_MC()
+    # test_gpssm_linear_aep_gaussian_kink_MM_scipy()
+    # test_gpssm_gp_aep_gaussian_kink_MM()
+    # test_gpssm_gp_aep_gaussian_kink_MC()
 
-    test_gpssm_linear_aep_gaussian_kink_MM_stochastic()
-    test_gpssm_linear_aep_gaussian_kink_MC_stochastic()
-    test_gpssm_gp_aep_gaussian_kink_MM_stochastic()
-    test_gpssm_gp_aep_gaussian_kink_MC_stochastic()
+    # test_gpssm_linear_aep_gaussian_kink_MM_stochastic()
+    # test_gpssm_linear_aep_gaussian_kink_MC_stochastic()
+    # test_gpssm_gp_aep_gaussian_kink_MM_stochastic()
+    # test_gpssm_gp_aep_gaussian_kink_MC_stochastic()
 
     # plot_gpssm_linear_aep_gaussian_stochastic()

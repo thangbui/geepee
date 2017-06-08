@@ -628,7 +628,7 @@ class SGPLVM(Base_SGPLVM):
     """
 
     def __init__(self, y_train, hidden_size, no_pseudo,
-                 lik='Gaussian', prior_mean=0, prior_var=1):
+                 lik='Gaussian', prior_mean=0, prior_var=1, nat_param=True):
         """Summary
         
         Args:
@@ -640,7 +640,8 @@ class SGPLVM(Base_SGPLVM):
             prior_var (int, optional): Description
         """
         super(SGPLVM, self).__init__(
-            y_train, hidden_size, no_pseudo, lik, prior_mean, prior_var)
+            y_train, hidden_size, no_pseudo, 
+            lik, prior_mean, prior_var, nat_param)
         self.sgp_layer = SGP_Layer(self.N, self.Din, self.Dout, self.M)
         
     @profile
@@ -676,35 +677,27 @@ class SGPLVM(Base_SGPLVM):
 
         # update model with new hypers
         self.update_hypers(params)
-        self.sgp_layer.compute_cavity(alpha)
-
         # compute cavity
-        t01 = self.prior_x1
-        t02 = self.prior_x2
-        t11 = self.factor_x1[idxs, :]
-        t12 = self.factor_x2[idxs, :]
-        cav_t1 = t01 + (1.0 - alpha) * t11
-        cav_t2 = t02 + (1.0 - alpha) * t12
-        vx = 1.0 / cav_t2
-        mx = cav_t1 / cav_t2
+        self.sgp_layer.compute_cavity(alpha)
+        mcav, vcav = self.get_cavity_x(alpha, idxs)
+        mpost, vpost = self.get_posterior_x(idxs)
         # for testing only
         # prop_mode = PROP_MC
         if prop_mode == PROP_MM:
             # propagate x cavity forward
-            mout, vout, psi1, psi2 = sgp_layer.forward_prop_thru_cav(
-                mx, vx)
+            mout, vout, psi1, psi2 = sgp_layer.forward_prop_thru_cav(mcav, vcav)
             # compute logZ and gradients
             logZ, dm, dv = self.lik_layer.compute_log_Z(mout, vout, yb, alpha)
             logZ_scale = scale_logZ * logZ
             dm_scale = scale_logZ * dm
             dv_scale = scale_logZ * dv
             sgp_grad_hyper, sgp_grad_input = sgp_layer.backprop_grads_lvm_mm(
-                mout, vout, dm_scale, dv_scale, psi1, psi2, mx, vx, alpha)
+                mout, vout, dm_scale, dv_scale, psi1, psi2, mcav, vcav, alpha)
             lik_grad_hyper = self.lik_layer.backprop_grads(
                 mout, vout, dm, dv, alpha, scale_logZ)
         elif prop_mode == PROP_MC:
             # propagate x cavity forward
-            res, res_s = sgp_layer.forward_prop_thru_cav(mx, vx, PROP_MC)
+            res, res_s = sgp_layer.forward_prop_thru_cav(mcav, vcav, PROP_MC)
             m, v, kfu, x, eps = res[0], res[1], res[2], res[3], res[4]
             m_s, v_s, kfu_s, x_s, eps_s = (
                 res_s[0], res_s[1], res_s[2], res_s[3], res_s[4])
@@ -716,7 +709,7 @@ class SGPLVM(Base_SGPLVM):
             sgp_grad_hyper, dx = sgp_layer.backprop_grads_lvm_mc(
                 m_s, v_s, dm_scale, dv_scale, kfu_s, x_s, alpha)
             sgp_grad_input = sgp_layer.backprop_grads_reparam(
-                dx, mx, vx, eps)
+                dx, mcav, vcav, eps)
             lik_grad_hyper = lik_layer.backprop_grads(
                 m, v, dm, dv, alpha, scale_logZ)
         else:
@@ -729,38 +722,26 @@ class SGPLVM(Base_SGPLVM):
         for key in lik_grad_hyper.keys():
             grad_all[key] = lik_grad_hyper[key]
 
-        # compute grad wrt x params
-        dcav_dt11 = (1.0 - alpha) * cav_t1 / cav_t2
-        dcav_dt12 = (1.0 - alpha) * (-0.5 * cav_t1 **
-                                     2 / cav_t2**2 - 0.5 / cav_t2)
-        dmx = sgp_grad_input['mx']
-        dvx = sgp_grad_input['vx']
-        dlogZ_dt11 = (1.0 - alpha) * dmx / cav_t2
-        dlogZ_dt12 = (1.0 - alpha) * (-dmx * cav_t1 /
-                                      cav_t2**2 - dvx / cav_t2**2)
+        # compute phi_x and gradients
+        phi_prior_x, _, _ = self.compute_phi_x(self.prior_mean, self.prior_var)
+        phi_prior_x *= self.N * self.Din
+        phi_cav_x, dmcav, dvcav = self.compute_phi_x(mcav, vcav)
+        phi_post_x, dmpost, dvpost = self.compute_phi_x(mpost, vpost)
+        scale_cav = - self.N * 1.0 / batch_size / alpha
+        scale_post = - self.N * 1.0 / batch_size * (1.0 - 1.0 / alpha)
+        x_contrib = phi_prior_x + scale_cav * phi_cav_x + scale_post * phi_post_x
 
-        post_t1 = t01 + t11
-        post_t2 = t02 + t12
-        dpost_dt11 = post_t1 / post_t2
-        dpost_dt12 = - 0.5 * post_t1**2 / post_t2**2 - 0.5 / post_t2
-
-        scale_x = N * 1.0 / batch_size
-        grad_all['x1'] = dlogZ_dt11 + scale_x * (
-            - 1.0 / alpha * dcav_dt11 - (1.0 - 1.0 / alpha) * dpost_dt11)
-        grad_all['x2'] = dlogZ_dt12 + scale_x * (
-            - 1.0 / alpha * dcav_dt12 - (1.0 - 1.0 / alpha) * dpost_dt12)
-        grad_all['x2'] *= 2 * t12
+        dmcav = scale_cav * dmcav + sgp_grad_input['mx']
+        dvcav = scale_cav * dvcav + sgp_grad_input['vx'] 
+        dmpost = scale_post * dmpost
+        dvpost = scale_post * dvpost
+        grads_x_cav = self.compute_cav_grad_x(dmcav, dvcav, mcav, vcav, alpha, idxs)
+        grads_x_post = self.compute_posterior_grad_x(dmpost, dvpost, idxs)
+        for key in grads_x_cav.keys():
+            grad_all[key] = grads_x_cav[key] + grads_x_post[key]
 
         # compute objective
         sgp_contrib = self.sgp_layer.compute_phi(alpha)
-
-        phi_prior_x = self.compute_phi_prior_x(idxs)
-        phi_poste_x = self.compute_phi_posterior_x(idxs)
-        phi_cavity_x = self.compute_phi_cavity_x(idxs, alpha)
-        x_contrib = scale_x * (
-            phi_prior_x - 1.0 / alpha * phi_cavity_x
-            - (1.0 - 1.0 / alpha) * phi_poste_x)
-
         energy = logZ_scale + x_contrib + sgp_contrib
 
         for p in self.fixed_params:
@@ -768,60 +749,57 @@ class SGPLVM(Base_SGPLVM):
 
         return energy, grad_all
 
-    def compute_phi_prior_x(self, idxs):
-        """Summary
-        
-        Args:
-            idxs (TYPE): Description
-        
-        Returns:
-            TYPE: Description
-        """
-        t1 = self.prior_x1
-        t2 = self.prior_x2
-        m = t1 / t2
-        v = 1.0 / t2
-        Nb = idxs.shape[0]
-        return 0.5 * Nb * self.Din * (m**2 / v + np.log(v))
+    def compute_cav_grad_x(self, dm, dv, m, v, alpha, idxs):
+        t1 = m / v
+        t2 = 1 / v
+        dt1 = (1.0 - alpha) * dm / t2
+        dt2 = (1.0 - alpha) * (-dm * t1 / t2**2 - dv / t2**2)
+        if self.nat_param:
+            dt2 *= 2*self.factor_x2[idxs, :]
+        else:
+            mpost = self.factor_x1[idxs, :]
+            vpost = self.factor_x2[idxs, :]
+            t1 = mpost / vpost
+            t2 = 1 / vpost
+            dm = dt1 / vpost
+            dv = - dt1 * mpost / vpost**2 - dt2 / vpost ** 2
+            dt1 = dm
+            dt2 = dv * 2 * self.factor_x2[idxs, :]
+            
+        d1 = np.zeros_like(self.factor_x1)
+        d2 = np.zeros_like(self.factor_x2)
+        d1[idxs, :] = dt1
+        d2[idxs, :] = dt2
+        return {'x1': d1, 'x2': d2}
 
-    def compute_phi_posterior_x(self, idxs):
-        """Summary
-        
-        Args:
-            idxs (TYPE): Description
-        
-        Returns:
-            TYPE: Description
-        """
-        t01 = self.prior_x1
-        t02 = self.prior_x2
-        t11 = self.factor_x1[idxs, :]
-        t12 = self.factor_x2[idxs, :]
-        t1 = t01 + t11
-        t2 = t02 + t12
-        m = t1 / t2
-        v = 1.0 / t2
-        return np.sum(0.5 * (m**2 / v + np.log(v)))
+    def get_cavity_x(self, alpha, idxs=None):
+        if idxs is None:
+            idxs = np.arange(self.N)
+        if self.nat_param:
+            t01 = self.prior_x1
+            t02 = self.prior_x2
+            t11 = self.factor_x1[idxs, :]
+            t12 = self.factor_x2[idxs, :]
+            cav_t1 = t01 + (1.0 - alpha) * t11
+            cav_t2 = t02 + (1.0 - alpha) * t12
+            vx = 1.0 / cav_t2
+            mx = cav_t1 / cav_t2
+        else:
+            mpost = self.factor_x1[idxs, :]
+            vpost = self.factor_x2[idxs, :]
+            t1 = mpost / vpost
+            t2 = 1 / vpost
+            cav_t1 = self.prior_x1 + (t1 - self.prior_x1) * (1 - alpha)
+            cav_t2 = self.prior_x2 + (t2 - self.prior_x2) * (1 - alpha)
+            vx = 1.0 / cav_t2
+            mx = cav_t1 / cav_t2
+        return mx, vx
 
-    def compute_phi_cavity_x(self, idxs, alpha=1.0):
-        """Summary
-        
-        Args:
-            idxs (TYPE): Description
-            alpha (float, optional): Description
-        
-        Returns:
-            TYPE: Description
-        """
-        t01 = self.prior_x1
-        t02 = self.prior_x2
-        t11 = self.factor_x1[idxs, :]
-        t12 = self.factor_x2[idxs, :]
-        t1 = t01 + (1.0 - alpha) * t11
-        t2 = t02 + (1.0 - alpha) * t12
-        m = t1 / t2
-        v = 1.0 / t2
-        return np.sum(0.5 * (m**2 / v + np.log(v)))
+    def compute_phi_x(self, mx, vx):
+        phi = np.sum(0.5 * (mx**2 / vx + np.log(vx)))
+        dmx = mx / vx
+        dvx = 0.5 * (- mx**2 / vx**2 + 1 / vx)
+        return phi, dmx, dvx
 
 
 class SDGPR(Base_SDGPR):
