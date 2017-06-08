@@ -396,6 +396,7 @@ class SGP_Layer(Base_SGP_Layer):
             dtheta1_R_d = dtheta1_R_d[triu_ind]
             deta1_R[d, :] = dtheta1_R_d.reshape(
                 (dtheta1_R_d.shape[0], ))
+        # pdb.set_trace()
 
         # grads wrt Kuu
         dKuuinv_Su = np.sum(dtheta1, axis=0)
@@ -1009,6 +1010,7 @@ class SGPSSM(Base_SGPSSM):
             yb = self.y_train[emi_idxs, :]
         batch_size_dyn = dyn_idxs.shape[0]
         scale_log_lik_dyn = - (N - 1) * 1.0 / batch_size_dyn
+        # scale_log_lik_dyn = 0
         batch_size_emi = emi_idxs.shape[0]
         scale_log_lik_emi = - N * 1.0 / batch_size_emi
 
@@ -1157,7 +1159,7 @@ class SGPSSM(Base_SGPSSM):
 
         post_1 = self.x_post_1[emi_idxs, :]
         post_2 = self.x_post_2[emi_idxs, :]
-        grads_x_1[emi_idxs, :] += dm / post_1
+        grads_x_1[emi_idxs, :] += dm / post_2
         grads_x_2[emi_idxs, :] += - dm * post_1 / post_2**2 - dv / post_2**2
 
         post_1 = self.x_post_1[0, :]
