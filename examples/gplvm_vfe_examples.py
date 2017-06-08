@@ -12,7 +12,7 @@ from .context import config
 np.random.seed(42)
 
 
-def run_cluster_MM():
+def run_cluster_MM(nat_param=True):
     import GPy
     # create dataset
     print "creating dataset..."
@@ -36,8 +36,9 @@ def run_cluster_MM():
     print "inference ..."
     M = 30
     D = 5
-    lvm = vfe.SGPLVM(Y, D, M, lik='Gaussian')
-    lvm.optimise(method='L-BFGS-B', maxiter=2000)
+    lvm = vfe.SGPLVM(Y, D, M, lik='Gaussian', nat_param=nat_param)
+    # lvm.optimise(method='L-BFGS-B', maxiter=2000)
+    lvm.optimise(method='adam', adam_lr=0.05, maxiter=2000)
 
     ls = np.exp(lvm.sgp_layer.ls)
     print ls
@@ -407,9 +408,9 @@ def run_frey():
     plt.show()
 
 if __name__ == '__main__':
-    run_cluster_MM()
+    run_cluster_MM(False)
     # run_cluster_MC()
-    run_semicircle()
+    # run_semicircle()
     # run_pinwheel()
     # run_xor()
     # run_oil()

@@ -11,6 +11,7 @@ import matplotlib.pylab as plt
 
 from .context import vfe
 from .context import flatten_dict, unflatten_dict
+from .context import PROP_MC, PROP_MM
 
 pp = pprint.PrettyPrinter(indent=4)
 np.random.seed(0)
@@ -887,7 +888,7 @@ def test_gpr_vfe_probit_scipy():
                          params_args, model, N_train, alpha))
 
 
-def test_gplvm_vfe_gaussian():
+def test_gplvm_vfe_gaussian(nat_param=True):
 
     # generate some datapoints for testing
     N_train = 5
@@ -895,7 +896,7 @@ def test_gplvm_vfe_gaussian():
     D = 2
     Q = 3
     y_train = np.random.randn(N_train, Q)
-    lvm = vfe.SGPLVM(y_train, D, M, lik='Gaussian')
+    lvm = vfe.SGPLVM(y_train, D, M, lik='Gaussian', nat_param=nat_param)
     # init hypers, inducing points and q(u) params
     init_params = lvm.init_hypers(y_train)
     
@@ -1689,7 +1690,7 @@ def test_gplvm_vfe_probit_MC():
                   % (n, d, grad_all['x2'][n, d], dx2_nd, (grad_all['x2'][n, d] - dx2_nd) / dx2_nd))
 
 
-def test_gplvm_vfe_gaussian_stochastic():
+def test_gplvm_vfe_gaussian_stochastic(nat_param=True):
 
     # generate some datapoints for testing
     N_train = 10
@@ -1698,7 +1699,7 @@ def test_gplvm_vfe_gaussian_stochastic():
     Q = 3
     mb_size = 3
     y_train = np.random.randn(N_train, Q)
-    lvm = vfe.SGPLVM(y_train, D, M, lik='Gaussian')
+    lvm = vfe.SGPLVM(y_train, D, M, lik='Gaussian', nat_param=nat_param)
 
     # init hypers, inducing points and q(u) params
     init_params = lvm.init_hypers(y_train)
@@ -2094,14 +2095,14 @@ def plot_gplvm_vfe_probit_stochastic():
     plt.savefig('/tmp/probit_stochastic_vfe_gplvm.pdf')
 
 
-def test_gplvm_vfe_gaussian_scipy():
+def test_gplvm_vfe_gaussian_scipy(nat_param=True):
     # generate some datapoints for testing
     N_train = 5
     M = 4
     D = 2
     Q = 3
     y_train = np.random.randn(N_train, Q)
-    lvm = vfe.SGPLVM(y_train, D, M, lik='Gaussian')
+    lvm = vfe.SGPLVM(y_train, D, M, lik='Gaussian', nat_param=nat_param)
 
     # init hypers, inducing points and q(u) params
     init_params_dict = lvm.init_hypers(y_train)
@@ -2144,8 +2145,8 @@ def test_gplvm_vfe_probit_scipy():
                          params_args, lvm, N_train, None))
 
 
-def test_gpssm_linear_vfe_gaussian_kink_MM():
-
+def test_gpssm_linear_vfe_gaussian_kink_MM(nat_param=True):
+    np.random.seed(0)
     def kink_true(x):
         fx = np.zeros(x.shape)
         for t in range(x.shape[0]):
@@ -2184,7 +2185,7 @@ def test_gpssm_linear_vfe_gaussian_kink_MM():
     D = 1
     (xtrue, x, y) = kink(N_train, process_noise, obs_noise)
     y_train = np.reshape(y, [y.shape[0], 1])
-    lvm = vfe.SGPSSM(y_train, Q, M, lik='Gaussian', gp_emi=False)
+    lvm = vfe.SGPSSM(y_train, Q, M, lik='Gaussian', gp_emi=False, nat_param=nat_param)
     
     lvm.optimise(
         method='adam', maxiter=500, adam_lr=0.08)
@@ -2353,6 +2354,236 @@ def test_gpssm_linear_vfe_gaussian_kink_MM():
               % (d, grad_all['R_emission'][d], dx1_nd, (grad_all['R_emission'][d] - dx1_nd) / dx1_nd))
 
 
+def test_gpssm_linear_vfe_gaussian_kink_MM_stochastic(nat_param=True):
+    np.random.seed(0)
+    def kink_true(x):
+        fx = np.zeros(x.shape)
+        for t in range(x.shape[0]):
+            xt = x[t]
+            if xt < 4:
+                fx[t] = xt + 1
+
+            else:
+                fx[t] = -4 * xt + 21
+        return fx
+
+    def kink(T, process_noise, obs_noise, xprev=None):
+        if xprev is None:
+            xprev = np.random.randn()
+        y = np.zeros([T, ])
+        x = np.zeros([T, ])
+        xtrue = np.zeros([T, ])
+        for t in range(T):
+            if xprev < 4:
+                fx = xprev + 1
+            else:
+                fx = -4 * xprev + 21
+
+            xtrue[t] = fx
+            x[t] = fx + np.sqrt(process_noise) * np.random.randn()
+            xprev = x[t]
+            y[t] = x[t] + np.sqrt(obs_noise) * np.random.randn()
+
+        return xtrue, x, y
+
+    N_train = 50
+    process_noise = 0.2
+    obs_noise = 0.1
+    alpha = 0.5
+    M = 4
+    Q = 1
+    D = 1
+    mb_size = M
+    (xtrue, x, y) = kink(N_train, process_noise, obs_noise)
+    y_train = np.reshape(y, [y.shape[0], 1])
+    lvm = vfe.SGPSSM(y_train, Q, M, lik='Gaussian', gp_emi=False, nat_param=nat_param)
+    
+    # lvm.optimise(
+    #     method='adam', maxiter=500, adam_lr=0.08)
+    # params = lvm.get_hypers()
+
+    # init hypers, inducing points and q(u) params
+    init_params = lvm.init_hypers(y_train)
+    params = init_params.copy()
+
+    np.random.seed(42)
+    logZ, grad_all = lvm.objective_function(
+        params, mb_size, prop_mode=PROP_MM)
+    pp.pprint(logZ)
+    pp.pprint(params)
+    # pdb.set_trace()
+
+    eps = 1e-5
+    # check grad ls
+    Din_i = lvm.Din
+    name = 'ls_dynamic'
+    for d in range(Din_i):
+        params1 = copy.deepcopy(params)
+        params1[name][d] = params1[name][d] + eps
+        np.random.seed(42)
+        logZ1, grad1 = lvm.objective_function(
+            params1, mb_size, prop_mode=PROP_MM)
+
+        params2 = copy.deepcopy(params)
+        params2[name][d] = params2[name][d] - eps
+        np.random.seed(42)
+        logZ2, grad2 = lvm.objective_function(
+            params2, mb_size, prop_mode=PROP_MM)
+
+        dls_id = (logZ1 - logZ2) / eps / 2
+        # print logZ1, logZ2
+        print('ls d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+              % (d, grad_all[name][d], dls_id, (grad_all[name][d] - dls_id) / dls_id))
+
+    # check grad sf
+    name = 'sf_dynamic'
+    params1 = copy.deepcopy(params)
+    params1[name] = params1[name] + eps
+    np.random.seed(42)
+    logZ1, grad1 = lvm.objective_function(
+        params1, mb_size, prop_mode=PROP_MM)
+    params2 = copy.deepcopy(params)
+    params2[name] = params2[name] - eps
+    np.random.seed(42)
+    logZ2, grad2 = lvm.objective_function(
+        params2, mb_size, prop_mode=PROP_MM)
+
+    dsf_i = (logZ1 - logZ2) / eps / 2
+    print('sf computed=%.5f, numerical=%.5f, diff=%.5f'
+          % (grad_all[name], dsf_i, (grad_all[name] - dsf_i) / dsf_i))
+
+    # check grad sn
+    params1 = copy.deepcopy(params)
+    params1['sn'] = params1['sn'] + eps
+    np.random.seed(42)
+    logZ1, grad1 = lvm.objective_function(
+        params1, mb_size, prop_mode=PROP_MM)
+    params2 = copy.deepcopy(params)
+    params2['sn'] = params2['sn'] - eps
+    np.random.seed(42)
+    logZ2, grad2 = lvm.objective_function(
+        params2, mb_size, prop_mode=PROP_MM)
+
+    dsn_i = (logZ1 - logZ2) / eps / 2
+    print('sn computed=%.5f, numerical=%.5f, diff=%.5f'
+          % (grad_all['sn'], dsn_i, (grad_all['sn'] - dsn_i) / dsn_i))
+
+    # check grad zu
+    name = 'zu_dynamic'
+    for m in range(M):
+        for k in range(Q):
+            params1 = copy.deepcopy(params)
+            eps1 = 0.0 * params1[name]
+            eps1[m, k] = eps
+            params1[name] = params1[name] + eps1
+            np.random.seed(42)
+            logZ1, grad1 = lvm.objective_function(
+                params1, mb_size, prop_mode=PROP_MM)
+            params2 = copy.deepcopy(params)
+            params2[name] = params2[name] - eps1
+            np.random.seed(42)
+            logZ2, grad2 = lvm.objective_function(
+                params2, mb_size, prop_mode=PROP_MM)
+
+            dzu_id = (logZ1 - logZ2) / eps / 2
+            print('zu m=%d, k=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (m, k, grad_all[name][m, k], dzu_id, (grad_all[name][m, k] - dzu_id) / dzu_id))
+
+    # check grad theta_1
+    Dout = lvm.dyn_layer.Dout
+    name = 'eta1_R_dynamic'
+    for d in range(Dout):
+        for j in range(M * (M + 1) / 2):
+            params1 = copy.deepcopy(params)
+            params1[name][d][j, ] = params1[name][d][j, ] + eps
+            np.random.seed(42)
+            logZ1, grad1 = lvm.objective_function(
+                params1, mb_size, prop_mode=PROP_MM)
+            params2 = copy.deepcopy(params)
+            params2[name][d][j, ] = params2[name][d][j, ] - eps
+            np.random.seed(42)
+            logZ2, grad2 = lvm.objective_function(
+                params2, mb_size, prop_mode=PROP_MM)
+
+            dR_id = (logZ1 - logZ2) / eps / 2
+            print('eta1_R d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (d, j, grad_all[name][d][j], dR_id, (grad_all[name][d][j] - dR_id) / dR_id))
+
+    # check grad theta_2
+    name = 'eta2_dynamic'
+    for d in range(Dout):
+        for j in range(M):
+            params1 = copy.deepcopy(params)
+            params1[name][d][j, ] = params1[name][d][j, ] + eps
+            np.random.seed(42)
+            logZ1, grad1 = lvm.objective_function(
+                params1, mb_size, prop_mode=PROP_MM)
+            params2 = copy.deepcopy(params)
+            params2[name][d][j, ] = params2[name][d][j, ] - eps
+            np.random.seed(42)
+            logZ2, grad2 = lvm.objective_function(
+                params2, mb_size, prop_mode=PROP_MM)
+
+            dR_id = (logZ1 - logZ2) / eps / 2
+            print('eta2 d=%d, j=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (d, j, grad_all[name][d][j], dR_id, (grad_all[name][d][j] - dR_id) / dR_id))
+
+    keys = ['x_factor_1', 'x_factor_2']
+    for key in keys:
+        # check grad x1
+        for n in range(N_train):
+            for d in range(Q):
+                params1 = copy.deepcopy(params)
+                params1[key][n, d] = params1[key][n, d] + eps
+                np.random.seed(42)
+                logZ1, grad1 = lvm.objective_function(
+                    params1, mb_size, prop_mode=PROP_MM)
+                params2 = copy.deepcopy(params)
+                params2[key][n, d] = params2[key][n, d] - eps
+                np.random.seed(42)
+                logZ2, grad2 = lvm.objective_function(
+                    params2, mb_size, prop_mode=PROP_MM)
+
+                dx1_nd = (logZ1 - logZ2) / eps / 2
+                print('%s n=%d, d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                      % (key, n, d, grad_all[key][n, d], dx1_nd, (grad_all[key][n, d] - dx1_nd) / dx1_nd))
+
+    # check grad C
+    for d in range(D):
+        for q in range(Q):
+            params1 = copy.deepcopy(params)
+            params1['C_emission'][d, q] = params1['C_emission'][d, q] + eps
+            np.random.seed(42)
+            logZ1, grad1 = lvm.objective_function(
+                params1, mb_size, prop_mode=PROP_MM)
+            params2 = copy.deepcopy(params)
+            params2['C_emission'][d, q] = params2['C_emission'][d, q] - eps
+            np.random.seed(42)
+            logZ2, grad2 = lvm.objective_function(
+                params2, mb_size, prop_mode=PROP_MM)
+
+            dx1_nd = (logZ1 - logZ2) / eps / 2
+            print('C d=%d, q=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+                  % (d, q, grad_all['C_emission'][d, q], dx1_nd, (grad_all['C_emission'][d, q] - dx1_nd) / dx1_nd))
+
+    # check grad R
+    for d in range(D):
+        params1 = copy.deepcopy(params)
+        params1['R_emission'][d] = params1['R_emission'][d] + eps
+        np.random.seed(42)
+        logZ1, grad1 = lvm.objective_function(
+            params1, mb_size, prop_mode=PROP_MM)
+        params2 = copy.deepcopy(params)
+        params2['R_emission'][d] = params2['R_emission'][d] - eps
+        np.random.seed(42)
+        logZ2, grad2 = lvm.objective_function(
+            params2, mb_size, prop_mode=PROP_MM)
+
+        dx1_nd = (logZ1 - logZ2) / eps / 2
+        print('R d=%d, computed=%.5f, numerical=%.5f, diff=%.5f'
+              % (d, grad_all['R_emission'][d], dx1_nd, (grad_all['R_emission'][d] - dx1_nd) / dx1_nd))
+
+
 if __name__ == '__main__':
     # for i in range(10):
     #     test_gpr_collapsed_vfe_gaussian()
@@ -2369,11 +2600,14 @@ if __name__ == '__main__':
     # test_gpr_vfe_probit_stochastic()
     # plot_gpr_vfe_probit_stochastic()
 
-    # test_gplvm_vfe_gaussian()
+    # test_gplvm_vfe_gaussian(True)
+    # test_gplvm_vfe_gaussian(False)
     # test_gplvm_vfe_gaussian_cluster()
-    # test_gplvm_vfe_gaussian_scipy()
+    # test_gplvm_vfe_gaussian_scipy(True)
+    # test_gplvm_vfe_gaussian_scipy(False)
     # test_gplvm_vfe_gaussian_MC()
-    # test_gplvm_vfe_gaussian_stochastic()
+    # test_gplvm_vfe_gaussian_stochastic(True)
+    # test_gplvm_vfe_gaussian_stochastic(False)
     # plot_gplvm_vfe_gaussian_stochastic()
 
     # test_gplvm_vfe_probit()
@@ -2382,4 +2616,7 @@ if __name__ == '__main__':
     # test_gplvm_vfe_probit_stochastic()
     # plot_gplvm_vfe_probit_stochastic()
 
-    test_gpssm_linear_vfe_gaussian_kink_MM()
+    test_gpssm_linear_vfe_gaussian_kink_MM(True)
+    test_gpssm_linear_vfe_gaussian_kink_MM_stochastic(True)
+    test_gpssm_linear_vfe_gaussian_kink_MM(False)
+    test_gpssm_linear_vfe_gaussian_kink_MM_stochastic(False)

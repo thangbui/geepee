@@ -102,7 +102,7 @@ def test_kink_linear_MM():
     M = 15
     # create vfe model
     model_vfe = vfe.SGPSSM(y_train, Dlatent, M, 
-        lik='Gaussian', prior_mean=0, prior_var=1000, gp_emi=False)
+        lik='Gaussian', prior_mean=0, prior_var=1000, gp_emi=False, nat_param=True)
     hypers = model_vfe.init_hypers(y_train)
     model_vfe.update_hypers(hypers)
     # optimise
@@ -136,7 +136,8 @@ def test_kink_linear_MC():
     #     method='L-BFGS-B', maxiter=10000, 
     #     reinit_hypers=False, prop_mode=config.PROP_MC)
     model_vfe.optimise(
-        method='adam', maxiter=10000, adam_lr=0.05, reinit_hypers=False, prop_mode=config.PROP_MC)
+        method='adam', maxiter=10000, adam_lr=0.05, 
+        reinit_hypers=False, prop_mode=config.PROP_MC)
     opt_hypers = model_vfe.get_hypers()
     plot_latent_kink(model_vfe, y, 'VFE_MC')
 

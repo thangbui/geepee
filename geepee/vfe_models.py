@@ -674,7 +674,7 @@ class SGPR(Base_SGPR):
         # update model with new hypers
         self.update_hypers(params)
 
-        # propagate x cavity forward
+        # propagate x forward
         mout, vout, kfu = self.sgp_layer.forward_prop_thru_post(xb, return_info=True)
         # compute logZ and gradients
         logZ, dm, dv = self.lik_layer.compute_log_lik_exp(mout, vout, yb)
@@ -801,7 +801,7 @@ class SGPLVM(Base_SGPLVM):
     """
 
     def __init__(self, y_train, hidden_size, no_pseudo,
-                 lik='Gaussian', prior_mean=0, prior_var=1):
+                 lik='Gaussian', prior_mean=0, prior_var=1, nat_param=True):
         """Summary
         
         Args:
@@ -813,7 +813,8 @@ class SGPLVM(Base_SGPLVM):
             prior_var (int, optional): Description
         """
         super(SGPLVM, self).__init__(
-            y_train, hidden_size, no_pseudo, lik, prior_mean, prior_var)
+            y_train, hidden_size, no_pseudo, lik, 
+            prior_mean, prior_var, nat_param)
         self.sgp_layer = SGP_Layer(self.N, self.Din, self.Dout, self.M)
         
 
@@ -848,18 +849,10 @@ class SGPLVM(Base_SGPLVM):
 
         # update model with new hypers
         self.update_hypers(params)
-
         # compute posterior for x
-        t01 = self.prior_x1
-        t02 = self.prior_x2
-        t11 = self.factor_x1[idxs, :]
-        t12 = self.factor_x2[idxs, :]
-        post_t1 = t01 + t11
-        post_t2 = t02 + t12
-        vx = 1.0 / post_t2
-        mx = post_t1 / post_t2
+        mx, vx = self.get_posterior_x(idxs)
         if prop_mode == PROP_MM:
-            # propagate x cavity forward
+            # propagate x forward
             mout, vout, psi1, psi2 = sgp_layer.forward_prop_thru_post(mx, vx, return_info=True)
             # compute logZ and gradients
             logZ, dm, dv = self.lik_layer.compute_log_lik_exp(mout, vout, yb)    
@@ -872,7 +865,7 @@ class SGPLVM(Base_SGPLVM):
                 mout, vout, dm, dv, yb, scale_log_lik)
         elif prop_mode == PROP_MC:
             # TODO
-            # propagate x cavity forward
+            # propagate x forward
             res, res_s = sgp_layer.forward_prop_thru_cav(mx, vx, PROP_MC)
             m, v, kfu, x, eps = res[0], res[1], res[2], res[3], res[4]
             m_s, v_s, kfu_s, x_s, eps_s = (
@@ -907,11 +900,9 @@ class SGPLVM(Base_SGPLVM):
         scale_x = N * 1.0 / batch_size
         dmx += scale_x * dkl_dmx
         dvx += scale_x * dkl_dvx
-        grad_all['x1'] = np.zeros_like(self.factor_x1)
-        grad_all['x2'] = np.zeros_like(self.factor_x2)
-        grad_all['x1'][idxs, :] = dmx / post_t2
-        grad_all['x2'][idxs, :] = -dmx * post_t1 / post_t2**2 - dvx / post_t2**2
-        grad_all['x2'][idxs, :] *= 2 * t12
+        grads_x = self.compute_posterior_grad_x(dmx, dvx, idxs)
+        for key in grads_x.keys():
+            grad_all[key] = grads_x[key]
 
         # compute objective
         sgp_KL_term = self.sgp_layer.compute_KL()
@@ -952,8 +943,8 @@ class SGPSSM(Base_SGPSSM):
     """
 
     def __init__(self, y_train, hidden_size, no_pseudo,
-                 lik='Gaussian', prior_mean=0, prior_var=1,
-                 x_control=None, gp_emi=False, control_to_emi=True):
+                 lik='Gaussian', prior_mean=0, prior_var=1, x_control=None, 
+                 gp_emi=False, control_to_emi=True, nat_param=True):
         """Summary
         
         Args:
@@ -969,7 +960,7 @@ class SGPSSM(Base_SGPSSM):
         """
         super(SGPSSM, self).__init__(
             y_train, hidden_size, no_pseudo, lik, prior_mean, prior_var,
-            x_control, gp_emi, control_to_emi)
+            x_control, gp_emi, control_to_emi, nat_param)
         self.dyn_layer = SGP_Layer(
             self.N - 1, self.Din + self.Dcon_dyn, self.Din, self.M)
         if gp_emi:
@@ -1016,8 +1007,8 @@ class SGPSSM(Base_SGPSSM):
 
         # update model with new hypers
         self.update_hypers(params)
+        # compute posterior
         post_m, post_v = self.get_posterior_x(emi_idxs)
-        # compute cavity factors for the latent variables
         idxs_prev = dyn_idxs + 1
         post_t_m, post_t_v = post_m[0:-1, :], post_v[0:-1, :]
         idxs_next = dyn_idxs
@@ -1137,7 +1128,7 @@ class SGPSSM(Base_SGPSSM):
         dv = dv_up + dv_entrop
         dv[1:, :] += dv_next
         dv[0:-1, :] += dv_prev
-        grads_x = self.compute_posterior_grad_x(dm, dv, dm0, dv0, emi_idxs)
+        grads_x = self.compute_posterior_grad_x(dm, dv, emi_idxs)
         for key in grads_x.keys():
             grad_all[key] = grads_x[key]
 
@@ -1152,31 +1143,6 @@ class SGPSSM(Base_SGPSSM):
             grad_all[p] = np.zeros_like(grad_all[p])
 
         return energy, grad_all
-
-    def compute_posterior_grad_x(self, dm, dv, dm0, dv0, emi_idxs):
-        grads_x_1 = np.zeros_like(self.x_post_1)
-        grads_x_2 = np.zeros_like(grads_x_1)
-
-        post_1 = self.x_post_1[emi_idxs, :]
-        post_2 = self.x_post_2[emi_idxs, :]
-        grads_x_1[emi_idxs, :] += dm / post_2
-        grads_x_2[emi_idxs, :] += - dm * post_1 / post_2**2 - dv / post_2**2
-
-        post_1 = self.x_post_1[0, :]
-        post_2 = self.x_post_2[0, :]
-        grads_x_1[0, :] += dm0 / post_1
-        grads_x_2[0, :] += - dm0 * post_1 / post_2**2 - dv0 / post_2**2
-
-        scale_x_cav = 3.0 * np.ones((self.N, 1))
-        scale_x_cav[0] = 2.0
-        scale_x_cav[-1] = 2.0
-        grad_1 = grads_x_1 * scale_x_cav
-        grad_2 = grads_x_2 * scale_x_cav
-        grads = {}
-        grads['x_factor_1'] = grad_1
-        grads['x_factor_2'] = grad_2 * 2 * self.x_factor_2
-        return grads
-
 
     def compute_transition_log_lik_exp(self, m_prop, v_prop, m_t, v_t, scale):
         """Summary
@@ -1226,3 +1192,4 @@ class SGPSSM(Base_SGPSSM):
             raise RuntimeError('invalid ndim, ndim=%d' % mout.ndim)
 
         return logZ, dmprop, dvprop, dmt, dvt, dsn
+

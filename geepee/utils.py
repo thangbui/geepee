@@ -99,7 +99,8 @@ def adam(func, init_params, callback=None, maxiter=1000,
     for i in range(maxiter):
         f, g = func(x, *args)
         if disp and i % 10 == 0:
-            print 'iter %d \t obj %.3f' % (i, f)
+            # print 'iter %d \t obj %.3f' % (i, f)
+            print '%.3f' % f
         if callback:
             callback(x)
         m = (1 - b1) * g + b1 * m  # First  moment estimate.

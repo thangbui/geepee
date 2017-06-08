@@ -274,7 +274,7 @@ class Base_SGP_Layer(object):
             return mout, vout
 
     def _forward_prop_random_thru_post_mm(self, mx, vx, return_info=False):
-        """Propagate uncertain inputs thru cavity, using Moment Matching
+        """Propagate uncertain inputs thru posterior, using Moment Matching
         
         Args:
             mx (float): input means, size K x Din
@@ -297,7 +297,7 @@ class Base_SGP_Layer(object):
             return mout, vout
 
     def _forward_prop_random_thru_post_mc(self, mx, vx):
-        """Propagate uncertain inputs thru cavity, using simple Monte Carlo
+        """Propagate uncertain inputs thru posterior, using simple Monte Carlo
         
         Args:
             mx (float): input means, size K x Din
@@ -635,7 +635,7 @@ class Base_SGPLVM(Base_Model):
     """
 
     def __init__(self, y_train, hidden_size, no_pseudo,
-                 lik='Gaussian', prior_mean=0, prior_var=1):
+                 lik='Gaussian', prior_mean=0, prior_var=1, nat_param=True):
         """Summary
         
         Args:
@@ -654,6 +654,7 @@ class Base_SGPLVM(Base_Model):
         self.Dout = Dout = y_train.shape[1]
         self.Din = Din = hidden_size
         self.M = M = no_pseudo
+        self.nat_param = nat_param
 
         if lik.lower() == 'gaussian':
             self.lik_layer = Gauss_Layer(N, Dout)
@@ -716,16 +717,16 @@ class Base_SGPLVM(Base_Model):
         my, vy = self.lik_layer.output_probabilistic(mf, vf)
         return my, vy
 
-    def get_posterior_x(self):
+    def get_posterior_x(self, idxs=None):
         """Summary
         
         Returns:
             TYPE: Description
         """
-        post_1 = self.prior_x1 + self.factor_x1
-        post_2 = self.prior_x2 + self.factor_x2
-        vx = 1.0 / post_2
-        mx = post_1 / post_2
+        if idxs is None:
+            idxs = np.arange(self.N)
+        vx = 1.0 / self.x_post_2[idxs, :]
+        mx = self.x_post_1[idxs, :] / self.x_post_2[idxs, :]
         return mx, vx
 
     def impute_missing(self, y, missing_mask, alpha=0.5, no_iters=10, add_noise=False):
@@ -819,11 +820,15 @@ class Base_SGPLVM(Base_Model):
         post_m_std = np.std(post_m, axis=0)
         post_m = (post_m - post_m_mean) / post_m_std
         post_v = 0.1 * np.ones_like(post_m)
-        post_2 = 1.0 / post_v
-        post_1 = post_2 * post_m
         x_params = {}
-        x_params['x1'] = post_1
-        x_params['x2'] = np.log(post_2 - 1) / 2
+        if self.nat_param:
+            post_2 = 1.0 / post_v
+            post_1 = post_2 * post_m
+            x_params['x1'] = post_1
+            x_params['x2'] = np.log(post_2 - 1) / 2
+        else:
+            x_params['x1'] = post_m
+            x_params['x2'] = np.log(post_v) / 2
         # learnt a GP mapping between hidden states
         print 'init latent function using GPR...'
         x = post_m
@@ -866,6 +871,32 @@ class Base_SGPLVM(Base_Model):
         self.lik_layer.update_hypers(params)
         self.factor_x1 = params['x1']
         self.factor_x2 = np.exp(2 * params['x2'])
+
+        if self.nat_param:
+            self.x_post_1 = self.prior_x1 + self.factor_x1
+            self.x_post_2 = self.prior_x2 + self.factor_x2
+        else:
+            self.x_post_1 = self.factor_x1 / self.factor_x2
+            self.x_post_2 = 1.0 / self.factor_x2
+
+    def compute_posterior_grad_x(self, dmx, dvx, idxs):
+        grads_x_1 = np.zeros_like(self.x_post_1)
+        grads_x_2 = np.zeros_like(grads_x_1)
+        if self.nat_param:
+            post_1 = self.x_post_1[idxs, :]
+            post_2 = self.x_post_2[idxs, :]
+            grads_x_1[idxs, :] = dmx / post_2
+            grads_x_2[idxs, :] = -dmx * post_1 / post_2**2 - dvx / post_2**2
+            grads_x_2[idxs, :] *= 2 * self.factor_x2[idxs, :]
+        else:
+            grads_x_1[idxs, :] = dmx
+            grads_x_2[idxs, :] = dvx
+            grads_x_2[idxs, :] *= 2 * self.factor_x2[idxs, :]
+        grads = {}
+        grads['x1'] = grads_x_1
+        grads['x2'] = grads_x_2
+        return grads
+
 
 
 class Base_SGPR(Base_Model):
@@ -1265,8 +1296,8 @@ class Base_SGPSSM(Base_Model):
     """
 
     def __init__(self, y_train, hidden_size, no_pseudo,
-                 lik='Gaussian', prior_mean=0, prior_var=1,
-                 x_control=None, gp_emi=False, control_to_emi=True):
+                 lik='Gaussian', prior_mean=0, prior_var=1, x_control=None, 
+                 gp_emi=False, control_to_emi=True, nat_param=True):
         """Summary
         
         Args:
@@ -1300,6 +1331,7 @@ class Base_SGPSSM(Base_Model):
         self.Din = Din = hidden_size
         self.M = M = no_pseudo
         self.gp_emi = gp_emi
+        self.nat_param = nat_param
 
         if gp_emi:
             if lik.lower() == 'gaussian':
@@ -1494,12 +1526,15 @@ class Base_SGPSSM(Base_Model):
         # post_m = (post_m - np.mean(post_m, axis=0)) / scale
         post_m = post_m
         post_v = 0.1 * np.ones_like(post_m)
-        post_2 = 1.0 / post_v
-        post_1 = post_2 * post_m
         ssm_params = {'sn': np.log(0.01)}
-        ssm_params['x_factor_1'] = post_1 / 3
-        ssm_params['x_factor_2'] = np.log(post_2 / 3) / 2
-
+        if self.nat_param:
+            post_2 = 1.0 / post_v
+            post_1 = post_2 * post_m
+            ssm_params['x_factor_1'] = post_1 / 3
+            ssm_params['x_factor_2'] = np.log(post_2 / 3) / 2
+        else:
+            ssm_params['x_factor_1'] = post_m
+            ssm_params['x_factor_2'] = np.log(post_v) / 2    
         # learn a GP mapping between hidden states
         print 'init latent function using GPR...'
         x = post_m[:self.N - 1, :]
@@ -1574,9 +1609,38 @@ class Base_SGPSSM(Base_Model):
         self.x_factor_1 = params['x_factor_1']
         self.x_factor_2 = np.exp(2 * params['x_factor_2'])
 
-        self.x_post_1 = 3 * self.x_factor_1
-        self.x_post_2 = 3 * self.x_factor_2
-        self.x_post_1[[0, -1], :] = 2 * self.x_factor_1[[0, -1], :]
-        self.x_post_2[[0, -1], :] = 2 * self.x_factor_2[[0, -1], :]
-        self.x_post_1[0, :] += self.x_prior_1
-        self.x_post_2[0, :] += self.x_prior_2
+        if self.nat_param:
+            self.x_post_1 = 3 * self.x_factor_1
+            self.x_post_2 = 3 * self.x_factor_2
+            self.x_post_1[[0, -1], :] = 2 * self.x_factor_1[[0, -1], :]
+            self.x_post_2[[0, -1], :] = 2 * self.x_factor_2[[0, -1], :]
+            self.x_post_1[0, :] += self.x_prior_1
+            self.x_post_2[0, :] += self.x_prior_2
+        else:
+            self.x_post_1 = self.x_factor_1 / self.x_factor_2
+            self.x_post_2 = 1.0 / self.x_factor_2
+
+    def compute_posterior_grad_x(self, dm, dv, idxs):
+        grads_x_1 = np.zeros_like(self.x_post_1)
+        grads_x_2 = np.zeros_like(grads_x_1)
+        if self.nat_param:
+            post_1 = self.x_post_1[idxs, :]
+            post_2 = self.x_post_2[idxs, :]
+            grad_1 = dm / post_2
+            grad_2 = - dm * post_1 / post_2**2 - dv / post_2**2
+            scale_x = 3.0 * np.ones((idxs.shape[0], 1))
+            scale_x[np.where(idxs == 0)[0]] = 2
+            scale_x[np.where(idxs == self.N)[0]] = 2
+            grad_1 = grad_1 * scale_x
+            grad_2 = grad_2 * scale_x
+            grads_x_1[idxs, :] = grad_1
+            grads_x_2[idxs, :] = grad_2 * 2 * self.x_factor_2[idxs, :]
+            
+        else:
+            grads_x_1[idxs, :] += dm
+            grads_x_2[idxs, :] += dv
+            grads_x_2[idxs, :] *= 2 * self.x_factor_2[idxs, :]
+        grads = {}
+        grads['x_factor_1'] = grads_x_1
+        grads['x_factor_2'] = grads_x_2
+        return grads
