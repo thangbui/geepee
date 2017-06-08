@@ -282,17 +282,17 @@ def run_banana_stoc():
                    maxiter=100000, mb_size=M, adam_lr=0.001)
     plot(model)
     plt.show()
-    plt.savefig('/tmp/vfe_gpc_banana_stoc.pdf')
+    # plt.savefig('/tmp/vfe_gpc_banana_stoc.pdf')
 
 if __name__ == '__main__':
-    run_regression_1D_collapsed()
+    # run_regression_1D_collapsed()
     # run_step_1D_collapsed()
     
-    run_regression_1D()
+    # run_regression_1D()
     # run_step_1D()
-    # run_banana()
+    run_banana()
 
-    run_regression_1D_stoc()
+    # run_regression_1D_stoc()
     # run_banana_stoc()
     
 

@@ -669,7 +669,6 @@ class SGPR(Base_SGPR):
             yb = self.y_train[idxs, :]
         batch_size = yb.shape[0]
         scale_loglik = - N * 1.0 / batch_size
-        # scale_loglik = 0
 
         # update model with new hypers
         self.update_hypers(params)
@@ -988,7 +987,6 @@ class SGPSSM(Base_SGPSSM):
         emi_layer = self.emi_layer
         if self.gp_emi:
             lik_layer = self.lik_layer
-        # TODO: deal with minibatch here
         if mb_size >= N:
             dyn_idxs = np.arange(0, N - 1)
             emi_idxs = np.arange(0, N)
@@ -1001,7 +999,6 @@ class SGPSSM(Base_SGPSSM):
             yb = self.y_train[emi_idxs, :]
         batch_size_dyn = dyn_idxs.shape[0]
         scale_log_lik_dyn = - (N - 1) * 1.0 / batch_size_dyn
-        # scale_log_lik_dyn = 0
         batch_size_emi = emi_idxs.shape[0]
         scale_log_lik_emi = - N * 1.0 / batch_size_emi
 

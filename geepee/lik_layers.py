@@ -1,5 +1,6 @@
 import numpy as np
 from scipy import special
+from scipy.stats import norm
 
 from config import *
 
@@ -48,6 +49,12 @@ class Lik_Layer(object):
         Returns:
             TYPE: Description
         """
+        return {}
+
+    def compute_log_lik_exp(self, m, v, y):
+        pass
+
+    def backprop_grads_log_lik_exp(self, m, v, dm, dv, y, scale=1.0):
         return {}
 
     def init_hypers(self):
@@ -304,8 +311,8 @@ class Probit_Layer(Lik_Layer):
                 eps = 1e-16
                 logZ = np.sum(np.log(Z + eps))
 
-                dlogZ_dt = 1 / (Z + eps) * 1 / np.sqrt(2 *
-                                                       np.pi) * np.exp(-t**2.0 / 2)
+                dlogZ_dt = 1 / (Z + eps) 
+                dlogZ_dt = dlogZ_dt / np.sqrt(2 * np.pi) * np.exp(-t**2.0 / 2)
                 dt_dm = y / np.sqrt(1 + vout)
                 dt_dv = -0.5 * y * mout / (1 + vout)**1.5
                 dlogZ_dm = dlogZ_dt * dt_dm
@@ -344,8 +351,8 @@ class Probit_Layer(Lik_Layer):
                 logZ_lse -= np.log(mout.shape[0])
                 logZ = np.sum(logZ_lse)
                 dlogZ = exp_term / sumexp
-                dlogZ_dt = 1 / (Z + eps) * 1 / np.sqrt(2 *
-                                                       np.pi) * np.exp(-t**2.0 / 2)
+                dlogZ_dt = 1 / (Z + eps) 
+                dlogZ_dt = dlogZ_dt / np.sqrt(2 * np.pi) * np.exp(-t**2.0 / 2)
                 dt_dm = y / np.sqrt(1 + vout)
                 dt_dv = -0.5 * y * mout / (1 + vout)**1.5
                 dlogZ_dm = dlogZ * dlogZ_dt * dt_dm
@@ -381,6 +388,35 @@ class Probit_Layer(Lik_Layer):
             raise RuntimeError('invalid ndim, ndim=%d' % mout.ndim)
 
         return logZ, dlogZ_dm, dlogZ_dv
+
+    def compute_log_lik_exp(self, m, v, y):
+        if m.ndim == 2:
+            gh_x, gh_w = self._gh_points(GH_DEGREE)
+            gh_x = gh_x[:, np.newaxis, np.newaxis]
+            gh_w = gh_w[:, np.newaxis, np.newaxis] / np.sqrt(np.pi)
+            v_expand = v[np.newaxis, :, :]
+            m_expand = m[np.newaxis, :, :]
+            # m_expand = np.zeros_like(m_expand)
+            # v_expand = np.ones_like(v_expand)
+            ts = gh_x * np.sqrt(2 * v_expand) + m_expand
+            logcdfs = norm.logcdf(ts * y)
+            prods = gh_w * logcdfs
+            loglik = np.sum(prods)
+
+            pdfs = norm.pdf(ts * y)
+            cdfs = norm.cdf(ts * y)
+            grad_cdfs = y * gh_w * pdfs / cdfs
+            dts_dm = 1
+            dts_dv = 0.5 * gh_x * np.sqrt(2 / v_expand)
+            dm = np.sum(grad_cdfs * dts_dm, axis=0)
+            dv = np.sum(grad_cdfs * dts_dv, axis=0)
+            # dm = np.zeros_like(dm)
+            # dv = np.zeros_like(dv) 
+        else:
+            raise NotImplementedError('TODO')
+
+        return loglik, dm, dv
+
 
     def output_probabilistic(self, mf, vf, alpha=1.0):
         """Summary

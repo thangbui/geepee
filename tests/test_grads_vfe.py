@@ -2595,9 +2595,9 @@ if __name__ == '__main__':
     # test_gpr_vfe_gaussian_stochastic()
     # plot_gpr_vfe_gaussian_stochastic()
 
-    # test_gpr_vfe_probit()
-    # test_gpr_vfe_probit_scipy()
-    # test_gpr_vfe_probit_stochastic()
+    test_gpr_vfe_probit()
+    test_gpr_vfe_probit_scipy()
+    test_gpr_vfe_probit_stochastic()
     # plot_gpr_vfe_probit_stochastic()
 
     # test_gplvm_vfe_gaussian(True)
@@ -2616,7 +2616,7 @@ if __name__ == '__main__':
     # test_gplvm_vfe_probit_stochastic()
     # plot_gplvm_vfe_probit_stochastic()
 
-    test_gpssm_linear_vfe_gaussian_kink_MM(True)
-    test_gpssm_linear_vfe_gaussian_kink_MM_stochastic(True)
-    test_gpssm_linear_vfe_gaussian_kink_MM(False)
-    test_gpssm_linear_vfe_gaussian_kink_MM_stochastic(False)
+    # test_gpssm_linear_vfe_gaussian_kink_MM(True)
+    # test_gpssm_linear_vfe_gaussian_kink_MM_stochastic(True)
+    # test_gpssm_linear_vfe_gaussian_kink_MM(False)
+    # test_gpssm_linear_vfe_gaussian_kink_MM_stochastic(False)
