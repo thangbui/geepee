@@ -196,9 +196,7 @@ class SGPR_collapsed(Base_Model):
         """
         K = no_samples
         fs = np.zeros((inputs.shape[0], self.Dout, K))
-        # TODO: remove for loop here
-        for k in range(K):
-            fs[:, :, k] = self.sgp_layer.sample(inputs)
+        # TODO: implement this
         return fs
 
     def predict_y(self, inputs, alpha=0.01, marginal=True):
@@ -625,7 +623,6 @@ class SGP_Layer(Base_SGP_Layer):
         return grad_hyper
 
 
-# TODO probit
 class SGPR(Base_SGPR):
     """Uncollapsed sparse Gaussian process approximations
     
@@ -932,7 +929,6 @@ class SGPLVM(Base_SGPLVM):
         return kl_sum, dkl_dmx, dkl_dvx
 
 
-# TODO: prediction and more robust init
 class SGPSSM(Base_SGPSSM):
     """Summary
     

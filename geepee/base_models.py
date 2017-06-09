@@ -116,10 +116,8 @@ class Base_Model(object):
 
         except KeyboardInterrupt:
             print 'Caught KeyboardInterrupt ...'
-            final_params = objective_wrapper.previous_x
-            # todo: deal with rresults here
+            final_params = objective_wrapper.previous_x    
 
-        # results = self.get_hypers()
         final_params = unflatten_dict(final_params, params_args)
         self.update_hypers(final_params)
         return final_params
@@ -454,7 +452,6 @@ class Base_SGP_Layer(object):
         self.Kuu += np.diag(JITTER * np.ones((M, )))
         self.Kuuinv = np.linalg.inv(self.Kuu)
 
-
     def update_posterior(self):
         """update the posterior
         """
@@ -492,7 +489,6 @@ class Base_SGP_Layer(object):
             ls = np.log(np.ones((Din, )) + 0.1 * np.random.rand(Din, ))
             sf = np.log(np.array([1]))
             zu = np.tile(np.linspace(-1, 1, M).reshape((M, 1)), (1, Din))
-            # zu += 0.01 * np.random.randn(zu.shape[0], zu.shape[1])
         else:
             if N < 10000:
                 centroids, label = kmeans2(x_train, M, minit='points')

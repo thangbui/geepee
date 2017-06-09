@@ -22,10 +22,6 @@ from kernels import *
 from base_models import Base_Model
 from base_models import Base_SGP_Layer, Base_SGPR, Base_SGPLVM, Base_SDGPR, Base_SGPSSM
 
-# TODO: do replacement sampling for now since this is faster
-# alternative would be
-# idxs = np.random.permutation(N)[:mb_size]
-
 
 class SGP_Layer(Base_SGP_Layer):
     """Summary
@@ -918,7 +914,6 @@ class SDGPR(Base_SDGPR):
 
         return energy, grad_all
 
-# TODO: prediction and more robust init
 class SGPSSM(Base_SGPSSM):
     """Summary
     
@@ -1361,13 +1356,9 @@ class SGPSSM(Base_SGPSSM):
         phi_cav_sum = np.sum(scale_x_cav * phi_cav)
         return phi_cav_sum
 
-# TODO: try mean and variance parameterisation instead of natural params
-
-# deep GP regression with hidden variables
-
 
 class SDGPR_H(Base_Model):
-    """Summary
+    """Deep GP regression model with inference for hidden variables
     
     Attributes:
         Din (TYPE): Description
