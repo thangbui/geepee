@@ -289,7 +289,8 @@ class SGP_Layer(Base_SGP_Layer):
     """Sparse Gaussian process layer
     """
 
-    def __init__(self, no_train, input_size, output_size, no_pseudo):
+    def __init__(self, no_train, input_size, output_size, no_pseudo, 
+            nat_param=True):
         """Initialisation
         
         Args:
@@ -299,7 +300,7 @@ class SGP_Layer(Base_SGP_Layer):
             no_pseudo (int): Number of pseudo-points
         """
         super(SGP_Layer, self).__init__(
-            no_train, input_size, output_size, no_pseudo)
+            no_train, input_size, output_size, no_pseudo, nat_param)
 
     def compute_KL(self):
         """Summary
@@ -344,6 +345,7 @@ class SGP_Layer(Base_SGP_Layer):
         diag_ind = np.diag_indices(M)
         mu = self.mu
         Su = self.Su
+        Suinv = self.Suinv
         Spmm = self.Splusmm
         Kuuinv = self.Kuuinv
         Kuu = self.Kuu
@@ -363,47 +365,21 @@ class SGP_Layer(Base_SGP_Layer):
         # compute grads wrt theta1 and theta2 via log lik exp term
         dA = np.einsum('nd,nm->dm', dm_all, psi1)
         dB = np.einsum('nd,nab->dab', dv, psi2)
-        dSu_via_v = np.einsum('ab,dbc,ce->dae', Kuuinv, dB, Kuuinv)
-        dmu = 2 * np.einsum('dab,db->da', dSu_via_v, mu) \
+        dSu = np.einsum('ab,dbc,ce->dae', Kuuinv, dB, Kuuinv)
+        dmu = 2 * np.einsum('dab,db->da', dSu, mu) \
             + np.einsum('ab,db->da', Kuuinv, dA)
-
-        dSu_via_m = np.einsum('da,db->dab', dmu, self.theta_2)
-        dSu = dSu_via_m + dSu_via_v
-        dSuinv = - np.einsum('dab,dbc,dce->dae', Su, dSu, Su)
-        dtheta1 = dSuinv
-        dtheta2 = np.einsum('dab,db->da', Su, dmu)
-        # add contrib from the KL term
-        dtheta2 += np.einsum('dab,bc,dc->da', Su, Kuuinv, mu)
-        dtheta1_1 = 0.5 * Su
-        SuKuuinv = np.einsum('dab,bc->dac', Su, Kuuinv)
-        dtheta1_2 = - 0.5 * np.einsum('dab,dbc->dac', SuKuuinv, Su)
-        mutheta2Su = np.einsum('da,db,dbc->dac', mu, self.theta_2, Su)
-        dtheta1_3 = - np.einsum('dab,dbc->dac', SuKuuinv, mutheta2Su)
-        dtheta1 += dtheta1_1 + dtheta1_2 + dtheta1_3
-        dtheta1T = np.transpose(dtheta1, [0, 2, 1])
-        dtheta1_R = np.einsum(
-            'dab,dbc->dac', self.theta_1_R, dtheta1 + dtheta1T)
-
-        deta1_R = np.zeros([self.Dout, M * (M + 1) / 2])
-        deta2 = dtheta2
-        for d in range(self.Dout):
-            dtheta1_R_d = dtheta1_R[d, :, :]
-            theta1_R_d = self.theta_1_R[d, :, :]
-            dtheta1_R_d[diag_ind] = dtheta1_R_d[
-                diag_ind] * theta1_R_d[diag_ind]
-            dtheta1_R_d = dtheta1_R_d[triu_ind]
-            deta1_R[d, :] = dtheta1_R_d.reshape(
-                (dtheta1_R_d.shape[0], ))
-        # pdb.set_trace()
+        # add in contribution from the KL term
+        dmu += np.einsum('ab,db->da', Kuuinv, mu)
+        dSu += 0.5 * (Kuuinv - Suinv)
+        deta1_R, deta2, dKuuinv_via_u = self.compute_posterior_grad_u(dmu, dSu)
 
         # grads wrt Kuu
-        dKuuinv_Su = np.sum(dtheta1, axis=0)
         dKuuinv_KL = - 0.5 * self.Dout * Kuu + 0.5 * np.sum(Spmm, axis=0)
         dKuuinv_A = np.einsum('da,db->ab', dA, mu)
         KuuinvSmmd = np.einsum('ab,dbc->dac', Kuuinv, Spmm)
         dKuuinv_B = 2 * np.einsum('dab,dac->bc', KuuinvSmmd, dB) \
             - np.sum(dB, axis=0)
-        dKuuinv = dKuuinv_A + dKuuinv_B + dKuuinv_Su + dKuuinv_KL
+        dKuuinv = dKuuinv_A + dKuuinv_B + dKuuinv_via_u + dKuuinv_KL
         M_inner = - np.dot(Kuuinv, np.dot(dKuuinv, Kuuinv))
         dhyp = d_trace_MKzz_dhypers(
             2 * self.ls, 2 * self.sf, self.zu, M_inner,
@@ -550,6 +526,7 @@ class SGP_Layer(Base_SGP_Layer):
         diag_ind = np.diag_indices(M)
         mu = self.mu
         Su = self.Su
+        Suinv = self.Suinv
         Spmm = self.Splusmm
         Kuuinv = self.Kuuinv
         Kuu = self.Kuu
@@ -566,46 +543,22 @@ class SGP_Layer(Base_SGP_Layer):
         dsf2 += dv_sum
         dsf = 2 * sf2 * dsf2
 
-        # compute grads wrt theta1 and theta2 via log lik exp term
-        SKuuinvKuf = np.einsum('dab,nb->nda', Su, kfuKuuinv)
-        dSinv_via_v = - np.einsum('nda,nd,ndb->dab',
-                                  SKuuinvKuf, dv, SKuuinvKuf)
-        dSinv_via_m = - np.einsum('nda,nd,db->dab', SKuuinvKuf, dm, mu)
-        dtheta1 = dSinv_via_m + dSinv_via_v
-        dtheta2 = np.einsum('nda,nd->da', SKuuinvKuf, dm)
-        # add in contrib from the KL term
-        dtheta2 += np.einsum('dab,bc,dc->da', Su, Kuuinv, mu)
-        dtheta1_1 = 0.5 * Su
-        SuKuuinv = np.einsum('dab,bc->dac', Su, Kuuinv)
-        dtheta1_2 = - 0.5 * np.einsum('dab,dbc->dac', SuKuuinv, Su)
-        mutheta2Su = np.einsum('da,db,dbc->dac', mu, self.theta_2, Su)
-        dtheta1_3 = - np.einsum('dab,dbc->dac', SuKuuinv, mutheta2Su)
-        dtheta1 += dtheta1_1 + dtheta1_2 + dtheta1_3
-        dtheta1T = np.transpose(dtheta1, [0, 2, 1])
-        dtheta1_R = np.einsum(
-            'dab,dbc->dac', self.theta_1_R, dtheta1 + dtheta1T)
-
-        deta1_R = np.zeros([self.Dout, M * (M + 1) / 2])
-        deta2 = dtheta2
-        for d in range(self.Dout):
-            dtheta1_R_d = dtheta1_R[d, :, :]
-            theta1_R_d = self.theta_1_R[d, :, :]
-            dtheta1_R_d[diag_ind] = dtheta1_R_d[
-                diag_ind] * theta1_R_d[diag_ind]
-            dtheta1_R_d = dtheta1_R_d[triu_ind]
-            deta1_R[d, :] = dtheta1_R_d.reshape(
-                (dtheta1_R_d.shape[0], ))
+        # compute grads wrt mean and covariance matrix via log lik exp term
+        dmu = np.einsum('nd,nm->dm', dm, kfuKuuinv)
+        dSu = np.einsum('na,nd,nb->dab', kfuKuuinv, dv, kfuKuuinv)
+        # add in contribution from the KL term
+        dmu += np.einsum('ab,db->da', Kuuinv, mu)
+        dSu += 0.5 * (Kuuinv - Suinv)
+        deta1_R, deta2, dKuuinv_via_u = self.compute_posterior_grad_u(dmu, dSu)
 
         # get contribution of Ahat and Bhat to Kuu and add to Minner
         dA = np.einsum('nd,nm->dm', dm, kfu)
         dKuuinv_m = np.einsum('da,db->ab', dA, mu)
         KuuinvS = np.einsum('ab,dbc->dac', Kuuinv, Su)
         dB = np.einsum('nd,na,nb->dab', dv, kfu, kfu)
-        dKuuinv_v = 2 * np.einsum('dab,dac->bc', KuuinvS, dB) \
-            - np.sum(dB, axis=0)
-        dKuuinv_S = np.sum(dtheta1, axis=0)
+        dKuuinv_v = 2 * np.einsum('dab,dac->bc', KuuinvS, dB) - np.sum(dB, axis=0)
         dKuuinv_KL = - 0.5 * self.Dout * Kuu + 0.5 * np.sum(Spmm, axis=0)
-        dKuuinv = dKuuinv_m + dKuuinv_v + dKuuinv_S + dKuuinv_KL
+        dKuuinv = dKuuinv_m + dKuuinv_v + dKuuinv_via_u + dKuuinv_KL
         M_inner = - np.dot(Kuuinv, np.dot(dKuuinv, Kuuinv))
         dhyp = d_trace_MKzz_dhypers(
             2 * self.ls, 2 * self.sf, self.zu, M_inner,
@@ -631,7 +584,7 @@ class SGPR(Base_SGPR):
         updated (bool): Description
     """
 
-    def __init__(self, x_train, y_train, no_pseudo, lik='Gaussian'):
+    def __init__(self, x_train, y_train, no_pseudo, lik='Gaussian', nat_param=True):
         """Summary
         
         Args:
@@ -640,11 +593,12 @@ class SGPR(Base_SGPR):
             no_pseudo (TYPE): Description
             lik (str, optional): Description
         """
-        super(SGPR, self).__init__(x_train, y_train, no_pseudo, lik)
-        self.sgp_layer = SGP_Layer(self.N, self.Din, self.Dout, self.M)
+        super(SGPR, self).__init__(x_train, y_train, no_pseudo, lik, nat_param)
+        self.sgp_layer = SGP_Layer(self.N, self.Din, self.Dout, self.M, nat_param)
         
     @profile
-    def objective_function(self, params, mb_size, alpha='not_used', prop_mode='not_used'):
+    def objective_function(self, params, mb_size, alpha='not_used', 
+        prop_mode='not_used'):
         """Summary
         
         Args:
@@ -666,6 +620,7 @@ class SGPR(Base_SGPR):
             yb = self.y_train[idxs, :]
         batch_size = yb.shape[0]
         scale_loglik = - N * 1.0 / batch_size
+        # scale_loglik = 0
 
         # update model with new hypers
         self.update_hypers(params)
@@ -811,7 +766,7 @@ class SGPLVM(Base_SGPLVM):
         super(SGPLVM, self).__init__(
             y_train, hidden_size, no_pseudo, lik, 
             prior_mean, prior_var, nat_param)
-        self.sgp_layer = SGP_Layer(self.N, self.Din, self.Dout, self.M)
+        self.sgp_layer = SGP_Layer(self.N, self.Din, self.Dout, self.M, nat_param)
         
 
     @profile
@@ -957,10 +912,10 @@ class SGPSSM(Base_SGPSSM):
             y_train, hidden_size, no_pseudo, lik, prior_mean, prior_var,
             x_control, gp_emi, control_to_emi, nat_param)
         self.dyn_layer = SGP_Layer(
-            self.N - 1, self.Din + self.Dcon_dyn, self.Din, self.M)
+            self.N - 1, self.Din + self.Dcon_dyn, self.Din, self.M, nat_param)
         if gp_emi:
             self.emi_layer = SGP_Layer(
-                self.N, self.Din + self.Dcon_emi, self.Dout, self.M)
+                self.N, self.Din + self.Dcon_emi, self.Dout, self.M, nat_param)
 
     @profile
     def objective_function(self, params, mb_size, alpha='not_used', prop_mode=PROP_MM):

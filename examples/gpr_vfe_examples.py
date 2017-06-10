@@ -37,7 +37,7 @@ def run_regression_1D_collapsed():
     # inference
     print "create model and optimize ..."
     M = 20
-    alpha = 0.01
+    alpha = 0.0001
     model = vfe.SGPR_collapsed(X, Y, M)
     # model.update_hypers(params)
     model.optimise(method='L-BFGS-B', alpha=alpha, maxiter=2000)
@@ -84,7 +84,7 @@ def run_step_1D_collapsed():
     plt.show()
 
 
-def run_regression_1D():
+def run_regression_1D(nat_param=True):
     np.random.seed(42)
 
     print "create dataset ..."
@@ -112,10 +112,11 @@ def run_regression_1D():
     # inference
     print "create model and optimize ..."
     M = 20
-    model = vfe.SGPR(X, Y, M, lik='Gaussian')
-    model.optimise(method='L-BFGS-B', maxiter=10000)
-    # plot(model)
-    # plt.show()
+    model = vfe.SGPR(X, Y, M, lik='Gaussian', nat_param=nat_param)
+    model.optimise(method='L-BFGS-B', maxiter=20000)
+    # model.optimise(method='adam', adam_lr=0.05, maxiter=2000)
+    plot(model)
+    plt.show()
 
 
 def run_step_1D():
@@ -287,10 +288,10 @@ def run_banana_stoc():
 if __name__ == '__main__':
     # run_regression_1D_collapsed()
     # run_step_1D_collapsed()
-    
-    # run_regression_1D()
+    run_regression_1D(True)
+    run_regression_1D(False)
     # run_step_1D()
-    run_banana()
+    # run_banana()
 
     # run_regression_1D_stoc()
     # run_banana_stoc()

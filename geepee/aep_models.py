@@ -35,7 +35,8 @@ class SGP_Layer(Base_SGP_Layer):
         Suhat (TYPE): Description
         Suhatinv (TYPE): Description
     """
-    def __init__(self, no_train, input_size, output_size, no_pseudo):
+    def __init__(self, no_train, input_size, output_size, no_pseudo, 
+            nat_param=False):
         """Initialisation
         
         Args:
@@ -44,7 +45,8 @@ class SGP_Layer(Base_SGP_Layer):
             output_size (int): Number of output dimensions
             no_pseudo (int): Number of pseudo-points
         """
-        super(SGP_Layer, self).__init__(no_train, input_size, output_size, no_pseudo)
+        super(SGP_Layer, self).__init__(
+            no_train, input_size, output_size, no_pseudo, nat_param)
         # variables for the cavity distribution
         Dout, M = self.Dout, self.M
         self.muhat = np.zeros([Dout, M, ])
@@ -544,7 +546,8 @@ class SGPR(Base_SGPR):
         sgp_layer (TYPE): Description
     """
 
-    def __init__(self, x_train, y_train, no_pseudo, lik='Gaussian'):
+    def __init__(self, x_train, y_train, no_pseudo, 
+        lik='Gaussian', nat_param=True):
         """Summary
         
         Args:
@@ -554,7 +557,8 @@ class SGPR(Base_SGPR):
             lik (str, optional): Description
         """
         super(SGPR, self).__init__(x_train, y_train, no_pseudo, lik)
-        self.sgp_layer = SGP_Layer(self.N, self.Din, self.Dout, self.M)
+        self.sgp_layer = SGP_Layer(self.N, self.Din, self.Dout, self.M, nat_param)
+        self.nat_param = nat_param
 
     @profile
     def objective_function(self, params, mb_size, alpha=1.0, prop_mode=PROP_MM):
@@ -638,7 +642,7 @@ class SGPLVM(Base_SGPLVM):
         super(SGPLVM, self).__init__(
             y_train, hidden_size, no_pseudo, 
             lik, prior_mean, prior_var, nat_param)
-        self.sgp_layer = SGP_Layer(self.N, self.Din, self.Dout, self.M)
+        self.sgp_layer = SGP_Layer(self.N, self.Din, self.Dout, self.M, nat_param)
         
     @profile
     def objective_function(self, params, mb_size, alpha=1.0, prop_mode=PROP_MM):

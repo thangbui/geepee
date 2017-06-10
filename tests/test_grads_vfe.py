@@ -151,7 +151,7 @@ def test_gpr_collapsed_vfe_gaussian_scipy():
                          params_args, model, None, alpha))
 
 
-def test_gpr_vfe_gaussian():
+def test_gpr_vfe_gaussian(nat_param=True):
 
     # generate some datapoints for testing
     N_train = 20
@@ -161,7 +161,7 @@ def test_gpr_vfe_gaussian():
     Q = 3
     y_train = np.random.randn(N_train, Q)
     x_train = np.random.randn(N_train, D)
-    model = vfe.SGPR(x_train, y_train, M, lik='Gaussian')
+    model = vfe.SGPR(x_train, y_train, M, lik='Gaussian', nat_param=nat_param)
 
     # init hypers, inducing points and q(u) params
     init_params = model.init_hypers(y_train)
@@ -391,7 +391,7 @@ def test_gpr_vfe_gaussian_optimised():
                   % (d, j, grad_all['eta2'][d][j], dR_id, (grad_all['eta2'][d][j] - dR_id) / dR_id))
 
 
-def test_gpr_vfe_probit():
+def test_gpr_vfe_probit(nat_param=True):
 
     # generate some datapoints for testing
     N_train = 5
@@ -401,7 +401,7 @@ def test_gpr_vfe_probit():
     Q = 3
     x_train = np.random.randn(N_train, D)
     y_train = 2 * np.random.randint(0, 2, size=(N_train, Q)) - 1
-    model = vfe.SGPR(x_train, y_train, M, lik='Probit')
+    model = vfe.SGPR(x_train, y_train, M, lik='Probit', nat_param=nat_param)
 
     # init hypers, inducing points and q(u) params
     init_params = model.init_hypers(y_train)
@@ -498,7 +498,7 @@ def test_gpr_vfe_probit():
                   % (d, j, grad_all['eta2'][d][j], dR_id, (grad_all['eta2'][d][j] - dR_id) / dR_id))
 
 
-def test_gpr_vfe_gaussian_stochastic():
+def test_gpr_vfe_gaussian_stochastic(nat_param=True):
 
     # generate some datapoints for testing
     N_train = 20
@@ -509,7 +509,7 @@ def test_gpr_vfe_gaussian_stochastic():
     mb_size = M
     y_train = np.random.randn(N_train, Q)
     x_train = np.random.randn(N_train, D)
-    model = vfe.SGPR(x_train, y_train, M, lik='Gaussian')
+    model = vfe.SGPR(x_train, y_train, M, lik='Gaussian', nat_param=nat_param)
 
     # init hypers, inducing points and q(u) params
     init_params = model.init_hypers(y_train)
@@ -633,7 +633,7 @@ def test_gpr_vfe_gaussian_stochastic():
                   % (d, j, grad_all['eta2'][d][j], dR_id, (grad_all['eta2'][d][j] - dR_id) / dR_id))
 
 
-def test_gpr_vfe_probit_stochastic():
+def test_gpr_vfe_probit_stochastic(nat_param=True):
 
     # generate some datapoints for testing
     N_train = 5
@@ -644,7 +644,7 @@ def test_gpr_vfe_probit_stochastic():
     Q = 3
     x_train = np.random.randn(N_train, D)
     y_train = 2 * np.random.randint(0, 2, size=(N_train, Q)) - 1
-    model = vfe.SGPR(x_train, y_train, M, lik='Probit')
+    model = vfe.SGPR(x_train, y_train, M, lik='Probit', nat_param=nat_param)
 
     # init hypers, inducing points and q(u) params
     init_params = model.init_hypers(y_train)
@@ -752,7 +752,7 @@ def test_gpr_vfe_probit_stochastic():
                   % (d, j, grad_all['eta2'][d][j], dR_id, (grad_all['eta2'][d][j] - dR_id) / dR_id))
 
 
-def plot_gpr_vfe_gaussian_stochastic():
+def plot_gpr_vfe_gaussian_stochastic(nat_param=True):
 
     # generate some datapoints for testing
     N_train = 2000
@@ -762,7 +762,7 @@ def plot_gpr_vfe_gaussian_stochastic():
     Q = 3
     y_train = np.random.randn(N_train, Q)
     x_train = np.random.randn(N_train, D)
-    model = vfe.SGPR(x_train, y_train, M, lik='Gaussian')
+    model = vfe.SGPR(x_train, y_train, M, lik='Gaussian', nat_param=True)
 
     # init hypers, inducing points and q(u) params
     params = model.init_hypers(y_train)
@@ -899,17 +899,6 @@ def test_gplvm_vfe_gaussian(nat_param=True):
     lvm = vfe.SGPLVM(y_train, D, M, lik='Gaussian', nat_param=nat_param)
     # init hypers, inducing points and q(u) params
     init_params = lvm.init_hypers(y_train)
-    
-    # pdb.set_trace()
-    # x = np.random.randn(N_train, D)
-    # init_params['x2'] = np.log(1e6*np.ones_like(init_params['x2'])) / 2
-    # init_params['x1'] = x * (1 + 1e6*np.ones_like(init_params['x2']))
-    # lvm = vfe.SGPLVM(y_train, D, M, lik='Gaussian', prior_mean=x, prior_var=0.000001)
-    # params = init_params.copy()
-    # logZ, grad_all = lvm.objective_function(params, N_train)
-    # reg = vfe.SGPR(x, y_train, M, lik='Gaussian')
-    # reg_logZ = reg.objective_function(init_params, N_train)
-    # pdb.set_trace()
 
     params = init_params.copy()
     logZ, grad_all = lvm.objective_function(
@@ -2589,19 +2578,21 @@ if __name__ == '__main__':
     #     test_gpr_collapsed_vfe_gaussian()
     #     test_gpr_collapsed_vfe_gaussian_scipy()
 
-    # test_gpr_vfe_gaussian()
+    # test_gpr_vfe_gaussian(True)
+    # test_gpr_vfe_gaussian(False)
     # test_gpr_vfe_gaussian_optimised()
     # test_gpr_vfe_gaussian_scipy()
     # test_gpr_vfe_gaussian_stochastic()
     # plot_gpr_vfe_gaussian_stochastic()
 
-    test_gpr_vfe_probit()
-    test_gpr_vfe_probit_scipy()
-    test_gpr_vfe_probit_stochastic()
+    # test_gpr_vfe_probit(True)
+    # test_gpr_vfe_probit(False)
+    # test_gpr_vfe_probit_scipy()
+    # test_gpr_vfe_probit_stochastic()
     # plot_gpr_vfe_probit_stochastic()
 
-    # test_gplvm_vfe_gaussian(True)
-    # test_gplvm_vfe_gaussian(False)
+    test_gplvm_vfe_gaussian(True)
+    test_gplvm_vfe_gaussian(False)
     # test_gplvm_vfe_gaussian_cluster()
     # test_gplvm_vfe_gaussian_scipy(True)
     # test_gplvm_vfe_gaussian_scipy(False)

@@ -178,7 +178,9 @@ class Base_SGP_Layer(object):
         zu (TYPE): Description
     """
 
-    def __init__(self, no_train, input_size, output_size, no_pseudo):
+    def __init__(
+            self, no_train, input_size, output_size, no_pseudo, 
+            nat_param=True):
         """Initialisation
         
         Args:
@@ -191,10 +193,12 @@ class Base_SGP_Layer(object):
         self.Dout = Dout = output_size
         self.M = M = no_pseudo
         self.N = N = no_train
+        self.nat_param = nat_param
 
         # variables for the mean and covariance of q(u)
         self.mu = np.zeros([Dout, M, ])
         self.Su = np.zeros([Dout, M, M])
+        self.Suinv = np.zeros([Dout, M, M])
         self.Splusmm = np.zeros([Dout, M, M])
 
         # numpy variable for inducing points, Kuuinv, Kuu and its gradients
@@ -319,10 +323,9 @@ class Base_SGP_Layer(object):
         else:
             return mout, vout
 
-
     @profile
     def backprop_predictive_grads_lvm_mm(self, m, v, dm_dm, dm_dv, dv_dm, dv_dv,
-                                         psi1, psi2, mx, vx):
+        psi1, psi2, mx, vx):
         """Summary
         
         Args:
@@ -378,7 +381,7 @@ class Base_SGP_Layer(object):
 
     @profile
     def backprop_predictive_grads_reg(self, m, v, dm_dm, dm_dv, dv_dm, dv_dv,
-                                      kfu, x):
+        kfu, x):
         """Summary
         
         Args:
@@ -453,12 +456,16 @@ class Base_SGP_Layer(object):
         self.Kuuinv = np.linalg.inv(self.Kuu)
 
     def update_posterior(self):
-        """update the posterior
+        """update the posterior approximation
         """
-        # compute the posterior approximation
-        Sinv = self.Kuuinv + self.theta_1
-        self.Su = np.linalg.inv(Sinv)
-        self.mu = np.einsum('dab,db->da', self.Su, self.theta_2)
+        if self.nat_param:
+            self.Suinv = self.Kuuinv + self.theta_1
+            self.Su = np.linalg.inv(self.Suinv)
+            self.mu = np.einsum('dab,db->da', self.Su, self.theta_2)
+        else:
+            self.Su = self.theta_1
+            self.Suinv = np.linalg.inv(self.Su)
+            self.mu = self.theta_2
         self.Splusmm = self.Su + np.einsum('da,db->dab', self.mu, self.mu)
         self.A = np.einsum('ab,db->da', self.Kuuinv, self.mu)
         self.B_sto = - self.Kuuinv + np.einsum(
@@ -469,6 +476,37 @@ class Base_SGP_Layer(object):
             'ab,dbc->dac',
             self.Kuuinv,
             np.einsum('dab,bc->dac', self.Su, self.Kuuinv))
+
+    def compute_posterior_grad_u(self, dmu, dSu):
+        # return grads wrt u params and Kuuinv
+        triu_ind = np.triu_indices(self.M)
+        diag_ind = np.diag_indices(self.M)
+        if self.nat_param:
+            dSu_via_m = np.einsum('da,db->dab', dmu, self.theta_2)
+            dSu += dSu_via_m
+            dSuinv = - np.einsum('dab,dbc,dce->dae', self.Su, dSu, self.Su)
+            dKuuinv = np.sum(dSuinv, axis=0)
+            dtheta1 = dSuinv
+            deta2 = np.einsum('dab,db->da', self.Su, dmu)
+        else:
+            deta2 = dmu
+            dtheta1 = dSu
+            dKuuinv = 0
+
+        dtheta1T = np.transpose(dtheta1, [0, 2, 1])
+        dtheta1_R = np.einsum('dab,dbc->dac', self.theta_1_R, dtheta1 + dtheta1T)
+        deta1_R = np.zeros([self.Dout, self.M * (self.M + 1) / 2])
+        for d in range(self.Dout):
+            dtheta1_R_d = dtheta1_R[d, :, :]
+            theta1_R_d = self.theta_1_R[d, :, :]
+            dtheta1_R_d[diag_ind] = dtheta1_R_d[diag_ind] * theta1_R_d[diag_ind]
+            dtheta1_R_d = dtheta1_R_d[triu_ind]
+            deta1_R[d, :] = dtheta1_R_d.reshape((dtheta1_R_d.shape[0], ))
+
+        return deta1_R, deta2, dKuuinv
+
+
+
 
     def init_hypers(self, x_train=None, key_suffix=''):
         """Summary
@@ -523,12 +561,17 @@ class Base_SGP_Layer(object):
             alpha = 0.5 * np.random.rand(M)
             # alpha = 0.01 * np.ones(M)
             Su = np.diag(alpha)
-            Suinv = np.diag(1 / alpha)
+            if self.nat_param:
+                Suinv = np.diag(1 / alpha)
+                theta2 = np.dot(Suinv, mu)
+                theta1 = Suinv
+            else:
+                Suinv = np.diag(1 / alpha) + Kuuinv
+                Su = np.linalg.inv(Suinv)
+                theta1 = Su
+                theta2 = np.dot(Su, mu / alpha.reshape((M, 1)))
 
-            theta2 = np.dot(Suinv, mu)
-            theta1 = Suinv
             R = np.linalg.cholesky(theta1).T
-
             triu_ind = np.triu_indices(M)
             diag_ind = np.diag_indices(M)
             R[diag_ind] = np.log(R[diag_ind])
@@ -815,8 +858,8 @@ class Base_SGPLVM(Base_Model):
         print 'init latent function using GPR...'
         x = post_m
         y = y_train
-        from aep_models import SGPR
-        reg = SGPR(x, y, self.M, 'Gaussian')
+        from vfe_models import SGPR
+        reg = SGPR(x, y, self.M, 'Gaussian', self.nat_param)
         reg.set_fixed_params(['sn', 'sf', 'ls', 'zu'])
         reg.optimise(method='L-BFGS-B', maxiter=100, disp=False)
         sgp_params = reg.sgp_layer.get_hypers()
@@ -893,7 +936,8 @@ class Base_SGPR(Base_Model):
         x_train (TYPE): Description
     """
 
-    def __init__(self, x_train, y_train, no_pseudo, lik='Gaussian'):
+    def __init__(self, x_train, y_train, no_pseudo, 
+        lik='Gaussian', nat_param=True):
         """Summary
         
         Args:
@@ -911,8 +955,8 @@ class Base_SGPR(Base_Model):
         self.Din = Din = x_train.shape[1]
         self.M = M = no_pseudo
         self.x_train = x_train
+        self.nat_param = nat_param
 
-        # self.sgp_layer = SGP_Layer(N, Din, Dout, M)
         if lik.lower() == 'gaussian':
             self.lik_layer = Gauss_Layer(N, Dout)
         elif lik.lower() == 'probit':
@@ -1035,7 +1079,8 @@ class Base_SDGPR(Base_Model):
         x_train (TYPE): Description
     """
 
-    def __init__(self, x_train, y_train, no_pseudos, hidden_sizes, lik='Gaussian'):
+    def __init__(self, x_train, y_train, no_pseudos, hidden_sizes, 
+        lik='Gaussian'):
         """Summary
         
         Args:
@@ -1250,9 +1295,10 @@ class Base_SDGPR(Base_Model):
             layer.update_hypers(params, key_suffix='_%d' % i)
         self.lik_layer.update_hypers(params)
 
-# TODO: prediction and more robust init
+
 class Base_SGPSSM(Base_Model):
-    """Summary
+    """Summary 
+    # TODO: prediction and more robust init
     
     Attributes:
         Dcon_dyn (TYPE): Description
@@ -1522,8 +1568,8 @@ class Base_SGPSSM(Base_Model):
         y = post_m[1:, :]
         if self.Dcon_dyn > 0:
             x = np.hstack((x, self.x_control[:self.N - 1, :]))
-        from aep_models import SGPR
-        reg = SGPR(x, y, self.M, 'Gaussian')
+        from vfe_models import SGPR
+        reg = SGPR(x, y, self.M, 'Gaussian', self.nat_param)
         reg.set_fixed_params(['sn', 'sf', 'ls', 'zu'])
         # reg.set_fixed_params(['sn', 'sf'])
         reg.optimise(method='L-BFGS-B', alpha=0.5, maxiter=500, disp=False)
@@ -1539,7 +1585,7 @@ class Base_SGPSSM(Base_Model):
                 x = np.hstack((x, self.x_control))
             y = self.y_train
             # TODO: deal with different likelihood here
-            reg = SGPR(x, y, self.M, 'Gaussian')
+            reg = SGPR(x, y, self.M, 'Gaussian', self.nat_param)
             reg.set_fixed_params(['sn', 'sf', 'ls', 'zu'])
             reg.optimise(method='L-BFGS-B', alpha=0.5, maxiter=5000, disp=True)
             emi_params = reg.sgp_layer.get_hypers(key_suffix='_emission')

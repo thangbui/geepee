@@ -33,12 +33,13 @@ def run_cluster_MM(nat_param=True):
         B.shape[0]), np.ones(C.shape[0]) * 2))
 
     # inference
+    np.random.seed(42)
     print "inference ..."
     M = 30
     D = 5
     lvm = vfe.SGPLVM(Y, D, M, lik='Gaussian', nat_param=nat_param)
-    # lvm.optimise(method='L-BFGS-B', maxiter=2000)
-    lvm.optimise(method='adam', adam_lr=0.05, maxiter=2000)
+    lvm.optimise(method='L-BFGS-B', maxiter=20)
+    # lvm.optimise(method='adam', adam_lr=0.05, maxiter=2000)
 
     ls = np.exp(lvm.sgp_layer.ls)
     print ls
@@ -409,6 +410,7 @@ def run_frey():
 
 if __name__ == '__main__':
     run_cluster_MM(False)
+    run_cluster_MM(True)
     # run_cluster_MC()
     # run_semicircle()
     # run_pinwheel()
