@@ -505,9 +505,6 @@ class Base_SGP_Layer(object):
 
         return deta1_R, deta2, dKuuinv
 
-
-
-
     def init_hypers(self, x_train=None, key_suffix=''):
         """Summary
         
@@ -575,7 +572,6 @@ class Base_SGP_Layer(object):
             triu_ind = np.triu_indices(M)
             diag_ind = np.diag_indices(M)
             R[diag_ind] = np.log(R[diag_ind])
-            np.log(R[diag_ind])
             eta1_d = R[triu_ind].reshape((M * (M + 1) / 2,))
             eta2_d = theta2.reshape((M,))
             eta1_R[d, :] = eta1_d

@@ -9,7 +9,7 @@ from scipy import special
 from .datautils import step, spiral
 from .context import aep
 
-def run_regression_1D():
+def run_regression_1D(nat_param=True):
     np.random.seed(42)
 
     print "create dataset ..."
@@ -37,10 +37,12 @@ def run_regression_1D():
     # inference
     print "create model and optimize ..."
     M = 20
-    model = aep.SGPR(X, Y, M, lik='Gaussian')
-    model.optimise(method='L-BFGS-B', alpha=0.1, maxiter=50000)
-    plot(model)
-    plt.show()
+    model = aep.SGPR(X, Y, M, lik='Gaussian', nat_param=nat_param)
+    model.update_hypers(model.init_hypers(Y))
+    print model.objective_function(model.get_hypers(), N, 0.1)
+    model.optimise(method='L-BFGS-B', alpha=0.1, maxiter=1)
+    # plot(model)
+    # plt.show()
 
 
 def run_banana():
@@ -307,11 +309,12 @@ def run_boston():
 
 
 if __name__ == '__main__':
-    # run_regression_1D()
+    run_regression_1D(True)
+    run_regression_1D(False)
     # run_banana()
     # run_step_1D()
     # run_spiral()
     # run_boston()
 
     # run_regression_1D_stoc()
-    run_banana_stoc()
+    # run_banana_stoc()
