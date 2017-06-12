@@ -5135,7 +5135,7 @@ if __name__ == '__main__':
     # plot_gplvm_aep_probit_stochastic()
     # plot_gplvm_aep_gaussian_stochastic()
 
-    # test_gpr_aep_gaussian(True)
+    test_gpr_aep_gaussian(True)
     test_gpr_aep_gaussian(False)
     # test_gpr_aep_probit()
     # test_gpr_aep_gaussian_scipy()

@@ -36,7 +36,7 @@ class SGP_Layer(Base_SGP_Layer):
         Suhatinv (TYPE): Description
     """
     def __init__(self, no_train, input_size, output_size, no_pseudo, 
-            nat_param=False):
+        nat_param=False):
         """Initialisation
         
         Args:
@@ -105,9 +105,7 @@ class SGP_Layer(Base_SGP_Layer):
         """
         N = self.N
         scale_post = N * 1.0 / alpha - 1.0
-        scale_post = 0
         scale_cav = - N * 1.0 / alpha
-        scale_cav = 0
         scale_prior = 1
         phi_prior = self.compute_phi_prior()
         phi_post = self.compute_phi_posterior()
@@ -447,9 +445,7 @@ class SGP_Layer(Base_SGP_Layer):
 
         beta = (N - alpha) * 1.0 / N
         scale_post = N * 1.0 / alpha - 1.0
-        scale_post = 0
         scale_cav = - N * 1.0 / alpha
-        scale_cav = 0
         scale_prior = 1
 
         # compute grads wrt kfu
@@ -562,14 +558,20 @@ class SGP_Layer(Base_SGP_Layer):
             dtheta1 = beta * dSuinv
             deta2 = beta * np.einsum('dab,db->da', self.Suhat, dmu)
         else:
-            # TODO
-            data_f_2 = np.einsum('dab,db->da', self.Suinv, self.mu)
-            dSu_via_m = np.einsum('da,db->dab', dmu, beta * data_f_2)
-            dSu += dSu_via_m
-            SuhatSuinv = np.einsum('dab,dbc->dac', self.Suhat, self.Suinv)
-            dtheta1 = beta * np.einsum('dab,dbc,dce->dae', SuhatSuinv, dSu, SuhatSuinv)
-            deta2 = beta * np.einsum('dab,db->da', SuhatSuinv, dmu)
-            dKuuinv = (1 - beta) / beta * np.sum(dtheta1, axis=0)
+            Suhat = self.Suhat
+            Suinv = self.Suinv
+            mu = self.mu
+            data_f_2 = np.einsum('dab,db->da', Suinv, mu)
+            dSuhat_via_mhat = np.einsum('da,db->dab', dmu, beta * data_f_2)
+            dSuhat = dSu + dSuhat_via_mhat
+            dmuhat = dmu
+            dSuhatinv = - np.einsum('dab,dbc,dce->dae', Suhat, dSuhat, Suhat)
+            dSuinv_1 = beta * dSuhatinv
+            Suhatdmu = np.einsum('dab,db->da', Suhat, dmuhat)
+            dSuinv = dSuinv_1 + beta * np.einsum('da,db->dab', Suhatdmu, mu)
+            dtheta1 = - np.einsum('dab,dbc,dce->dae', Suinv, dSuinv, Suinv)
+            deta2 = beta * np.einsum('dab,db->da', Suinv, Suhatdmu)
+            dKuuinv = (1 - beta) / beta * np.sum(dSuinv_1, axis=0)
 
         dtheta1T = np.transpose(dtheta1, [0, 2, 1])
         dtheta1_R = np.einsum('dab,dbc->dac', self.theta_1_R, dtheta1 + dtheta1T)
@@ -628,7 +630,6 @@ class SGPR(Base_SGPR):
             yb = self.y_train[idxs, :]
         batch_size = yb.shape[0]
         scale_logZ = - N * 1.0 / batch_size / alpha
-        scale_logZ = 0
         # update model with new hypers
         self.update_hypers(params)
         self.sgp_layer.compute_cavity(alpha)
