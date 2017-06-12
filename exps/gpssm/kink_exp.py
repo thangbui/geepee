@@ -1,10 +1,15 @@
+
+import sys
+sys.path.append('../../')
 import matplotlib
 matplotlib.use('Agg')
 import numpy as np
 import scipy.stats
 import matplotlib.pylab as plt
 import os, sys
-from ..context import aep, ep
+import geepee.aep_models as aep
+import geepee.vfe_models as vfe
+import geepee.ep_models as ep
 import pdb
 
 np.random.seed(42)
@@ -58,8 +63,7 @@ lsn = np.log(process_noise)/2
 params = {'ls': lls, 'sf': lsf, 'sn': lsn, 'R': R, 'C': C, 'zu': zu}
 
 # create model
-model = aep.SGPSSM(y_train, Dlatent, M, 
-    lik='Gaussian', prior_mean=0, prior_var=1000)
+model = aep.SGPSSM(y_train, Dlatent, M, lik='Gaussian', prior_mean=0, prior_var=1000)
 hypers = model.init_hypers(y_train)
 for key in params.keys():
     hypers[key] = params[key]
@@ -125,7 +129,6 @@ def plot_latent(model, latent_true, fname):
     print 'll %.3f +/- %.3f' % (mll, ll_std)
 
 plot_latent(model, xtrue, 'aep')
-
 
 # create EP model
 opt_hypers = model.get_hypers()
