@@ -1119,7 +1119,7 @@ def test_gplvm_aep_probit_scipy():
                          params_args, lvm, N_train, alpha))
 
 
-def test_gpr_aep_gaussian():
+def test_gpr_aep_gaussian(nat_param=True):
 
     # generate some datapoints for testing
     N_train = 20
@@ -1129,7 +1129,7 @@ def test_gpr_aep_gaussian():
     Q = 3
     y_train = np.random.randn(N_train, Q)
     x_train = np.random.randn(N_train, D)
-    model = aep.SGPR(x_train, y_train, M, lik='Gaussian')
+    model = aep.SGPR(x_train, y_train, M, lik='Gaussian', nat_param=nat_param)
 
     # init hypers, inducing points and q(u) params
     init_params = model.init_hypers(y_train)
@@ -5120,22 +5120,23 @@ def plot_gpssm_linear_aep_gaussian_stochastic():
 
 
 if __name__ == '__main__':
-    test_gplvm_aep_gaussian(True)
-    test_gplvm_aep_gaussian(False)
+    # test_gplvm_aep_gaussian(True)
+    # test_gplvm_aep_gaussian(False)
     # test_gplvm_aep_probit()
     # test_gplvm_aep_gaussian_scipy()
     # test_gplvm_aep_probit_scipy()
     # test_gplvm_aep_gaussian_MC()
     # test_gplvm_aep_probit_MC()    
     # test_gplvm_aep_probit_stochastic()
-    test_gplvm_aep_gaussian_stochastic(True)
-    test_gplvm_aep_gaussian_stochastic(False)
+    # test_gplvm_aep_gaussian_stochastic(True)
+    # test_gplvm_aep_gaussian_stochastic(False)
 
 
     # plot_gplvm_aep_probit_stochastic()
     # plot_gplvm_aep_gaussian_stochastic()
 
-    # test_gpr_aep_gaussian()
+    # test_gpr_aep_gaussian(True)
+    test_gpr_aep_gaussian(False)
     # test_gpr_aep_probit()
     # test_gpr_aep_gaussian_scipy()
     # test_gpr_aep_probit_scipy()

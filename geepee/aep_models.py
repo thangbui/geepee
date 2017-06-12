@@ -105,7 +105,9 @@ class SGP_Layer(Base_SGP_Layer):
         """
         N = self.N
         scale_post = N * 1.0 / alpha - 1.0
+        scale_post = 0
         scale_cav = - N * 1.0 / alpha
+        scale_cav = 0
         scale_prior = 1
         phi_prior = self.compute_phi_prior()
         phi_post = self.compute_phi_posterior()
@@ -433,17 +435,21 @@ class SGP_Layer(Base_SGP_Layer):
         diag_ind = np.diag_indices(M)
         mu = self.mu
         Su = self.Su
+        Suinv = self.Suinv
         Spmm = self.Splusmm
         muhat = self.muhat
         Suhat = self.Suhat
+        Suhatinv = self.Suhatinv
         Spmmhat = self.Splusmmhat
         Kuuinv = self.Kuuinv
         Kuu = self.Kuu
         kfuKuuinv = np.dot(kfu, Kuuinv)
 
         beta = (N - alpha) * 1.0 / N
-        scale_poste = N * 1.0 / alpha - 1.0
+        scale_post = N * 1.0 / alpha - 1.0
+        scale_post = 0
         scale_cav = - N * 1.0 / alpha
+        scale_cav = 0
         scale_prior = 1
 
         # compute grads wrt kfu
@@ -457,49 +463,44 @@ class SGP_Layer(Base_SGP_Layer):
         dsf2 += dv_sum
         dsf = 2 * sf2 * dsf2
 
-        # compute grads wrt theta1 and theta2
-        SKuuinvKuf = np.einsum('dab,nb->nda', Suhat, kfuKuuinv)
-        dSinv_via_v = - np.einsum('nda,nd,ndb->dab',
-                                  SKuuinvKuf, dv, SKuuinvKuf)
-        dSinv_via_m = - np.einsum('nda,nd,db->dab', SKuuinvKuf, dm, muhat)
-        dSinv = dSinv_via_m + dSinv_via_v
-        dSinvM = np.einsum('nda,nd->da', SKuuinvKuf, dm)
-        dtheta1 = beta * dSinv
-        dtheta2 = beta * dSinvM
+        # compute grads wrt cavity mean and covariance
+        dmucav = np.einsum('nd,nm->dm', dm, kfuKuuinv)
+        dSucav = np.einsum('na,nd,nb->dab', kfuKuuinv, dv, kfuKuuinv)
+        # add in contribution from the normalising factor
+        Suinvmuhat = np.einsum('dab,db->da', Suhatinv, muhat)
+        dmucav += scale_cav * Suinvmuhat
+        dSucav += scale_cav * (
+            0.5 * Suhatinv 
+            - 0.5 * np.einsum('da,db->dab', Suinvmuhat, Suinvmuhat))
+        deta1_R_cav, deta2_cav, dKuuinv_via_cav = \
+            self.compute_cav_grad_u(dmucav, dSucav, alpha)
 
-        dtheta1 = -0.5 * scale_poste * Spmm - 0.5 * scale_cav * beta * Spmmhat + dtheta1
-        dtheta2 = scale_poste * mu + scale_cav * beta * muhat + dtheta2
-        dtheta1T = np.transpose(dtheta1, [0, 2, 1])
-        dtheta1_R = np.einsum(
-            'dab,dbc->dac', self.theta_1_R, dtheta1 + dtheta1T)
+        # compute grads wrt posterior mean and covariance
+        Suinvmu = np.einsum('dab,db->da', Suinv, mu)
+        dmu = scale_post * Suinvmu
+        dSu = scale_post * (
+            0.5 * Suinv - 0.5 * np.einsum('da,db->dab', Suinvmu, Suinvmu))
+        deta1_R_post, deta2_post, dKuuinv_via_post = \
+            self.compute_posterior_grad_u(dmu, dSu)
 
-        deta1_R = np.zeros([self.Dout, M * (M + 1) / 2])
-        deta2 = dtheta2
-        for d in range(self.Dout):
-            dtheta1_R_d = dtheta1_R[d, :, :]
-            theta1_R_d = self.theta_1_R[d, :, :]
-            dtheta1_R_d[diag_ind] = dtheta1_R_d[
-                diag_ind] * theta1_R_d[diag_ind]
-            dtheta1_R_d = dtheta1_R_d[triu_ind]
-            deta1_R[d, :] = dtheta1_R_d.reshape(
-                (dtheta1_R_d.shape[0], ))
+        # contrib from phi prior term
+        dKuuinv_via_prior = - 0.5 * self.Dout * Kuu
+
+        deta1_R = deta1_R_cav + deta1_R_post
+        deta2 = deta2_cav + deta2_post
+        dKuuinv_via_phi = dKuuinv_via_cav + dKuuinv_via_post + dKuuinv_via_prior
 
         # get contribution of Ahat and Bhat to Kuu and add to Minner
         dAhat = np.einsum('nd,nm->dm', dm, kfu)
         dKuuinv_m = np.einsum('da,db->ab', dAhat, muhat)
         KuuinvSmmd = np.einsum('ab,dbc->dac', Kuuinv, Suhat)
         dBhat = np.einsum('nd,na,nb->dab', dv, kfu, kfu)
-        dKuuinv_v_1 = 2 * np.einsum('dab,dac->bc', KuuinvSmmd, dBhat) \
+        dKuuinv_v = 2 * np.einsum('dab,dac->bc', KuuinvSmmd, dBhat) \
             - np.sum(dBhat, axis=0)
-        dKuuinv_v_2 = np.sum(dSinv, axis=0)
-        dKuuinv = dKuuinv_m + dKuuinv_v_1 + dKuuinv_v_2
-
-        Minner = scale_poste * np.sum(Spmm, axis=0) + scale_cav * \
-            np.sum(Spmmhat, axis=0) - 2.0 * dKuuinv
-        M_all = 0.5 * (scale_prior * self.Dout * Kuuinv +
-                       np.dot(Kuuinv, np.dot(Minner, Kuuinv)))
+        dKuuinv = dKuuinv_m + dKuuinv_v + dKuuinv_via_phi
+        M_inner = - np.dot(Kuuinv, np.dot(dKuuinv, Kuuinv))
         dhyp = d_trace_MKzz_dhypers(
-            2 * self.ls, 2 * self.sf, self.zu, M_all,
+            2 * self.ls, 2 * self.sf, self.zu, M_inner,
             self.Kuu - np.diag(JITTER * np.ones(self.M)))
 
         dzu += dhyp[2]
@@ -513,7 +514,7 @@ class SGP_Layer(Base_SGP_Layer):
 
         return grad_hyper
 
-    def compute_cavity(self, alpha=1.0):
+    def compute_cavity(self, alpha):
         """compute the leave one out moments and a few other things for training
         
         Args:
@@ -523,9 +524,19 @@ class SGP_Layer(Base_SGP_Layer):
         Dout = self.Dout
         Kuu = self.Kuu
         Kuuinv = self.Kuuinv
-        self.Suhatinv = Kuuinv + beta * self.theta_1
-        self.Suhat = np.linalg.inv(self.Suhatinv)
-        self.muhat = np.einsum('dab,db->da', self.Suhat, beta * self.theta_2)
+        if self.nat_param:
+            self.Suhatinv = Kuuinv + beta * self.theta_1
+            self.Suhat = np.linalg.inv(self.Suhatinv)
+            self.muhat = np.einsum('dab,db->da', self.Suhat, beta * self.theta_2)
+        else:
+            data_f_1 = self.Suinv - Kuuinv
+            data_f_2 = np.einsum('dab,db->da', self.Suinv, self.mu)
+            cav_f_1 = Kuuinv + beta * data_f_1
+            cav_f_2 = beta * data_f_2
+            self.Suhatinv = cav_f_1
+            self.Suhat = np.linalg.inv(self.Suhatinv)
+            self.muhat = np.einsum('dab,db->da', self.Suhat, cav_f_2)
+
         self.Ahat = np.einsum('ab,db->da', Kuuinv, self.muhat)
         Smm = self.Suhat + np.einsum('da,db->dab', self.muhat, self.muhat)
         self.Splusmmhat = Smm
@@ -537,6 +548,40 @@ class SGP_Layer(Base_SGP_Layer):
             'ab,dbc->dac',
             Kuuinv,
             np.einsum('dab,bc->dac', self.Suhat, Kuuinv))
+
+    def compute_cav_grad_u(self, dmu, dSu, alpha):
+        # return grads wrt u params and Kuuinv
+        triu_ind = np.triu_indices(self.M)
+        diag_ind = np.diag_indices(self.M)
+        beta = (self.N - alpha) * 1.0 / self.N
+        if self.nat_param:
+            dSu_via_m = np.einsum('da,db->dab', dmu, beta * self.theta_2)
+            dSu += dSu_via_m
+            dSuinv = - np.einsum('dab,dbc,dce->dae', self.Suhat, dSu, self.Suhat)
+            dKuuinv = np.sum(dSuinv, axis=0)
+            dtheta1 = beta * dSuinv
+            deta2 = beta * np.einsum('dab,db->da', self.Suhat, dmu)
+        else:
+            # TODO
+            data_f_2 = np.einsum('dab,db->da', self.Suinv, self.mu)
+            dSu_via_m = np.einsum('da,db->dab', dmu, beta * data_f_2)
+            dSu += dSu_via_m
+            SuhatSuinv = np.einsum('dab,dbc->dac', self.Suhat, self.Suinv)
+            dtheta1 = beta * np.einsum('dab,dbc,dce->dae', SuhatSuinv, dSu, SuhatSuinv)
+            deta2 = beta * np.einsum('dab,db->da', SuhatSuinv, dmu)
+            dKuuinv = (1 - beta) / beta * np.sum(dtheta1, axis=0)
+
+        dtheta1T = np.transpose(dtheta1, [0, 2, 1])
+        dtheta1_R = np.einsum('dab,dbc->dac', self.theta_1_R, dtheta1 + dtheta1T)
+        deta1_R = np.zeros([self.Dout, self.M * (self.M + 1) / 2])
+        for d in range(self.Dout):
+            dtheta1_R_d = dtheta1_R[d, :, :]
+            theta1_R_d = self.theta_1_R[d, :, :]
+            dtheta1_R_d[diag_ind] = dtheta1_R_d[diag_ind] * theta1_R_d[diag_ind]
+            dtheta1_R_d = dtheta1_R_d[triu_ind]
+            deta1_R[d, :] = dtheta1_R_d.reshape((dtheta1_R_d.shape[0], ))
+
+        return deta1_R, deta2, dKuuinv
 
 
 class SGPR(Base_SGPR):
@@ -583,10 +628,7 @@ class SGPR(Base_SGPR):
             yb = self.y_train[idxs, :]
         batch_size = yb.shape[0]
         scale_logZ = - N * 1.0 / batch_size / alpha
-        scale_poste = N * 1.0 / alpha - 1.0
-        scale_cav = - N * 1.0 / alpha
-        scale_prior = 1
-
+        scale_logZ = 0
         # update model with new hypers
         self.update_hypers(params)
         self.sgp_layer.compute_cavity(alpha)
