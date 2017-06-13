@@ -2165,7 +2165,7 @@ def test_gpssm_linear_vfe_gaussian_kink_MM(nat_param=True):
 
         return xtrue, x, y
 
-    N_train = 50
+    N_train = 100
     process_noise = 0.2
     obs_noise = 0.1
     alpha = 0.5
@@ -2591,8 +2591,8 @@ if __name__ == '__main__':
     # test_gpr_vfe_probit_stochastic()
     # plot_gpr_vfe_probit_stochastic()
 
-    test_gplvm_vfe_gaussian(True)
-    test_gplvm_vfe_gaussian(False)
+    # test_gplvm_vfe_gaussian(True)
+    # test_gplvm_vfe_gaussian(False)
     # test_gplvm_vfe_gaussian_cluster()
     # test_gplvm_vfe_gaussian_scipy(True)
     # test_gplvm_vfe_gaussian_scipy(False)
@@ -2607,7 +2607,7 @@ if __name__ == '__main__':
     # test_gplvm_vfe_probit_stochastic()
     # plot_gplvm_vfe_probit_stochastic()
 
-    # test_gpssm_linear_vfe_gaussian_kink_MM(True)
+    test_gpssm_linear_vfe_gaussian_kink_MM(True)
     # test_gpssm_linear_vfe_gaussian_kink_MM_stochastic(True)
     # test_gpssm_linear_vfe_gaussian_kink_MM(False)
     # test_gpssm_linear_vfe_gaussian_kink_MM_stochastic(False)

@@ -958,9 +958,9 @@ class SGPSSM(Base_SGPSSM):
         # compute posterior
         post_m, post_v = self.get_posterior_x(emi_idxs)
         idxs_prev = dyn_idxs + 1
-        post_t_m, post_t_v = post_m[0:-1, :], post_v[0:-1, :]
+        post_t_m, post_t_v = post_m[1:, :], post_v[1:, :]
         idxs_next = dyn_idxs
-        post_tm1_m, post_tm1_v = post_m[1:, :], post_v[1:, :]
+        post_tm1_m, post_tm1_v = post_m[0:-1, :], post_v[0:-1, :]
         if self.Dcon_dyn > 0:
             post_tm1_mc = np.hstack((post_tm1_m, self.x_control[idxs_next, :]))
             post_tm1_vc = np.hstack(
@@ -985,7 +985,6 @@ class SGPSSM(Base_SGPSSM):
             sgp_grad_hyper, sgp_grad_input = dyn_layer.backprop_grads_lvm_mm(
                 mprop, vprop, dmprop, dvprop,
                 psi1, psi2, post_tm1_mc, post_tm1_vc)
-
             if self.gp_emi:
                 # deal with the emission factors here
                 mout, vout, psi1, psi2 = emi_layer.forward_prop_thru_post(
@@ -1053,9 +1052,9 @@ class SGPSSM(Base_SGPSSM):
 
         dm_up = emi_grad_input['mx'][:, :self.Din]
         dv_up = emi_grad_input['vx'][:, :self.Din]
-        dm_prev, dv_prev = dmt, dvt
-        dm_next = sgp_grad_input['mx'][:, :self.Din]
-        dv_next = sgp_grad_input['vx'][:, :self.Din]
+        dm_next, dv_next = dmt, dvt
+        dm_prev = sgp_grad_input['mx'][:, :self.Din]
+        dv_prev = sgp_grad_input['vx'][:, :self.Din]
 
         # compute entropy
         scale_entropy = - N * 1.0 / batch_size_emi

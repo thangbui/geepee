@@ -1121,7 +1121,6 @@ class SGPSSM(Base_SGPSSM):
             raise NotImplementedError('propgation mode not implemented')
 
         if not self.gp_emi:
-            # pdb.set_trace()
             logZ_emi, emi_grad_input, emi_grad_hyper = emi_layer.compute_emission_tilted(
                 cav_up_mc, cav_up_vc, alpha, scale_logZ_emi, emi_idxs)
 
@@ -1304,10 +1303,13 @@ class SGPSSM(Base_SGPSSM):
         v_sum = v_t + v_prop + sn2 / alpha
         m_diff = m_t - m_prop
         exp_term = -0.5 * m_diff**2 / v_sum
-        const_term = -0.5 * np.log(2 * np.pi * v_sum)
-        alpha_term = 0.5 * (1 - alpha) * np.log(2 *
-                                                np.pi * sn2) - 0.5 * np.log(alpha)
+        # const_term = -0.5 * np.log(2 * np.pi * v_sum)
+        # alpha_term = 0.5 * (1 - alpha) * np.log(2 *
+        #                                         np.pi * sn2) - 0.5 * np.log(alpha)
+        alpha_term = - 0.5 * alpha * np.log(2 * np.pi * sn2)
+        const_term = - 0.5 * np.log(1 + alpha * (v_t + v_prop) / sn2)
         logZ = exp_term + const_term + alpha_term
+
         if m_prop.ndim == 2:
             logZ = scale * np.sum(logZ)
             dvt = scale * (-0.5 / v_sum + 0.5 * m_diff**2 / v_sum**2)

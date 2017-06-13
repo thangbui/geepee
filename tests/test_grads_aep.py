@@ -1123,7 +1123,7 @@ def test_gpr_aep_gaussian(nat_param=True):
 
     # generate some datapoints for testing
     N_train = 20
-    alpha = 0.5
+    alpha = 0.0001
     M = 10
     D = 2
     Q = 3

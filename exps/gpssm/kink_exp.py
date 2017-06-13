@@ -97,7 +97,6 @@ obs_noise = 0.1
 (xtrue, x, y) = kink(T, process_noise, obs_noise)
 y_train = np.reshape(y, [y.shape[0], 1])
 
-# init hypers
 Dlatent = 1
 Dobs = 1
 M = 15
@@ -110,7 +109,7 @@ vfe_hypers = model_vfe.init_hypers(y_train)
 model_vfe.update_hypers(vfe_hypers)
 # optimise
 # model_vfe.optimise(method='L-BFGS-B', maxiter=10000, reinit_hypers=False)
-model_vfe.optimise(method='adam', adam_lr=0.01, maxiter=10000, reinit_hypers=False)
+model_vfe.optimise(method='adam', adam_lr=0.01, maxiter=20000, reinit_hypers=False)
 opt_hypers = model_vfe.get_hypers()
 plot_latent(model_vfe, y, 'VFE')
 
@@ -126,7 +125,7 @@ for alpha in alphas:
     model_aep.update_hypers(aep_hypers)
     # optimise
     # model_aep.optimise(method='L-BFGS-B', alpha=alpha, maxiter=10000, reinit_hypers=False)
-    model_aep.optimise(method='adam', alpha=alpha, adam_lr=0.01, maxiter=10000, reinit_hypers=False)
+    model_aep.optimise(method='adam', alpha=alpha, adam_lr=0.01, maxiter=20000, reinit_hypers=False)
     opt_hypers = model_aep.get_hypers()
     plot_latent(model_aep, y, 'AEP_%.3f'%alpha)
 
