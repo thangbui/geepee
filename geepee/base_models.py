@@ -8,7 +8,7 @@ from scipy.spatial.distance import cdist
 
 from config import *
 from utils import ObjectiveWrapper, flatten_dict, unflatten_dict, adam
-from utils import profile, PCA_reduce
+from utils import profile, PCA_reduce, matrixInverse
 from lik_layers import Gauss_Layer, Probit_Layer, Gauss_Emis
 from kernels import *
 
@@ -461,10 +461,12 @@ class Base_SGP_Layer(object):
         if self.nat_param:
             self.Suinv = self.Kuuinv + self.theta_1
             self.Su = np.linalg.inv(self.Suinv)
+            # self.Su = matrixInverse(self.Suinv)
             self.mu = np.einsum('dab,db->da', self.Su, self.theta_2)
         else:
             self.Su = self.theta_1
             self.Suinv = np.linalg.inv(self.Su)
+            # self.Suinv = matrixInverse(self.Su)
             self.mu = self.theta_2
         self.Splusmm = self.Su + np.einsum('da,db->dab', self.mu, self.mu)
         self.A = np.einsum('ab,db->da', self.Kuuinv, self.mu)
@@ -504,9 +506,6 @@ class Base_SGP_Layer(object):
             deta1_R[d, :] = dtheta1_R_d.reshape((dtheta1_R_d.shape[0], ))
 
         return deta1_R, deta2, dKuuinv
-
-
-
 
     def init_hypers(self, x_train=None, key_suffix=''):
         """Summary
@@ -575,7 +574,6 @@ class Base_SGP_Layer(object):
             triu_ind = np.triu_indices(M)
             diag_ind = np.diag_indices(M)
             R[diag_ind] = np.log(R[diag_ind])
-            np.log(R[diag_ind])
             eta1_d = R[triu_ind].reshape((M * (M + 1) / 2,))
             eta2_d = theta2.reshape((M,))
             eta1_R[d, :] = eta1_d
@@ -612,9 +610,9 @@ class Base_SGP_Layer(object):
         params_zu_i = self.zu
 
         for d in range(Dout):
-            Rd = self.theta_1_R[d, :, :]
+            Rd = np.copy(self.theta_1_R[d, :, :])
             Rd[diag_ind] = np.log(Rd[diag_ind])
-            params_eta1_R[d, :] = Rd[triu_ind]
+            params_eta1_R[d, :] = np.copy(Rd[triu_ind])
 
         params['zu' + key_suffix] = self.zu
         params['eta1_R' + key_suffix] = params_eta1_R
@@ -640,7 +638,7 @@ class Base_SGP_Layer(object):
             theta_m_d = params['eta2' + key_suffix][d, :]
             theta_R_d = params['eta1_R' + key_suffix][d, :]
             R = np.zeros((M, M))
-            R[triu_ind] = theta_R_d.reshape(theta_R_d.shape[0], )
+            R[triu_ind] = np.copy(theta_R_d.reshape(theta_R_d.shape[0], ))
             R[diag_ind] = np.exp(R[diag_ind])
             self.theta_1_R[d, :, :] = R
             self.theta_1[d, :, :] = np.dot(R.T, R)
@@ -1407,10 +1405,6 @@ class Base_SGPSSM(Base_Model):
         Returns:
             TYPE: Description
         """
-        # TODO
-        if not self.updated:
-            self.dyn_layer.update_posterior()
-            self.updated = True
         mf, vf = self.dyn_layer.forward_prop_thru_post(inputs)
         return mf, vf
 
@@ -1424,11 +1418,6 @@ class Base_SGPSSM(Base_Model):
         Returns:
             TYPE: Description
         """
-        if not self.updated:
-            self.dyn_layer.update_posterior()
-            if self.gp_emi:
-                self.emi_layer.update_posterior()
-            self.updated = True
         mx = np.zeros((T, self.Din))
         vx = np.zeros((T, self.Din))
         my = np.zeros((T, self.Dout))
@@ -1469,12 +1458,6 @@ class Base_SGPSSM(Base_Model):
         Returns:
             TYPE: Description
         """
-        # TODO
-        if not self.updated:
-            self.dyn_layer.update_posterior()
-            if self.gp_emi:
-                self.emi_layer.update_posterior()
-            self.updated = True
         mf, vf = self.dyn_layer.forward_prop_thru_post(inputs)
         if self.gp_emi:
             mg, vg = self.emi_layer.forward_prop_thru_post(mf, vf)
@@ -1506,11 +1489,6 @@ class Base_SGPSSM(Base_Model):
         Returns:
             TYPE: Description
         """
-        if not self.updated:
-            self.dyn_layer.update_posterior()
-            if self.gp_emi:
-                self.emi_layer.update_posterior()
-            self.updated = True
         mx, vx = self.get_posterior_x()
         if self.Dcon_emi > 0:
             mx = np.hstack((mx, self.x_control))
@@ -1535,22 +1513,25 @@ class Base_SGPSSM(Base_Model):
         """
         # initialise latent variables and emission using a Gaussian LDS
         print 'init latent variable using LDS...'
-        from pylds.models import DefaultLDS
-        model = DefaultLDS(self.Dout, self.Din, self.Dcon_dyn)
-        model.add_data(y_train, inputs=self.x_control)
-        # Initialize with a few iterations of Gibbs
-        for _ in range(100):
-            model.resample_model()
-        # run EM
-        for _ in range(100):
-            model.EM_step()
+        if self.Din == self.Dout:
+            post_m = np.copy(y_train)
+        else:
+            from pylds.models import DefaultLDS
+            model = DefaultLDS(self.Dout, self.Din, self.Dcon_dyn)
+            model.add_data(y_train, inputs=self.x_control)
+            # Initialize with a few iterations of Gibbs
+            for _ in range(100):
+                model.resample_model()
+            # run EM
+            for _ in range(100):
+                model.EM_step()
 
-        s = model.states_list.pop()
-        s.info_E_step()
-        post_m = s.smoothed_mus
-        # post_v = np.diagonal(s.smoothed_sigmas, axis1=1, axis2=2)
-        # scale = np.std(post_m, axis=0)
-        # post_m = (post_m - np.mean(post_m, axis=0)) / scale
+            s = model.states_list.pop()
+            s.info_E_step()
+            post_m = s.smoothed_mus
+            # post_v = np.diagonal(s.smoothed_sigmas, axis1=1, axis2=2)
+            # scale = np.std(post_m, axis=0)
+            # post_m = (post_m - np.mean(post_m, axis=0)) / scale
         post_m = post_m
         post_v = 0.1 * np.ones_like(post_m)
         ssm_params = {'sn': np.log(0.01)}
@@ -1560,7 +1541,7 @@ class Base_SGPSSM(Base_Model):
             ssm_params['x_factor_1'] = post_1 / 3
             ssm_params['x_factor_2'] = np.log(post_2 / 3) / 2
         else:
-            ssm_params['x_factor_1'] = post_m
+            ssm_params['x_factor_1'] = np.copy(post_m)
             ssm_params['x_factor_2'] = np.log(post_v) / 2    
         # learn a GP mapping between hidden states
         print 'init latent function using GPR...'
@@ -1569,11 +1550,14 @@ class Base_SGPSSM(Base_Model):
         if self.Dcon_dyn > 0:
             x = np.hstack((x, self.x_control[:self.N - 1, :]))
         from vfe_models import SGPR
+        # from aep_models import SGPR
         reg = SGPR(x, y, self.M, 'Gaussian', self.nat_param)
-        reg.set_fixed_params(['sn', 'sf', 'ls', 'zu'])
-        # reg.set_fixed_params(['sn', 'sf'])
-        reg.optimise(method='L-BFGS-B', alpha=0.5, maxiter=500, disp=False)
+        # reg.set_fixed_params(['sn', 'sf', 'ls', 'zu'])
+        reg.set_fixed_params(['sn', 'sf'])
+        opt_params = reg.optimise(method='L-BFGS-B', maxiter=500, disp=False)
+        reg.update_hypers(opt_params)
         dyn_params = reg.sgp_layer.get_hypers(key_suffix='_dynamic')
+        
         # dyn_params['ls_dynamic'] -= np.log(5)
         # dyn_params['ls_dynamic'][self.Din:] = np.log(1)
 
@@ -1587,14 +1571,18 @@ class Base_SGPSSM(Base_Model):
             # TODO: deal with different likelihood here
             reg = SGPR(x, y, self.M, 'Gaussian', self.nat_param)
             reg.set_fixed_params(['sn', 'sf', 'ls', 'zu'])
-            reg.optimise(method='L-BFGS-B', alpha=0.5, maxiter=5000, disp=True)
+            opt_params = reg.optimise(method='L-BFGS-B', alpha=0.5, maxiter=5000, disp=False)
+            reg.update_hypers(opt_params)
             emi_params = reg.sgp_layer.get_hypers(key_suffix='_emission')
             # emi_params['ls_emission'] -= np.log(5)
             lik_params = self.lik_layer.init_hypers(key_suffix='_emission')
         else:
             emi_params = self.emi_layer.init_hypers(key_suffix='_emission')
             if isinstance(self.emi_layer, Gauss_Emis):
-                emi_params['C_emission'] = s.C
+                if self.Din == self.Dout:
+                    emi_params['C_emission'] = np.eye(self.Din)
+                else:
+                    emi_params['C_emission'] = s.C
         init_params = dict(dyn_params)
         init_params.update(emi_params)
         if self.gp_emi:

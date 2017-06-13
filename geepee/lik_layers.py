@@ -556,16 +556,18 @@ class Gauss_Emis():
         R = self.R
         Dout = self.Dout
         Vy = np.diag(R / alpha) + np.einsum('da,na,ab->ndb', C, vx, C.T)
-        Ly = np.linalg.cholesky(Vy)
         Ydiff = self.y[idxs, :] - np.einsum('da,na->nd', C, mx)
-
         VinvY = np.linalg.solve(Vy, Ydiff)
         quad_term = -0.5 * np.sum(Ydiff * VinvY)
-        Vlogdet_term = - np.sum(np.log(np.diagonal(Ly, axis1=1, axis2=2)))
-        Rlogdet_term = 0.5 * Nb * (1 - alpha) * np.sum(np.log(R))
-        const_term = - Nb * Dout * \
-            (0.5 * alpha * np.log(2 * np.pi) + np.log(alpha))
+        CVC = np.einsum('da,na,ab->ndb', C, vx, C.T)
+        CVCR = CVC / R
+        I = np.tile(np.eye(Dout)[np.newaxis, :, :], [Nb, 1, 1])
+        ICVCR = I + alpha * CVCR
+        Vlogdet_term = -0.5 * np.sum(np.linalg.slogdet(ICVCR)[1])
+        const_term = - Nb * Dout * 0.5 * alpha * np.log(2 * np.pi)
+        Rlogdet_term = - 0.5 * Nb * alpha * np.sum(np.log(R))
         logZ = const_term + Rlogdet_term + Vlogdet_term + quad_term
+        # print const_term / alpha, Rlogdet_term / alpha, Vlogdet_term / alpha, quad_term / alpha
 
         Vyinv = np.linalg.inv(Vy)
         dR = (-0.5 * np.sum(np.diagonal(Vyinv, axis1=1, axis2=2), axis=0)
@@ -616,6 +618,7 @@ class Gauss_Emis():
         CRC = np.dot(C.T, np.dot(np.diag(1 / R), C))
         term4 = - 0.5 * np.sum(np.sum(vx, axis=0) * np.diag(CRC))
         logZ = term1 + term2 + term3 + term4
+        # print term1, term2, term3, term4
 
         dR2 = - 0.5 * Nb / R
         dR3 = 0.5 * np.sum((yb - Cmx)**2, axis=0) / R**2

@@ -36,7 +36,7 @@ class SGP_Layer(Base_SGP_Layer):
         Suhatinv (TYPE): Description
     """
     def __init__(self, no_train, input_size, output_size, no_pseudo, 
-        nat_param=False):
+        nat_param=True):
         """Initialisation
         
         Args:
@@ -961,6 +961,7 @@ class SDGPR(Base_SDGPR):
 
         return energy, grad_all
 
+
 class SGPSSM(Base_SGPSSM):
     """Summary
     
@@ -1120,6 +1121,7 @@ class SGPSSM(Base_SGPSSM):
             raise NotImplementedError('propgation mode not implemented')
 
         if not self.gp_emi:
+            # pdb.set_trace()
             logZ_emi, emi_grad_input, emi_grad_hyper = emi_layer.compute_emission_tilted(
                 cav_up_mc, cav_up_vc, alpha, scale_logZ_emi, emi_idxs)
 
@@ -1169,10 +1171,6 @@ class SGPSSM(Base_SGPSSM):
         energy = logZ_dyn + logZ_emi + x_contrib + dyn_contrib + emi_contrib
         for p in self.fixed_params:
             grad_all[p] = np.zeros_like(grad_all[p])
-
-        # energy /= self.N
-        # for key in grad_all.keys():
-        #     grad_all[key] /= self.N
 
         return energy, grad_all
 
