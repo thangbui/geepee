@@ -101,34 +101,18 @@ y_train = np.reshape(y, [y.shape[0], 1])
 Dlatent = 1
 Dobs = 1
 M = 15
-# C = 1*np.ones((1, 1))
-# R = np.ones(1)*np.log(obs_noise)/2
-# lls = np.reshape(np.log(2), [Dlatent, ])
-# lsf = np.reshape(np.log(2), [1, ])
-# zu = np.linspace(-1, 5, M)
-# zu = np.reshape(zu, [M, 1])
-# lsn = np.log(process_noise)/2
-# params = {'ls': lls, 'sf': lsf, 'sn': lsn, 'R_emission': R, 'C_emission': C, 'zu': zu}
 
 # create VFE model
 np.random.seed(42)
 model_vfe = vfe.SGPSSM(y_train, Dlatent, M, 
     lik='Gaussian', prior_mean=0, prior_var=1)
 vfe_hypers = model_vfe.init_hypers(y_train)
-# for key in params.keys():
-#     vfe_hypers[key] = params[key]
-# pdb.set_trace()
 model_vfe.update_hypers(vfe_hypers)
 # optimise
-# model_vfe.set_fixed_params(['C_emission'])
 # model_vfe.optimise(method='L-BFGS-B', maxiter=10000, reinit_hypers=False)
 model_vfe.optimise(method='adam', adam_lr=0.01, maxiter=10000, reinit_hypers=False)
 opt_hypers = model_vfe.get_hypers()
 plot_latent(model_vfe, y, 'VFE')
-# print model_vfe.dyn_layer.mu, model_vfe.dyn_layer.Su
-# print model_vfe.dyn_layer.A
-# print model_vfe.dyn_layer.B_sto
-# print model_vfe.dyn_layer.B_det
 
 alphas = [0.001, 0.05, 0.2, 0.5, 1.0]
 # alphas = [0.05]
@@ -139,33 +123,10 @@ for alpha in alphas:
     model_aep = aep.SGPSSM(y_train, Dlatent, M, 
         lik='Gaussian', prior_mean=0, prior_var=1)
     aep_hypers = model_aep.init_hypers(y_train)
-    # for key in params.keys():
-    #     aep_hypers[key] = params[key]
-    # pdb.set_trace()
     model_aep.update_hypers(aep_hypers)
-    # print model_aep.dyn_layer.mu, model_aep.dyn_layer.Su
-    # print model_vfe.dyn_layer.theta_1 - model_aep.dyn_layer.theta_1
-    # print model_vfe.dyn_layer.theta_2 - model_aep.dyn_layer.theta_2
-    # print model_vfe.dyn_layer.ls - model_aep.dyn_layer.ls
-    # print model_vfe.dyn_layer.Kuu - model_aep.dyn_layer.Kuu
-    # print model_vfe.dyn_layer.mu - model_aep.dyn_layer.mu
-    # print model_vfe.dyn_layer.Su - model_aep.dyn_layer.Su
-
-    # vfe_params = model_vfe.dyn_layer.get_hypers()
-    # aep_params = model_aep.dyn_layer.get_hypers()
-    # for key in vfe_params.keys():
-    #     print key, vfe_params[key] - aep_params[key]
-    # for key in vfe_hypers.keys():
-    #     print key, vfe_hypers[key] - aep_hypers[key]
-    # pdb.set_trace()
-
-    # print model_aep.dyn_layer.A
-    # print model_aep.dyn_layer.B_sto
-    # print model_aep.dyn_layer.B_det
     # optimise
-    # model_aep.set_fixed_params(['C_emission'])
     # model_aep.optimise(method='L-BFGS-B', alpha=alpha, maxiter=10000, reinit_hypers=False)
-    model_aep.optimise(method='adam', alpha=alpha, adam_lr=0.01, maxiter=10, reinit_hypers=False)
+    model_aep.optimise(method='adam', alpha=alpha, adam_lr=0.01, maxiter=10000, reinit_hypers=False)
     opt_hypers = model_aep.get_hypers()
     plot_latent(model_aep, y, 'AEP_%.3f'%alpha)
 
