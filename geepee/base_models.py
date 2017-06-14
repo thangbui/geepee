@@ -1534,7 +1534,7 @@ class Base_SGPSSM(Base_Model):
             # post_m = (post_m - np.mean(post_m, axis=0)) / scale
         post_m = post_m
         post_v = 0.1 * np.ones_like(post_m)
-        ssm_params = {'sn': np.log(0.01)}
+        ssm_params = {'sn': np.log(0.01)*np.ones(1)}
         if self.nat_param:
             post_2 = 1.0 / post_v
             post_1 = post_2 * post_m

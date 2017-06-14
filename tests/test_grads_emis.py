@@ -240,6 +240,5 @@ def test_gauss_emis_limit():
 if __name__ == '__main__':
     for i in range(10):
         test_gauss_emis_log_tilted()
-        # test_gauss_emis_log_lik()
-
-    # test_gauss_emis_limit()
+        test_gauss_emis_log_lik()
+    test_gauss_emis_limit()

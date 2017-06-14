@@ -1168,6 +1168,8 @@ class SGPSSM(Base_SGPSSM):
         phi_cavity_x = self.compute_phi_cavity_x(alpha)
         x_contrib = phi_prior_x + phi_poste_x + phi_cavity_x
         energy = logZ_dyn + logZ_emi + x_contrib + dyn_contrib + emi_contrib
+        # print logZ_dyn, logZ_emi, x_contrib, dyn_contrib, emi_contrib
+        # print phi_prior_x, phi_poste_x, phi_cavity_x
         for p in self.fixed_params:
             grad_all[p] = np.zeros_like(grad_all[p])
 
@@ -1378,6 +1380,7 @@ class SGPSSM(Base_SGPSSM):
         post_1 = self.x_post_1
         post_2 = self.x_post_2
         phi_post = 0.5 * (post_1**2 / post_2 - np.log(post_2))
+        # print np.sum(phi_post)
         scale_x_post = - (1.0 - 1.0 / alpha) * np.ones((self.N, 1))
         scale_x_post[0:self.N - 1] = scale_x_post[0:self.N - 1] + 1 / alpha
         scale_x_post[1:self.N] = scale_x_post[1:self.N] + 1 / alpha
@@ -1392,11 +1395,11 @@ class SGPSSM(Base_SGPSSM):
         Returns:
             TYPE: Description
         """
-        scale = -1.0 / alpha
+        scale = - 1.0 / alpha
         cav_1 = self.x_post_1 - alpha * self.x_factor_1
         cav_2 = self.x_post_2 - alpha * self.x_factor_2
         phi_cav = 0.5 * (cav_1**2 / cav_2 - np.log(cav_2))
-
+        # print np.sum(phi_cav)
         scale_x_cav = scale * np.ones((self.N, 1))
         scale_x_cav[0:self.N - 1] = scale_x_cav[0:self.N - 1] + scale
         scale_x_cav[1:self.N] = scale_x_cav[1:self.N] + scale

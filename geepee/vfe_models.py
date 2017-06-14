@@ -1086,6 +1086,7 @@ class SGPSSM(Base_SGPSSM):
         else:
             emi_KL = 0
         energy = logZ_dyn + logZ_emi + x_entrop + dyn_KL + emi_KL
+        # print logZ_dyn, logZ_emi, x_entrop, dyn_KL, emi_KL
         for p in self.fixed_params:
             grad_all[p] = np.zeros_like(grad_all[p])
 

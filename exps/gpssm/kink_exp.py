@@ -84,18 +84,49 @@ def plot_latent(model, y, plot_title=''):
     mx, vx = model.get_posterior_x()
     ax.set_xlabel(r'$x_{t-1}$')
     ax.set_ylabel(r'$x_{t}$')
-    # ax.set_xlim([-4, 6])
+    ax.set_xlim([-4, 6])
     # ax.set_ylim([-7, 7])
     plt.title(plot_title)
     # plt.savefig('/tmp/kink_'+plot_title+'.pdf')
     plt.savefig('/tmp/kink_'+plot_title+'.png')
 
+def plot_prediction(model, y_train, y_test, plot_title=''):
+    T = y_test.shape[0]
+    mx, vx, my, vy_noiseless, vy = model.predict_forward(T)
+    T_train = y_train.shape[0]
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    ax.plot(np.arange(T_train), y_train[:, 0], 'k+-')
+    ttest = np.arange(T_train, T_train+T)
+    # pdb.set_trace()
+    ax.plot(ttest, my[:, 0], '-', color='r')
+    ax.fill_between(
+        ttest, 
+        my[:, 0] + 2*np.sqrt(vy_noiseless[:, 0]),
+        my[:, 0] - 2*np.sqrt(vy_noiseless[:, 0]),
+        alpha=0.3, edgecolor='r', facecolor='r')
+
+    ax.fill_between(
+        ttest, 
+        my[:, 0] + 2*np.sqrt(vy[:, 0]),
+        my[:, 0] - 2*np.sqrt(vy[:, 0]),
+        alpha=0.1, edgecolor='r', facecolor='r')
+    ax.plot(ttest, y_test, 'bo')
+    ax.set_xlim([T_train-10, T_train + T])
+    plt.title(plot_title)
+    # plt.savefig('/tmp/kink_pred_'+plot_title+'.pdf')
+    plt.savefig('/tmp/kink_pred_'+plot_title+'.png')
+
+
 # generate a dataset from the kink function above
 T = 200
+Ttest = 30
 process_noise = 0.2
 obs_noise = 0.1
-(xtrue, x, y) = kink(T, process_noise, obs_noise)
-y_train = np.reshape(y, [y.shape[0], 1])
+(xtrue, x, y) = kink(T+Ttest, process_noise, obs_noise)
+y_train = y[:T]
+y_test = y[T:]
+y_train = np.reshape(y_train, [y_train.shape[0], 1])
 
 Dlatent = 1
 Dobs = 1
@@ -111,10 +142,11 @@ model_vfe.update_hypers(vfe_hypers)
 # model_vfe.optimise(method='L-BFGS-B', maxiter=10000, reinit_hypers=False)
 model_vfe.optimise(method='adam', adam_lr=0.01, maxiter=20000, reinit_hypers=False)
 opt_hypers = model_vfe.get_hypers()
-plot_latent(model_vfe, y, 'VFE')
+plot_latent(model_vfe, y_train, 'VFE')
+plot_prediction(model_vfe, y_train, y_test, 'VFE')
 
 alphas = [0.001, 0.05, 0.2, 0.5, 1.0]
-# alphas = [0.05]
+# alphas = [1]
 for alpha in alphas:
     print 'alpha = %.3f' % alpha
     # create AEP model
@@ -127,7 +159,8 @@ for alpha in alphas:
     # model_aep.optimise(method='L-BFGS-B', alpha=alpha, maxiter=10000, reinit_hypers=False)
     model_aep.optimise(method='adam', alpha=alpha, adam_lr=0.01, maxiter=20000, reinit_hypers=False)
     opt_hypers = model_aep.get_hypers()
-    plot_latent(model_aep, y, 'AEP_%.3f'%alpha)
+    plot_latent(model_aep, y_train, 'AEP_%.3f'%alpha)
+    plot_prediction(model_aep, y_train, y_test, 'AEP_%.3f'%alpha)
 
     # # create EP model
     # model_ep = ep.SGPSSM(y_train, Dlatent, M, 
