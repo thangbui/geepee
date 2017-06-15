@@ -959,6 +959,10 @@ class SDGPR(Base_SDGPR):
         for p in self.fixed_params:
             grad_all[p] = np.zeros_like(grad_all[p])
 
+        energy /= N
+        for key in grad_all.keys():
+            grad_all[key] /= N
+
         return energy, grad_all
 
 

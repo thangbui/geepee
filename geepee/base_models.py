@@ -102,7 +102,7 @@ class Base_Model(object):
                 final_params = results
             else:
                 options = {'maxfun': maxfun, 'maxiter': maxiter,
-                           'disp': disp, 'gtol': 1e-8}
+                           'disp': disp, 'gtol': 1e-5, 'ftol': 1e-5}
                 results = minimize(
                     fun=objective_wrapper,
                     x0=init_params_vec,
@@ -247,10 +247,7 @@ class Base_SGP_Layer(object):
                 # return self._forward_prop_random_thru_post_lin(mx, vx,
                 # return_info)
             elif mode == PROP_MC:
-                raise NotImplementedError(
-                    'Prediction with sampling not implemented TODO')
-                # return self._forward_prop_random_thru_post_mc(mx, vx,
-                # return_info)
+                return self._forward_prop_random_thru_post_mc(mx, vx, return_info)
             else:
                 raise NotImplementedError('unknown propagation mode')
 
@@ -298,7 +295,7 @@ class Base_SGP_Layer(object):
         else:
             return mout, vout
 
-    def _forward_prop_random_thru_post_mc(self, mx, vx):
+    def _forward_prop_random_thru_post_mc(self, mx, vx, return_info=False):
         """Propagate uncertain inputs thru posterior, using simple Monte Carlo
         
         Args:

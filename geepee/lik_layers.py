@@ -1,6 +1,7 @@
 import numpy as np
 from scipy import special
 from scipy.stats import norm
+import pdb
 
 from config import *
 
@@ -203,7 +204,7 @@ class Gauss_Layer(Lik_Layer):
 
             return exptn_sum, de_dm, de_dv
         elif mout.ndim == 3:
-            # TODO
+            pdb.set_trace()
             return logZ, dlogZ_dm, dlogZ_dv
         else:
             raise RuntimeError('invalid ndim, ndim=%d' % mout.ndim)

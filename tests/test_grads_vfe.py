@@ -126,6 +126,7 @@ def test_gpr_vfe_gaussian_collapsed():
     print 'gpr vfe gaussian collapsed'
     check_grad(params, model, alpha=alpha)
 
+
 def test_gpr_vfe_gaussian(nat_param=True, stoc=False):
     N_train = 20
     M = 10
@@ -478,20 +479,20 @@ if __name__ == '__main__':
     # test_gplvm_vfe_gaussian(nat_param=False, stoc=False, prop_mode=PROP_MM)
     # test_gplvm_vfe_gaussian(nat_param=False, stoc=True, prop_mode=PROP_MM)
 
-    # test_gplvm_vfe_gaussian(nat_param=True, stoc=False, prop_mode=PROP_MC)
-    # test_gplvm_vfe_gaussian(nat_param=True, stoc=True, prop_mode=PROP_MC)
-    # test_gplvm_vfe_gaussian(nat_param=False, stoc=False, prop_mode=PROP_MC)
-    # test_gplvm_vfe_gaussian(nat_param=False, stoc=True, prop_mode=PROP_MC)
+    test_gplvm_vfe_gaussian(nat_param=True, stoc=False, prop_mode=PROP_MC)
+    test_gplvm_vfe_gaussian(nat_param=True, stoc=True, prop_mode=PROP_MC)
+    test_gplvm_vfe_gaussian(nat_param=False, stoc=False, prop_mode=PROP_MC)
+    test_gplvm_vfe_gaussian(nat_param=False, stoc=True, prop_mode=PROP_MC)
 
     # test_gplvm_vfe_probit(nat_param=True, stoc=False, prop_mode=PROP_MM)
     # test_gplvm_vfe_probit(nat_param=True, stoc=True, prop_mode=PROP_MM)
     # test_gplvm_vfe_probit(nat_param=False, stoc=False, prop_mode=PROP_MM)
     # test_gplvm_vfe_probit(nat_param=False, stoc=True, prop_mode=PROP_MM)
     
-    # test_gplvm_vfe_probit(nat_param=True, stoc=False, prop_mode=PROP_MC)
-    # test_gplvm_vfe_probit(nat_param=True, stoc=True, prop_mode=PROP_MC)
-    # test_gplvm_vfe_probit(nat_param=False, stoc=False, prop_mode=PROP_MC)
-    # test_gplvm_vfe_probit(nat_param=False, stoc=True, prop_mode=PROP_MC)
+    test_gplvm_vfe_probit(nat_param=True, stoc=False, prop_mode=PROP_MC)
+    test_gplvm_vfe_probit(nat_param=True, stoc=True, prop_mode=PROP_MC)
+    test_gplvm_vfe_probit(nat_param=False, stoc=False, prop_mode=PROP_MC)
+    test_gplvm_vfe_probit(nat_param=False, stoc=True, prop_mode=PROP_MC)
 
     # plot_gplvm_vfe_probit_stochastic()
     # plot_gplvm_vfe_gaussian_stochastic()
@@ -537,20 +538,20 @@ if __name__ == '__main__':
     # # test_dgprh_vfe_probit(nat_param=False, stoc=True)
 
     # TODO: GPSSM, prop MC
-    test_gpssm_linear_vfe_gaussian_kink(nat_param=True, stoc=False, prop_mode=PROP_MM)
-    test_gpssm_linear_vfe_gaussian_kink(nat_param=True, stoc=True, prop_mode=PROP_MM)
-    test_gpssm_linear_vfe_gaussian_kink(nat_param=False, stoc=False, prop_mode=PROP_MM)
-    test_gpssm_linear_vfe_gaussian_kink(nat_param=False, stoc=True, prop_mode=PROP_MM)
+    # test_gpssm_linear_vfe_gaussian_kink(nat_param=True, stoc=False, prop_mode=PROP_MM)
+    # test_gpssm_linear_vfe_gaussian_kink(nat_param=True, stoc=True, prop_mode=PROP_MM)
+    # test_gpssm_linear_vfe_gaussian_kink(nat_param=False, stoc=False, prop_mode=PROP_MM)
+    # test_gpssm_linear_vfe_gaussian_kink(nat_param=False, stoc=True, prop_mode=PROP_MM)
 
     # test_gpssm_linear_vfe_gaussian_kink(nat_param=True, stoc=False, prop_mode=PROP_MC)
     # test_gpssm_linear_vfe_gaussian_kink(nat_param=True, stoc=True, prop_mode=PROP_MC)
     # test_gpssm_linear_vfe_gaussian_kink(nat_param=False, stoc=False, prop_mode=PROP_MC)
     # test_gpssm_linear_vfe_gaussian_kink(nat_param=False, stoc=True, prop_mode=PROP_MC)
 
-    test_gpssm_gp_vfe_gaussian_kink(nat_param=True, stoc=False, prop_mode=PROP_MM)
-    test_gpssm_gp_vfe_gaussian_kink(nat_param=True, stoc=True, prop_mode=PROP_MM)
-    test_gpssm_gp_vfe_gaussian_kink(nat_param=False, stoc=False, prop_mode=PROP_MM)
-    test_gpssm_gp_vfe_gaussian_kink(nat_param=False, stoc=True, prop_mode=PROP_MM)
+    # test_gpssm_gp_vfe_gaussian_kink(nat_param=True, stoc=False, prop_mode=PROP_MM)
+    # test_gpssm_gp_vfe_gaussian_kink(nat_param=True, stoc=True, prop_mode=PROP_MM)
+    # test_gpssm_gp_vfe_gaussian_kink(nat_param=False, stoc=False, prop_mode=PROP_MM)
+    # test_gpssm_gp_vfe_gaussian_kink(nat_param=False, stoc=True, prop_mode=PROP_MM)
 
     # test_gpssm_gp_vfe_gaussian_kink(nat_param=True, stoc=False, prop_mode=PROP_MC)
     # test_gpssm_gp_vfe_gaussian_kink(nat_param=True, stoc=True, prop_mode=PROP_MC)

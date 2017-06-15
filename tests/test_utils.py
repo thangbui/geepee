@@ -41,7 +41,7 @@ class bcolors:
 
 def print_message(message_str, computed, numerical):
     diff = (computed - numerical) / numerical
-    if np.abs(diff) < 1e-4 or ((np.isinf(diff) or np.isnan(diff) or np.abs(diff) > 1e-4) and np.abs(numerical) < 1e-4):
+    if np.abs(diff) < 1e-4 or ((np.isinf(diff) or np.isnan(diff) or (np.abs(diff) < 1 and np.abs(diff) > 1e-4)) and np.abs(numerical) < 1e-4):
         pass
     else:
         print(bcolors.FAIL + '%s, computed=%.5f, numerical=%.5f, rel. diff=%.5f' % (message_str, computed, numerical, diff) + bcolors.ENDC)
@@ -54,7 +54,7 @@ def check_grad(params, model, stochastic=False, alpha=0.5, stoc_seed=42, prop_mo
             N = int(np.ceil(model.N/3.0))
     else:
         N = model.N
-    eps = 1e-5
+    eps = 1e-4
     if stochastic:
         np.random.seed(stoc_seed)
     logZ, grad_all = model.objective_function(params, N, alpha=alpha, prop_mode=prop_mode)
