@@ -378,8 +378,9 @@ def test_gpssm_linear_vfe_gaussian_kink(nat_param=True, stoc=False, prop_mode=PR
     (xtrue, x, y) = kink(N_train, process_noise, obs_noise)
     y_train = np.reshape(y, [y.shape[0], 1])
     # TODO nat_param=nat_param
-    lvm = vfe.SGPSSM(y_train, Q, M, lik='Gaussian', gp_emi=False)
-    lvm.optimise(method='adam', maxiter=500, adam_lr=0.08)
+    lvm = vfe.SGPSSM(y_train, Q, M, lik='Gaussian', gp_emi=False, nat_param=nat_param)
+
+    lvm.optimise(method='adam', maxiter=1000, adam_lr=0.1)
     params = lvm.get_hypers()
 
     # # init hypers, inducing points and q(u) params
@@ -398,10 +399,13 @@ def test_gpssm_gp_vfe_gaussian_kink(nat_param=True, stoc=False, prop_mode=PROP_M
     D = 1
     (xtrue, x, y) = kink(N_train, process_noise, obs_noise)
     y_train = np.reshape(y, [y.shape[0], 1])
-    lvm = vfe.SGPSSM(y_train, Q, M, lik='Gaussian', gp_emi=True)
+    lvm = vfe.SGPSSM(y_train, Q, M, lik='Gaussian', gp_emi=True, nat_param=nat_param)
 
-    # init hypers, inducing points and q(u) params
-    params = lvm.init_hypers(y_train)
+    lvm.optimise(method='adam', maxiter=1000, adam_lr=0.1)
+    params = lvm.get_hypers()
+
+    # # init hypers, inducing points and q(u) params
+    # params = lvm.init_hypers(y_train)
     
     print 'gplvm gp emis vfe kink nat_param %r stoc %r prop_mode %s' % (nat_param, stoc, prop_mode)
     check_grad(params, lvm, stochastic=stoc, prop_mode=prop_mode)
@@ -479,20 +483,20 @@ if __name__ == '__main__':
     # test_gplvm_vfe_gaussian(nat_param=False, stoc=False, prop_mode=PROP_MM)
     # test_gplvm_vfe_gaussian(nat_param=False, stoc=True, prop_mode=PROP_MM)
 
-    test_gplvm_vfe_gaussian(nat_param=True, stoc=False, prop_mode=PROP_MC)
-    test_gplvm_vfe_gaussian(nat_param=True, stoc=True, prop_mode=PROP_MC)
-    test_gplvm_vfe_gaussian(nat_param=False, stoc=False, prop_mode=PROP_MC)
-    test_gplvm_vfe_gaussian(nat_param=False, stoc=True, prop_mode=PROP_MC)
+    # test_gplvm_vfe_gaussian(nat_param=True, stoc=False, prop_mode=PROP_MC)
+    # test_gplvm_vfe_gaussian(nat_param=True, stoc=True, prop_mode=PROP_MC)
+    # test_gplvm_vfe_gaussian(nat_param=False, stoc=False, prop_mode=PROP_MC)
+    # test_gplvm_vfe_gaussian(nat_param=False, stoc=True, prop_mode=PROP_MC)
 
     # test_gplvm_vfe_probit(nat_param=True, stoc=False, prop_mode=PROP_MM)
     # test_gplvm_vfe_probit(nat_param=True, stoc=True, prop_mode=PROP_MM)
     # test_gplvm_vfe_probit(nat_param=False, stoc=False, prop_mode=PROP_MM)
     # test_gplvm_vfe_probit(nat_param=False, stoc=True, prop_mode=PROP_MM)
     
-    test_gplvm_vfe_probit(nat_param=True, stoc=False, prop_mode=PROP_MC)
-    test_gplvm_vfe_probit(nat_param=True, stoc=True, prop_mode=PROP_MC)
-    test_gplvm_vfe_probit(nat_param=False, stoc=False, prop_mode=PROP_MC)
-    test_gplvm_vfe_probit(nat_param=False, stoc=True, prop_mode=PROP_MC)
+    # test_gplvm_vfe_probit(nat_param=True, stoc=False, prop_mode=PROP_MC)
+    # test_gplvm_vfe_probit(nat_param=True, stoc=True, prop_mode=PROP_MC)
+    # test_gplvm_vfe_probit(nat_param=False, stoc=False, prop_mode=PROP_MC)
+    # test_gplvm_vfe_probit(nat_param=False, stoc=True, prop_mode=PROP_MC)
 
     # plot_gplvm_vfe_probit_stochastic()
     # plot_gplvm_vfe_gaussian_stochastic()
@@ -548,14 +552,14 @@ if __name__ == '__main__':
     # test_gpssm_linear_vfe_gaussian_kink(nat_param=False, stoc=False, prop_mode=PROP_MC)
     # test_gpssm_linear_vfe_gaussian_kink(nat_param=False, stoc=True, prop_mode=PROP_MC)
 
-    # test_gpssm_gp_vfe_gaussian_kink(nat_param=True, stoc=False, prop_mode=PROP_MM)
-    # test_gpssm_gp_vfe_gaussian_kink(nat_param=True, stoc=True, prop_mode=PROP_MM)
-    # test_gpssm_gp_vfe_gaussian_kink(nat_param=False, stoc=False, prop_mode=PROP_MM)
-    # test_gpssm_gp_vfe_gaussian_kink(nat_param=False, stoc=True, prop_mode=PROP_MM)
+    test_gpssm_gp_vfe_gaussian_kink(nat_param=True, stoc=False, prop_mode=PROP_MM)
+    test_gpssm_gp_vfe_gaussian_kink(nat_param=True, stoc=True, prop_mode=PROP_MM)
+    test_gpssm_gp_vfe_gaussian_kink(nat_param=False, stoc=False, prop_mode=PROP_MM)
+    test_gpssm_gp_vfe_gaussian_kink(nat_param=False, stoc=True, prop_mode=PROP_MM)
 
-    # test_gpssm_gp_vfe_gaussian_kink(nat_param=True, stoc=False, prop_mode=PROP_MC)
-    # test_gpssm_gp_vfe_gaussian_kink(nat_param=True, stoc=True, prop_mode=PROP_MC)
-    # test_gpssm_gp_vfe_gaussian_kink(nat_param=False, stoc=False, prop_mode=PROP_MC)
-    # test_gpssm_gp_vfe_gaussian_kink(nat_param=False, stoc=True, prop_mode=PROP_MC)
+    test_gpssm_gp_vfe_gaussian_kink(nat_param=True, stoc=False, prop_mode=PROP_MC)
+    test_gpssm_gp_vfe_gaussian_kink(nat_param=True, stoc=True, prop_mode=PROP_MC)
+    test_gpssm_gp_vfe_gaussian_kink(nat_param=False, stoc=False, prop_mode=PROP_MC)
+    test_gpssm_gp_vfe_gaussian_kink(nat_param=False, stoc=True, prop_mode=PROP_MC)
 
     # plot_gpssm_linear_vfe_gaussian_stochastic()

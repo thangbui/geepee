@@ -660,6 +660,10 @@ class SGPR(Base_SGPR):
         for p in self.fixed_params:
             grad_all[p] = np.zeros_like(grad_all[p])
 
+        energy /= N
+        for key in grad_all.keys():
+            grad_all[key] /= N
+
         return energy, grad_all
 
 
@@ -1177,6 +1181,10 @@ class SGPSSM(Base_SGPSSM):
         for p in self.fixed_params:
             grad_all[p] = np.zeros_like(grad_all[p])
 
+        energy /= N
+        for key in grad_all.keys():
+            grad_all[key] /= N
+
         return energy, grad_all
 
     def compute_posterior_grad_x(self, alpha):
@@ -1582,6 +1590,10 @@ class SDGPR_H(Base_Model):
 
         for p in self.fixed_params:
             grad_all[p] = np.zeros_like(grad_all[p])
+
+        energy /= N
+        for key in grad_all.keys():
+            grad_all[key] /= N
 
         return energy, grad_all
 

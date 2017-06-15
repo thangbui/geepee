@@ -837,7 +837,7 @@ class Base_SGPLVM(Base_Model):
         # TODO: alternatitve method for non real-valued data
         post_m = PCA_reduce(y_train, self.Din)
         post_m_mean = np.mean(post_m, axis=0)
-        post_m_std = np.std(post_m, axis=0)
+        post_m_std = np.std(post_m, axis=0) + 1e-5
         post_m = (post_m - post_m_mean) / post_m_std
         post_v = 0.1 * np.ones_like(post_m)
         x_params = {}
@@ -1642,12 +1642,11 @@ class Base_SGPSSM(Base_Model):
             grad_2 = - dm * post_1 / post_2**2 - dv / post_2**2
             scale_x = 3.0 * np.ones((idxs.shape[0], 1))
             scale_x[np.where(idxs == 0)[0]] = 2
-            scale_x[np.where(idxs == self.N)[0]] = 2
+            scale_x[np.where(idxs == self.N-1)[0]] = 2
             grad_1 = grad_1 * scale_x
             grad_2 = grad_2 * scale_x
             grads_x_1[idxs, :] = grad_1
             grads_x_2[idxs, :] = grad_2 * 2 * self.x_factor_2[idxs, :]
-            
         else:
             grads_x_1[idxs, :] += dm
             grads_x_2[idxs, :] += dv

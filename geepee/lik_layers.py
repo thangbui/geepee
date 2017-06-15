@@ -192,9 +192,9 @@ class Gauss_Layer(Lik_Layer):
         Raises:
             RuntimeError: Description
         """
+        sn2 = np.exp(2.0 * self.sn)
         # real valued data, gaussian lik
         if mout.ndim == 2:
-            sn2 = np.exp(2.0 * self.sn)
             term1 = -0.5 * np.log(2 * np.pi * sn2)
             term2 = -0.5 / sn2 * (y**2 - 2 * y * mout + mout**2 + vout)
             de_dm = 1.0 / sn2 * (y - mout)
@@ -204,23 +204,31 @@ class Gauss_Layer(Lik_Layer):
 
             return exptn_sum, de_dm, de_dv
         elif mout.ndim == 3:
-            pdb.set_trace()
+            term1 = - 0.5 * np.log(2*np.pi*sn2)
+            term2 = - 0.5 * ((y - mout) ** 2 + vout) / sn2
+            sumterm = term1 + term2
+            logZ = np.sum(np.mean(sumterm, axis=0))
+            dlogZ_dm = (y - mout) / sn2 / mout.shape[0]
+            dlogZ_dv = - 0.5 / sn2 * np.ones_like(vout) / mout.shape[0]
             return logZ, dlogZ_dm, dlogZ_dv
         else:
             raise RuntimeError('invalid ndim, ndim=%d' % mout.ndim)
 
     def backprop_grads_log_lik_exp(self, m, v, dm, dv, y, scale=1.0):
         # real valued data, gaussian lik
+        sn2 = np.exp(2.0 * self.sn)
         if m.ndim == 2:
-            sn2 = np.exp(2.0 * self.sn)
             term1 = -1
             term2 = 1 / sn2 * (y**2 - 2 * y * m + m**2 + v)
             dsn = term1 + term2
             dsn = scale * np.sum(dsn)
             return {'sn': dsn}
-        elif mout.ndim == 3:
-            # TODO
-            return logZ, dlogZ_dm, dlogZ_dv
+        elif m.ndim == 3:
+            term1 = - 1
+            term2 =  ((y - m) ** 2 + v) / sn2
+            dsn = term1 + term2
+            dsn = scale * np.sum(dsn) / m.shape[0]
+            return {'sn': dsn}
         else:
             raise RuntimeError('invalid ndim, ndim=%d' % mout.ndim)
 
@@ -397,8 +405,6 @@ class Probit_Layer(Lik_Layer):
             gh_w = gh_w[:, np.newaxis, np.newaxis] / np.sqrt(np.pi)
             v_expand = v[np.newaxis, :, :]
             m_expand = m[np.newaxis, :, :]
-            # m_expand = np.zeros_like(m_expand)
-            # v_expand = np.ones_like(v_expand)
             ts = gh_x * np.sqrt(2 * v_expand) + m_expand
             logcdfs = norm.logcdf(ts * y)
             prods = gh_w * logcdfs
@@ -411,10 +417,25 @@ class Probit_Layer(Lik_Layer):
             dts_dv = 0.5 * gh_x * np.sqrt(2 / v_expand)
             dm = np.sum(grad_cdfs * dts_dm, axis=0)
             dv = np.sum(grad_cdfs * dts_dv, axis=0)
-            # dm = np.zeros_like(dm)
-            # dv = np.zeros_like(dv) 
         else:
-            raise NotImplementedError('TODO')
+            gh_x, gh_w = self._gh_points(GH_DEGREE)
+            gh_x = gh_x[:, np.newaxis, np.newaxis, np.newaxis]
+            gh_w = gh_w[:, np.newaxis, np.newaxis, np.newaxis] / np.sqrt(np.pi)
+            v_expand = v[np.newaxis, :, :, :]
+            m_expand = m[np.newaxis, :, :, :]
+            ts = gh_x * np.sqrt(2 * v_expand) + m_expand
+            logcdfs = norm.logcdf(ts * y)
+            prods = gh_w * logcdfs
+            prods_mean = np.mean(prods, axis=1)
+            loglik = np.sum(prods_mean)
+
+            pdfs = norm.pdf(ts * y)
+            cdfs = norm.cdf(ts * y)
+            grad_cdfs = y * gh_w * pdfs / cdfs
+            dts_dm = 1
+            dts_dv = 0.5 * gh_x * np.sqrt(2 / v_expand)
+            dm = np.sum(grad_cdfs * dts_dm, axis=0) / m.shape[0]
+            dv = np.sum(grad_cdfs * dts_dv, axis=0) / m.shape[0]
 
         return loglik, dm, dv
 

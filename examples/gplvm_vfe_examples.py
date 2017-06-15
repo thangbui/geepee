@@ -1,5 +1,5 @@
-# import matplotlib
-# matplotlib.use('Agg')
+import matplotlib
+matplotlib.use('Agg')
 print "importing stuff..."
 import numpy as np
 import pdb
@@ -49,7 +49,8 @@ def run_cluster_MM(nat_param=True):
     plt.scatter(mx[:, inds[0]], mx[:, inds[1]], c=labels)
     zu = lvm.sgp_layer.zu
     plt.plot(zu[:, inds[0]], zu[:, inds[1]], 'ko')
-    plt.show()
+    # plt.show()
+    plt.savefig('/tmp/gplvm_cluster_MM.pdf')
 
 
 def run_cluster_MC():
@@ -73,6 +74,7 @@ def run_cluster_MC():
         B.shape[0]), np.ones(C.shape[0]) * 2))
 
     # inference
+    np.random.seed(42)
     print "inference ..."
     M = 30
     D = 5
@@ -87,9 +89,9 @@ def run_cluster_MC():
     mx, vx = lvm.get_posterior_x()
     plt.scatter(mx[:, inds[0]], mx[:, inds[1]], c=labels)
     zu = lvm.sgp_layer.zu
-    # plt.plot(zu[:, inds[0]], zu[:, inds[1]], 'ko')
+    plt.plot(zu[:, inds[0]], zu[:, inds[1]], 'ko')
     # plt.show()
-    plt.savefig('/tmp/gplvm_cluster.pdf')
+    plt.savefig('/tmp/gplvm_cluster_MC.pdf')
 
 
 def run_mnist():
@@ -329,7 +331,8 @@ def run_xor():
     M = 10
     D = 2
     lvm = vfe.SGPLVM(Y, D, M, lik='Probit')
-    lvm.optimise(method='L-BFGS-B', maxiter=200)
+    # lvm.optimise(method='L-BFGS-B', maxiter=200)
+    lvm.optimise(method='adam', maxiter=2000, adam_lr=0.05)
 
     # predict given inputs
     mx, vx = lvm.get_posterior_x()
@@ -351,6 +354,7 @@ def run_xor():
         plt.contour(X, Y, np.log(Z[:, d] + 1e-16).reshape(X.shape))
         plt.xlim(*lims)
         plt.ylim(*lims)
+        plt.savefig('/tmp/gplvm_xor_MM_%d.pdf' % d)
 
     # Y_test = np.array([[1, -1, 1], [-1, 1, 1], [-1, -1, -1], [1, 1, -1]])
     # # impute missing data
@@ -364,7 +368,7 @@ def run_xor():
 
     # 	print k, my_pred, vy_pred, Y_test_k
 
-    plt.show()
+    # plt.show()
 
 
 def run_frey():
@@ -408,11 +412,12 @@ def run_frey():
 
     plt.show()
 
+
 if __name__ == '__main__':
-    run_cluster_MM(False)
-    run_cluster_MM(True)
+    # run_cluster_MM(False)
+    # run_cluster_MM(True)
     # run_cluster_MC()
     # run_semicircle()
     # run_pinwheel()
-    # run_xor()
+    run_xor()
     # run_oil()
