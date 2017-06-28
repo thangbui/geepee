@@ -10,7 +10,7 @@ import matplotlib.pylab as plt
 
 from .context import aep
 from .context import flatten_dict, unflatten_dict
-from .context import PROP_MC, PROP_MM
+from .context import PROP_MC, PROP_MM, PROP_LIN
 from test_utils import kink, check_grad
 
 np.random.seed(42)
@@ -476,40 +476,50 @@ def plot_gpssm_linear_aep_gaussian_stochastic():
 
 
 if __name__ == '__main__':
-    # TODO: test lin prop mode
+    # TODO: PROP_LIN
 
     test_gplvm_aep_gaussian(nat_param=True, stoc=False, prop_mode=PROP_MM)
     # test_gplvm_aep_gaussian(nat_param=True, stoc=True, prop_mode=PROP_MM)
-    # test_gplvm_aep_gaussian(nat_param=False, stoc=False, prop_mode=PROP_MM)
+    test_gplvm_aep_gaussian(nat_param=False, stoc=False, prop_mode=PROP_MM)
     # test_gplvm_aep_gaussian(nat_param=False, stoc=True, prop_mode=PROP_MM)
 
-    test_gplvm_aep_gaussian(nat_param=True, stoc=False, prop_mode=PROP_MC)
+    # test_gplvm_aep_gaussian(nat_param=True, stoc=False, prop_mode=PROP_MC)
     # test_gplvm_aep_gaussian(nat_param=True, stoc=True, prop_mode=PROP_MC)
     # test_gplvm_aep_gaussian(nat_param=False, stoc=False, prop_mode=PROP_MC)
     # test_gplvm_aep_gaussian(nat_param=False, stoc=True, prop_mode=PROP_MC)
 
-    test_gplvm_aep_probit(nat_param=True, stoc=False, prop_mode=PROP_MM)
+    # test_gplvm_aep_gaussian(nat_param=True, stoc=False, prop_mode=PROP_LIN)
+    # test_gplvm_aep_gaussian(nat_param=True, stoc=True, prop_mode=PROP_LIN)
+    # test_gplvm_aep_gaussian(nat_param=False, stoc=False, prop_mode=PROP_LIN)
+    # test_gplvm_aep_gaussian(nat_param=False, stoc=True, prop_mode=PROP_LIN)
+
+    # test_gplvm_aep_probit(nat_param=True, stoc=False, prop_mode=PROP_MM)
     # test_gplvm_aep_probit(nat_param=True, stoc=True, prop_mode=PROP_MM)
     # test_gplvm_aep_probit(nat_param=False, stoc=False, prop_mode=PROP_MM)
     # test_gplvm_aep_probit(nat_param=False, stoc=True, prop_mode=PROP_MM)
     
-    test_gplvm_aep_probit(nat_param=True, stoc=False, prop_mode=PROP_MC)
+    # test_gplvm_aep_probit(nat_param=True, stoc=False, prop_mode=PROP_MC)
     # test_gplvm_aep_probit(nat_param=True, stoc=True, prop_mode=PROP_MC)
     # test_gplvm_aep_probit(nat_param=False, stoc=False, prop_mode=PROP_MC)
     # test_gplvm_aep_probit(nat_param=False, stoc=True, prop_mode=PROP_MC)
 
+    # test_gplvm_aep_probit(nat_param=True, stoc=False, prop_mode=PROP_LIN)
+    # test_gplvm_aep_probit(nat_param=True, stoc=True, prop_mode=PROP_LIN)
+    # test_gplvm_aep_probit(nat_param=False, stoc=False, prop_mode=PROP_LIN)
+    # test_gplvm_aep_probit(nat_param=False, stoc=True, prop_mode=PROP_LIN)
+
     # plot_gplvm_aep_probit_stochastic()
     # plot_gplvm_aep_gaussian_stochastic()
 
-    # test_gpr_aep_gaussian(nat_param=True, stoc=False)
-    # test_gpr_aep_gaussian(nat_param=True, stoc=True)
-    # test_gpr_aep_gaussian(nat_param=False, stoc=False)
-    # test_gpr_aep_gaussian(nat_param=False, stoc=True)
+    test_gpr_aep_gaussian(nat_param=True, stoc=False)
+    test_gpr_aep_gaussian(nat_param=True, stoc=True)
+    test_gpr_aep_gaussian(nat_param=False, stoc=False)
+    test_gpr_aep_gaussian(nat_param=False, stoc=True)
 
-    # test_gpr_aep_probit(nat_param=True, stoc=False)
-    # test_gpr_aep_probit(nat_param=True, stoc=True)
-    # test_gpr_aep_probit(nat_param=False, stoc=False)
-    # test_gpr_aep_probit(nat_param=False, stoc=True)
+    test_gpr_aep_probit(nat_param=True, stoc=False)
+    test_gpr_aep_probit(nat_param=True, stoc=True)
+    test_gpr_aep_probit(nat_param=False, stoc=False)
+    test_gpr_aep_probit(nat_param=False, stoc=True)
 
     # plot_gpr_aep_probit_stochastic()
     # plot_gpr_aep_gaussian_stochastic()

@@ -102,7 +102,7 @@ class Base_Model(object):
                 final_params = results
             else:
                 options = {'maxfun': maxfun, 'maxiter': maxiter,
-                           'disp': disp, 'gtol': 1e-5, 'ftol': 1e-5}
+                           'disp': disp, 'gtol': 1e-6, 'ftol': 1e-6}
                 results = minimize(
                     fun=objective_wrapper,
                     x0=init_params_vec,
@@ -1118,7 +1118,15 @@ class Base_SDGPR(Base_Model):
         """
         pass
 
-    def predict_f(self, inputs):
+    def predict_f(self, inputs, prop_mode=PROP_MM, no_samples=200):
+        if prop_mode == PROP_MM:
+            return self.predict_f_mm(inputs)
+        elif prop_mode == PROP_MC:
+            return self.predict_f_mc(inputs, no_samples)
+        else:
+            raise NotImplementedError('prop_mode %s unknown' % prop_mode)
+
+    def predict_f_mm(self, inputs):
         """Summary
         
         Args:
@@ -1137,6 +1145,32 @@ class Base_SDGPR(Base_Model):
             else:
                 mf, vf = layer.forward_prop_thru_post(mf, vf)
         return mf, vf
+
+    def predict_f_mc(self, inputs, no_samples):
+        """Summary
+        
+        Args:
+            inputs (TYPE): Description
+        
+        Returns:
+            TYPE: Description
+        """
+        if not self.updated:
+            for layer in self.sgp_layers:
+                layer.update_posterior()
+            self.updated = True
+        samples = inputs
+        for i, layer in enumerate(self.sgp_layers):
+            mf, vf = layer.forward_prop_thru_post(samples)
+            if i == 0:
+                eps = np.random.randn(no_samples, mf.shape[0], mf.shape[1])   
+                samples = np.sqrt(vf) * eps + mf
+                samples = np.reshape(samples, [no_samples*mf.shape[0], mf.shape[1]])
+            else:
+                eps = np.random.randn(mf.shape[0], mf.shape[1])   
+                samples = np.sqrt(vf) * eps + mf
+        samples = np.reshape(samples, [no_samples, inputs.shape[0], layer.Dout])
+        return samples, mf, vf
 
     def predict_f_with_input_grad(self, inputs):
         """Summary
@@ -1405,7 +1439,17 @@ class Base_SGPSSM(Base_Model):
         mf, vf = self.dyn_layer.forward_prop_thru_post(inputs)
         return mf, vf
 
-    def predict_forward(self, T, x_control=None):
+    def predict_forward(self, T, x_control=None, prop_mode=PROP_MM, no_samples=200):
+        if prop_mode == PROP_MM:
+            return self.predict_forward_mm(T, x_control)
+        elif prop_mode == PROP_LIN:
+            raise NotImplementedError('TODO')
+        elif prop_mode == PROP_MC:
+            return self.predict_forward_mc(T, x_control, no_samples)
+        else:
+            raise NotImplementedError('unknown prop mode %s' % prop_mode)
+
+    def predict_forward_mm(self, T, x_control):
         """Summary
         
         Args:
@@ -1445,6 +1489,46 @@ class Base_SGPSSM(Base_Model):
             mtm1 = mt
             vtm1 = vt
         return mx, vx, my, vy_noiseless, vy
+
+    def predict_forward_mc(self, T, x_control, no_samples):
+        """Summary
+        
+        Args:
+            T (TYPE): Description
+            x_control (None, optional): Description
+        
+        Returns:
+            TYPE: Description
+        """
+        x = np.zeros((T, no_samples, self.Din))
+        my = np.zeros((T, no_samples, self.Dout))
+        vy = np.zeros((T, no_samples, self.Dout))
+        post_m, post_v = self.get_posterior_x()
+        mtm1 = post_m[[-1], :]
+        vtm1 = post_v[[-1], :]
+        eps = np.random.randn(no_samples, self.Din)
+        x_samples = eps * np.sqrt(vtm1) + mtm1
+        for t in range(T):
+            if self.Dcon_dyn > 0:
+                xc_samples = np.hstack((x_samples, np.tile(x_control[[t], :], [no_samples, 1])))
+            else:
+                xc_samples = x_samples
+            mt, vt = self.dyn_layer.forward_prop_thru_post(xc_samples)
+            eps = np.random.randn(no_samples, self.Din)
+            x_samples = eps * np.sqrt(vt) + mt
+            if self.Dcon_emi > 0:
+                xc_samples = np.hstack((x_samples, np.tile(x_control[[t], :]), [no_samples, 1]))
+            else:
+                xc_samples = x_samples
+            if self.gp_emi:
+                mft, vft = self.emi_layer.forward_prop_thru_post(xc_samples)
+                myt, vyt_n = self.lik_layer.output_probabilistic(mft, vft)
+            else:
+                myt, _, vyt_n = self.emi_layer.output_probabilistic(xc_samples, np.zeros_like(x_samples))
+                vyt_n = np.diagonal(vyt_n, axis1=1, axis2=2)
+            x[t, :, :] = x_samples
+            my[t, :, :], vy[t, :, :] = myt, vyt_n
+        return x, my, vy
 
     def predict_y(self, inputs):
         """Summary

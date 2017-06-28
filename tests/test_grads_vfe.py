@@ -476,8 +476,7 @@ def plot_gpssm_linear_vfe_gaussian_stochastic():
 
 
 if __name__ == '__main__':
-    # TODO: lin and MC prop mode
-
+    # TODO: MC prop mode
     # test_gplvm_vfe_gaussian(nat_param=True, stoc=False, prop_mode=PROP_MM)
     # test_gplvm_vfe_gaussian(nat_param=True, stoc=True, prop_mode=PROP_MM)
     # test_gplvm_vfe_gaussian(nat_param=False, stoc=False, prop_mode=PROP_MM)
@@ -552,14 +551,14 @@ if __name__ == '__main__':
     # test_gpssm_linear_vfe_gaussian_kink(nat_param=False, stoc=False, prop_mode=PROP_MC)
     # test_gpssm_linear_vfe_gaussian_kink(nat_param=False, stoc=True, prop_mode=PROP_MC)
 
-    test_gpssm_gp_vfe_gaussian_kink(nat_param=True, stoc=False, prop_mode=PROP_MM)
-    test_gpssm_gp_vfe_gaussian_kink(nat_param=True, stoc=True, prop_mode=PROP_MM)
-    test_gpssm_gp_vfe_gaussian_kink(nat_param=False, stoc=False, prop_mode=PROP_MM)
-    test_gpssm_gp_vfe_gaussian_kink(nat_param=False, stoc=True, prop_mode=PROP_MM)
+    # test_gpssm_gp_vfe_gaussian_kink(nat_param=True, stoc=False, prop_mode=PROP_MM)
+    # test_gpssm_gp_vfe_gaussian_kink(nat_param=True, stoc=True, prop_mode=PROP_MM)
+    # test_gpssm_gp_vfe_gaussian_kink(nat_param=False, stoc=False, prop_mode=PROP_MM)
+    # test_gpssm_gp_vfe_gaussian_kink(nat_param=False, stoc=True, prop_mode=PROP_MM)
 
-    test_gpssm_gp_vfe_gaussian_kink(nat_param=True, stoc=False, prop_mode=PROP_MC)
-    test_gpssm_gp_vfe_gaussian_kink(nat_param=True, stoc=True, prop_mode=PROP_MC)
-    test_gpssm_gp_vfe_gaussian_kink(nat_param=False, stoc=False, prop_mode=PROP_MC)
-    test_gpssm_gp_vfe_gaussian_kink(nat_param=False, stoc=True, prop_mode=PROP_MC)
+    # test_gpssm_gp_vfe_gaussian_kink(nat_param=True, stoc=False, prop_mode=PROP_MC)
+    # test_gpssm_gp_vfe_gaussian_kink(nat_param=True, stoc=True, prop_mode=PROP_MC)
+    # test_gpssm_gp_vfe_gaussian_kink(nat_param=False, stoc=False, prop_mode=PROP_MC)
+    # test_gpssm_gp_vfe_gaussian_kink(nat_param=False, stoc=True, prop_mode=PROP_MC)
 
     # plot_gpssm_linear_vfe_gaussian_stochastic()

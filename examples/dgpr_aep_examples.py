@@ -8,6 +8,7 @@ from scipy import special
 
 from .context import aep
 from .datautils import step, spiral
+from .context import config
 
 
 def run_regression_1D():
@@ -21,17 +22,19 @@ def run_regression_1D():
 
     def plot(m):
         xx = np.linspace(-0.5, 1.5, 100)[:, None]
-        mean, var = m.predict_f(xx)
+        # mean, var = m.predict_f(xx)
+        samples, mf, vf = m.predict_f(xx, config.PROP_MC)
         zu = m.sgp_layers[0].zu
         mean_u, var_u = m.predict_f(zu)
         plt.figure()
         plt.plot(X, Y, 'kx', mew=2)
-        plt.plot(xx, mean, 'b', lw=2)
-        plt.fill_between(
-            xx[:, 0],
-            mean[:, 0] - 2 * np.sqrt(var[:, 0]),
-            mean[:, 0] + 2 * np.sqrt(var[:, 0]),
-            color='blue', alpha=0.2)
+        # plt.plot(xx, mean, 'b', lw=2)
+        # plt.fill_between(
+        #     xx[:, 0],
+        #     mean[:, 0] - 2 * np.sqrt(var[:, 0]),
+        #     mean[:, 0] + 2 * np.sqrt(var[:, 0]),
+        #     color='blue', alpha=0.2)
+        plt.plot(np.tile(xx[np.newaxis, :], [200, 1]))
         plt.errorbar(zu, mean_u, yerr=2 * np.sqrt(var_u), fmt='ro')
         plt.xlim(-0.1, 1.1)
 
@@ -42,7 +45,7 @@ def run_regression_1D():
     model = aep.SDGPR(X, Y, M, hidden_size, lik='Gaussian')
     model.optimise(method='L-BFGS-B', alpha=1, maxiter=2000)
     plot(model)
-    plt.show()
+    # plt.show()
     plt.savefig('/tmp/aep_dgpr_1D.pdf')
 
 
@@ -180,12 +183,12 @@ def run_step_1D():
         y = x.copy()
         y[y < 0.0] = 0.0
         y[y > 0.0] = 1.0
-        return y + 0.05 * np.random.randn(x.shape[0], 1)
+        return y + 0.02 * np.random.randn(x.shape[0], 1)
 
     print "create dataset ..."
     N = 100
     X = np.random.rand(N, 1) * 3 - 1.5
-    Y = step(X)
+    Y = step(X) - 0.5
     # plt.plot(X, Y, 'kx', mew=2)
 
     def plot(m):
@@ -214,9 +217,10 @@ def run_step_1D():
     # inference
     print "create model and optimize ..."
     M = 20
-    hidden_size = [3, 2]
+    hidden_size = [2]
     model = aep.SDGPR(X, Y, M, hidden_size, lik='Gaussian')
-    model.optimise(method='L-BFGS-B', alpha=1, maxiter=1000)
+    # model.optimise(method='L-BFGS-B', alpha=1, maxiter=1000)
+    model.optimise(method='adam', adam_lr=0.05, alpha=1, maxiter=2000)
     plot(model)
     plt.show()
 
@@ -268,8 +272,8 @@ def run_spiral():
 if __name__ == '__main__':
     # run_regression_1D()
     # run_banana()
-    # run_step_1D()
+    run_step_1D()
     # run_spiral()
 
     # run_regression_1D_stoc()
-    run_banana_stoc()
+    # run_banana_stoc()

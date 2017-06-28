@@ -15,6 +15,7 @@ from scipy.cluster.vq import kmeans2
 from utils import *
 from kernels import *
 from lik_layers import Gauss_Layer, Probit_Layer, Gauss_Emis
+from base_models import Base_SGPR, Base_SGPLVM, Base_SGPSSM
 from config import *
 
 
@@ -549,133 +550,7 @@ class SGP_Layer(object):
         self.update_posterior()
 
 
-class EP_Model(object):
-    """Summary
-
-    Attributes:
-        fixed_params (list): Description
-        N (TYPE): Description
-        updated (bool): Description
-        y_train (TYPE): Description
-    """
-
-    def __init__(self, y_train):
-        """Summary
-
-        Args:
-            y_train (TYPE): Description
-        """
-        self.y_train = y_train
-        self.N = y_train.shape[0]
-        self.fixed_params = []
-        self.updated = False
-
-    def init_hypers(self, y_train=None, x_train=None):
-        """Summary
-
-        Args:
-            y_train (None, optional): Description
-            x_train (None, optional): Description
-
-        Returns:
-            TYPE: Description
-        """
-        pass
-
-    def get_hypers(self):
-        """Summary
-
-        Returns:
-            TYPE: Description
-        """
-        pass
-
-    def inference(self, alpha, no_epochs=10):
-        """Summary
-
-        Args:
-            alpha (TYPE): Description
-            no_epochs (int, optional): Description
-
-        Returns:
-            TYPE: Description
-        """
-        pass
-
-    def optimise(
-            self, method='L-BFGS-B', tol=None, reinit_hypers=True,
-            callback=None, maxiter=1000, alpha=0.5, adam_lr=0.05, **kargs):
-        """Summary
-
-        Args:
-            method (str, optional): Description
-            tol (None, optional): Description
-            reinit_hypers (bool, optional): Description
-            callback (None, optional): Description
-            maxiter (int, optional): Description
-            alpha (float, optional): Description
-            adam_lr (float, optional): Description
-            **kargs: Description
-
-        Returns:
-            TYPE: Description
-        """
-        self.updated = False
-
-        if reinit_hypers:
-            init_params_dict = self.init_hypers(self.y_train)
-        else:
-            init_params_dict = self.get_hypers()
-
-        init_params_vec, params_args = flatten_dict(init_params_dict)
-
-        N = self.N
-        idxs = np.arange(N)
-
-        try:
-            if method.lower() == 'adam':
-                results = adam(objective_wrapper, init_params_vec,
-                               step_size=adam_lr,
-                               maxiter=maxiter,
-                               args=(params_args, self, idxs, alpha))
-            else:
-                options = {'maxiter': maxiter, 'disp': True, 'gtol': 1e-8}
-                results = minimize(
-                    fun=objective_wrapper,
-                    x0=init_params_vec,
-                    args=(params_args, self, idxs, alpha),
-                    method=method,
-                    jac=True,
-                    tol=tol,
-                    callback=callback,
-                    options=options)
-
-        except KeyboardInterrupt:
-            print 'Caught KeyboardInterrupt ...'
-            results = []
-            # todo: deal with rresults here
-
-        results = self.get_hypers()
-        return results
-
-    def set_fixed_params(self, params):
-        """Summary
-
-        Args:
-            params (TYPE): Description
-
-        Returns:
-            TYPE: Description
-        """
-        if isinstance(params, (list)):
-            for p in params:
-                if p not in self.fixed_params:
-                    self.fixed_params.append(p)
-        else:
-            self.fixed_params.append(params)
-
-
-class SGPR(EP_Model):
+class SGPR(Base_SGPR):
     """Summary
 
     Attributes:
@@ -701,20 +576,8 @@ class SGPR(EP_Model):
         Raises:
             NotImplementedError: Description
         """
-        super(SGPR, self).__init__(y_train)
-        self.N = N = y_train.shape[0]
-        self.Dout = Dout = y_train.shape[1]
-        self.Din = Din = x_train.shape[1]
-        self.M = M = no_pseudo
-        self.x_train = x_train
-
-        self.sgp_layer = SGP_Layer(N, Din, Dout, M)
-        if lik.lower() == 'gaussian':
-            self.lik_layer = Gauss_Layer(N, Dout)
-        elif lik.lower() == 'probit':
-            self.lik_layer = Probit_Layer(N, Dout)
-        else:
-            raise NotImplementedError('likelihood not implemented')
+        super(SGPR, self).__init__(x_train, y_train, no_pseudo, lik)
+        self.sgp_layer = SGP_Layer(self.N, self.Din, self.Dout, self.M)
 
     def inference(self, alpha=1.0, no_epochs=10, parallel=False, decay=0.5):
         """Summary
@@ -764,95 +627,8 @@ class SGPR(EP_Model):
         except KeyboardInterrupt:
             print 'Caught KeyboardInterrupt ...'
 
-    def predict_f(self, inputs):
-        """Summary
 
-        Args:
-            inputs (TYPE): Description
-
-        Returns:
-            TYPE: Description
-        """
-        if not self.updated:
-            self.sgp_layer.update_posterior()
-            self.updated = True
-        mf, vf = self.sgp_layer.forward_prop_thru_post(inputs)
-        return mf, vf
-
-    def sample_f(self, inputs, no_samples=1):
-        """Summary
-
-        Args:
-            inputs (TYPE): Description
-            no_samples (int, optional): Description
-
-        Returns:
-            TYPE: Description
-        """
-        if not self.updated:
-            self.sgp_layer.update_posterior()
-            self.updated = True
-        K = no_samples
-        fs = np.zeros((inputs.shape[0], self.Dout, K))
-        # TODO: remove for loop here
-        for k in range(K):
-            fs[:, :, k] = self.sgp_layer.sample(inputs)
-        return fs
-
-    def predict_y(self, inputs):
-        """Summary
-
-        Args:
-            inputs (TYPE): Description
-
-        Returns:
-            TYPE: Description
-        """
-        if not self.updated:
-            self.sgp_layer.update_posterior()
-            self.updated = True
-        mf, vf = self.sgp_layer.forward_prop_thru_post(inputs)
-        my, vy = self.lik_layer.output_probabilistic(mf, vf)
-        return my, vy
-
-    def update_hypers(self, params):
-        """Summary
-
-        Args:
-            params (TYPE): Description
-
-        Returns:
-            TYPE: Description
-        """
-        self.sgp_layer.update_hypers(params)
-        self.lik_layer.update_hypers(params)
-
-    def init_hypers(self):
-        """Summary
-
-        Returns:
-            TYPE: Description
-        """
-        sgp_params = self.sgp_layer.init_hypers(self.x_train)
-        lik_params = self.lik_layer.init_hypers()
-        init_params = dict(sgp_params)
-        init_params.update(lik_params)
-        return init_params
-
-    def get_hypers(self):
-        """Summary
-
-        Returns:
-            TYPE: Description
-        """
-        sgp_params = self.sgp_layer.get_hypers()
-        lik_params = self.lik_layer.get_hypers()
-        params = dict(sgp_params)
-        params.update(lik_params)
-        return params
-
-
-class SGPLVM(EP_Model):
+class SGPLVM(Base_SGPLVM):
     """Summary
 
     Attributes:
@@ -884,23 +660,12 @@ class SGPLVM(EP_Model):
         Raises:
             NotImplementedError: Description
         """
-        super(SGPLVM, self).__init__(y_train)
-        self.N = N = y_train.shape[0]
-        self.Dout = Dout = y_train.shape[1]
-        self.Din = Din = hidden_size
-        self.M = M = no_pseudo
-
-        self.sgp_layer = SGP_Layer(N, Din, Dout, M)
-        if lik.lower() == 'gaussian':
-            self.lik_layer = Gauss_Layer(N, Dout)
-        elif lik.lower() == 'probit':
-            self.lik_layer = Probit_Layer(N, Dout)
-        else:
-            raise NotImplementedError('likelihood not implemented')
+        super(SGPLVM, self).__init__(y_train, hidden_size, no_pseudo, lik, prior_mean, prior_var)
+        self.sgp_layer = SGP_Layer(self.N, self.Din, self.Dout, self.M)
 
         # natural params for latent variables
-        self.tx1 = np.zeros((N, Din))
-        self.tx2 = np.zeros((N, Din))
+        self.tx1 = np.zeros((self.N, self.Din))
+        self.tx2 = np.zeros((self.N, self.Din))
 
         self.t01 = prior_mean / prior_var
         self.t02 = 1.0 / prior_var
@@ -1033,96 +798,96 @@ class SGPLVM(EP_Model):
         mx = post_1 / post_2
         return mx, vx
 
-    def predict_f(self, inputs):
-        """Summary
+    # def predict_f(self, inputs):
+    #     """Summary
 
-        Args:
-            inputs (TYPE): Description
+    #     Args:
+    #         inputs (TYPE): Description
 
-        Returns:
-            TYPE: Description
-        """
-        if not self.updated:
-            self.sgp_layer.update_posterior()
-            self.updated = True
-        mf, vf = self.sgp_layer.forward_prop_thru_post(inputs)
-        return mf, vf
+    #     Returns:
+    #         TYPE: Description
+    #     """
+    #     if not self.updated:
+    #         self.sgp_layer.update_posterior()
+    #         self.updated = True
+    #     mf, vf = self.sgp_layer.forward_prop_thru_post(inputs)
+    #     return mf, vf
 
-    def sample_f(self, inputs, no_samples=1):
-        """Summary
+    # def sample_f(self, inputs, no_samples=1):
+    #     """Summary
 
-        Args:
-            inputs (TYPE): Description
-            no_samples (int, optional): Description
+    #     Args:
+    #         inputs (TYPE): Description
+    #         no_samples (int, optional): Description
 
-        Returns:
-            TYPE: Description
-        """
-        if not self.updated:
-            self.sgp_layer.update_posterior()
-            self.updated = True
-        K = no_samples
-        fs = np.zeros((inputs.shape[0], self.Dout, K))
-        # TODO: remove for loop here
-        for k in range(K):
-            fs[:, :, k] = self.sgp_layer.sample(inputs)
-        return fs
+    #     Returns:
+    #         TYPE: Description
+    #     """
+    #     if not self.updated:
+    #         self.sgp_layer.update_posterior()
+    #         self.updated = True
+    #     K = no_samples
+    #     fs = np.zeros((inputs.shape[0], self.Dout, K))
+    #     # TODO: remove for loop here
+    #     for k in range(K):
+    #         fs[:, :, k] = self.sgp_layer.sample(inputs)
+    #     return fs
 
-    def predict_y(self, inputs):
-        """Summary
+    # def predict_y(self, inputs):
+    #     """Summary
 
-        Args:
-            inputs (TYPE): Description
+    #     Args:
+    #         inputs (TYPE): Description
 
-        Returns:
-            TYPE: Description
-        """
-        if not self.updated:
-            self.sgp_layer.update_posterior()
-            self.updated = True
-        mf, vf = self.sgp_layer.forward_prop_thru_post(inputs)
-        my, vy = self.lik_layer.output_probabilistic(mf, vf)
-        return my, vy
+    #     Returns:
+    #         TYPE: Description
+    #     """
+    #     if not self.updated:
+    #         self.sgp_layer.update_posterior()
+    #         self.updated = True
+    #     mf, vf = self.sgp_layer.forward_prop_thru_post(inputs)
+    #     my, vy = self.lik_layer.output_probabilistic(mf, vf)
+    #     return my, vy
 
-    def update_hypers(self, params):
-        """Summary
+    # def update_hypers(self, params):
+    #     """Summary
 
-        Args:
-            params (TYPE): Description
+    #     Args:
+    #         params (TYPE): Description
 
-        Returns:
-            TYPE: Description
-        """
-        self.sgp_layer.update_hypers(params)
-        self.lik_layer.update_hypers(params)
+    #     Returns:
+    #         TYPE: Description
+    #     """
+    #     self.sgp_layer.update_hypers(params)
+    #     self.lik_layer.update_hypers(params)
 
-    def init_hypers(self):
-        """Summary
+    # def init_hypers(self):
+    #     """Summary
 
-        Returns:
-            TYPE: Description
-        """
-        sgp_params = self.sgp_layer.init_hypers()
-        lik_params = self.lik_layer.init_hypers()
-        init_params = dict(sgp_params)
-        init_params.update(lik_params)
+    #     Returns:
+    #         TYPE: Description
+    #     """
+    #     sgp_params = self.sgp_layer.init_hypers()
+    #     lik_params = self.lik_layer.init_hypers()
+    #     init_params = dict(sgp_params)
+    #     init_params.update(lik_params)
 
-        return init_params
+    #     return init_params
 
-    def get_hypers(self):
-        """Summary
+    # def get_hypers(self):
+    #     """Summary
 
-        Returns:
-            TYPE: Description
-        """
-        sgp_params = self.sgp_layer.get_hypers()
-        lik_params = self.lik_layer.get_hypers()
-        params = dict(sgp_params)
-        params.update(lik_params)
-        return params
+    #     Returns:
+    #         TYPE: Description
+    #     """
+    #     sgp_params = self.sgp_layer.get_hypers()
+    #     lik_params = self.lik_layer.get_hypers()
+    #     params = dict(sgp_params)
+    #     params.update(lik_params)
+    #     return params
 
 
-class SGPSSM(EP_Model):
+class SGPSSM(Base_SGPSSM):
     """Summary
 
     Attributes:
@@ -1146,7 +911,8 @@ class SGPSSM(EP_Model):
     """
 
     def __init__(self, y_train, hidden_size, no_pseudo,
-                 lik='Gaussian', prior_mean=0, prior_var=1):
+                 lik='Gaussian', prior_mean=0, prior_var=1,
+                 x_control=None, gp_emi=False, control_to_emi=True):
         """Summary
 
         Args:
@@ -1160,22 +926,20 @@ class SGPSSM(EP_Model):
         Raises:
             NotImplementedError: Description
         """
-        super(SGPSSM, self).__init__(y_train)
-        self.N = N = y_train.shape[0]
-        self.Dout = Dout = y_train.shape[1]
-        self.Din = Din = hidden_size
-        self.M = M = no_pseudo
-        self.lik = lik.lower()
+        super(SGPSSM, self).__init__(
+            y_train, hidden_size, no_pseudo, 
+            lik, prior_mean, prior_var,
+            x_control, gp_emi, control_to_emi)
 
-        self.sgp_layer = SGP_Layer(N - 1, Din, Din, M)
-        if lik.lower() == 'gaussian':
-            self.emi_layer = Gauss_Emis(y_train, Dout, Din)
-        elif lik.lower() == 'probit':
-            self.emi_layer = Probit_Emis(y_train, Dout, Din)
-        else:
-            raise NotImplementedError('likelihood not implemented')
+        self.dyn_layer = SGP_Layer(
+            self.N - 1, self.Din + self.Dcon_dyn, self.Din, self.M)
+        if gp_emi:
+            self.emi_layer = SGP_Layer(
+                self.N, self.Din + self.Dcon_emi, self.Dout, self.M)
 
         # natural params for latent variables
+        N = self.N
+        Din = self.Din
         self.x_prev_1 = np.zeros((N, Din))
         self.x_prev_2 = np.zeros((N, Din))
         self.x_next_1 = np.zeros((N, Din))
@@ -1184,8 +948,6 @@ class SGPSSM(EP_Model):
         self.x_up_2 = np.zeros((N, Din))
         self.x_prior_1 = prior_mean / prior_var
         self.x_prior_2 = 1.0 / prior_var
-
-        self.sn = 0
         self.UP, self.PREV, self.NEXT = 'UP', 'PREV', 'NEXT'
 
     def inf_parallel(self, epoch, alpha, decay):
@@ -1201,17 +963,18 @@ class SGPSSM(EP_Model):
         """
         # merge info from output
         cav_up_m, cav_up_v, _, _ = self.compute_cavity_x(self.UP, alpha)
-        # only do this once at the begining for gaussian emission lik
-        if self.lik == 'gaussian' and epoch == 0:
-            up_1, up_2 = self.emi_layer.compute_factor(
-                cav_up_m, cav_up_v, alpha)
-            self.x_up_1 = up_1
-            self.x_up_2 = up_2
-        else:
-            up_1, up_2 = self.emi_layer.compute_factor(
-                cav_up_m, cav_up_v, alpha)
-            self.x_up_1 = up_1
-            self.x_up_2 = up_2
+        if not self.gp_emi:
+            # only do this once at the begining for gaussian emission lik
+            if isinstance(self.emi_layer, Gauss_Layer) and epoch == 0:
+                up_1, up_2 = self.emi_layer.compute_factor(
+                    cav_up_m, cav_up_v, alpha)
+                self.x_up_1 = up_1
+                self.x_up_2 = up_2
+            else:
+                up_1, up_2 = self.emi_layer.compute_factor(
+                    cav_up_m, cav_up_v, alpha)
+                self.x_up_1 = up_1
+                self.x_up_2 = up_2
         # deal with the dynamics factors here
         cav_t_m, cav_t_v, cav_t_1, cav_t_2 = \
             self.compute_cavity_x(self.PREV, alpha)
@@ -1220,15 +983,15 @@ class SGPSSM(EP_Model):
 
         idxs = np.arange(self.N - 1)
         (mprop, vprop, extra_res) = \
-            self.sgp_layer.forward_prop_thru_cav(
+            self.dyn_layer.forward_prop_thru_cav(
                 idxs, cav_tm1_m, cav_tm1_v, alpha=alpha)
         logZ, dmprop, dvprop, dmt, dvt = \
             self.compute_transition_tilted(
                 mprop, vprop, cav_t_m, cav_t_v, alpha)
-        grad_hyper, grad_cav = self.sgp_layer.backprop_grads_lvm(
+        grad_hyper, grad_cav = self.dyn_layer.backprop_grads_lvm(
             mprop, vprop, dmprop, dvprop,
             extra_res, cav_tm1_m, cav_tm1_v, alpha=alpha)
-        self.sgp_layer.update_factor(
+        self.dyn_layer.update_factor(
             idxs, alpha, grad_cav, extra_res, decay=decay)
 
         self.update_factor_x(
@@ -1255,17 +1018,18 @@ class SGPSSM(EP_Model):
         """
         # merge info from output
         cav_up_m, cav_up_v, _, _ = self.compute_cavity_x(self.UP, alpha)
-        # only do this once at the begining for gaussian emission lik
-        if self.lik == 'gaussian' and epoch == 0:
-            up_1, up_2 = self.emi_layer.compute_factor(
-                cav_up_m, cav_up_v, alpha)
-            self.x_up_1 = up_1
-            self.x_up_2 = up_2
-        else:
-            up_1, up_2 = self.emi_layer.compute_factor(
-                cav_up_m, cav_up_v, alpha)
-            self.x_up_1 = up_1
-            self.x_up_2 = up_2
+        if not self.gp_emi:
+            # only do this once at the begining for gaussian emission lik
+            if isinstance(self.emi_layer, Gauss_Layer) and epoch == 0:
+                up_1, up_2 = self.emi_layer.compute_factor(
+                    cav_up_m, cav_up_v, alpha)
+                self.x_up_1 = up_1
+                self.x_up_2 = up_2
+            else:
+                up_1, up_2 = self.emi_layer.compute_factor(
+                    cav_up_m, cav_up_v, alpha)
+                self.x_up_1 = up_1
+                self.x_up_2 = up_2
 
         for n in range(0, self.N - 1):
             # deal with the dynamics factors here
@@ -1275,15 +1039,15 @@ class SGPSSM(EP_Model):
                 self.compute_cavity_x_sequential(self.NEXT, [n], alpha)
 
             (mprop, vprop, extra_res) = \
-                self.sgp_layer.forward_prop_thru_cav(
+                self.dyn_layer.forward_prop_thru_cav(
                     [n], cav_tm1_m, cav_tm1_v, alpha=alpha)
             logZ, dmprop, dvprop, dmt, dvt = \
                 self.compute_transition_tilted(
                     mprop, vprop, cav_t_m, cav_t_v, alpha)
-            grad_hyper, grad_cav = self.sgp_layer.backprop_grads_lvm(
+            grad_hyper, grad_cav = self.dyn_layer.backprop_grads_lvm(
                 mprop, vprop, dmprop, dvprop,
                 extra_res, cav_tm1_m, cav_tm1_v, alpha=alpha)
-            self.sgp_layer.update_factor(
+            self.dyn_layer.update_factor(
                 [n], alpha, grad_cav, extra_res, decay=decay)
 
             self.update_factor_x_sequential(
@@ -1541,94 +1305,607 @@ class SGPSSM(EP_Model):
         my, vy, vyn = self.emi_layer.output_probabilistic(mx, vx)
         return my, vy, vyn
 
-    def predict_f(self, inputs):
+    # def predict_f(self, inputs):
+    #     """Summary
+
+    #     Args:
+    #         inputs (TYPE): Description
+
+    #     Returns:
+    #         TYPE: Description
+    #     """
+    #     if not self.updated:
+    #         self.sgp_layer.update_posterior()
+    #         self.updated = True
+    #     mf, vf = self.sgp_layer.forward_prop_thru_post(inputs)
+    #     return mf, vf
+
+    # def sample_f(self, inputs, no_samples=1):
+    #     """Summary
+
+    #     Args:
+    #         inputs (TYPE): Description
+    #         no_samples (int, optional): Description
+
+    #     Returns:
+    #         TYPE: Description
+    #     """
+    #     if not self.updated:
+    #         self.sgp_layer.update_posterior()
+    #         self.updated = True
+    #     K = no_samples
+    #     fs = np.zeros((inputs.shape[0], self.Dout, K))
+    #     # TODO: remove for loop here
+    #     for k in range(K):
+    #         fs[:, :, k] = self.sgp_layer.sample(inputs)
+    #     return fs
+
+    # def predict_y(self, inputs):
+    #     """Summary
+
+    #     Args:
+    #         inputs (TYPE): Description
+
+    #     Returns:
+    #         TYPE: Description
+    #     """
+    #     if not self.updated:
+    #         self.sgp_layer.update_posterior()
+    #         self.updated = True
+    #     mf, vf = self.sgp_layer.forward_prop_thru_post(inputs)
+    #     my, vy = self.emi_layer.output_probabilistic(mf, vf)
+    #     return my, vy
+
+    # def update_hypers(self, params):
+    #     """Summary
+
+    #     Args:
+    #         params (TYPE): Description
+
+    #     Returns:
+    #         TYPE: Description
+    #     """
+    #     self.sgp_layer.update_hypers(params)
+    #     self.emi_layer.update_hypers(params)
+    #     self.sn = params['sn']
+
+    # def init_hypers(self):
+    #     """Summary
+
+    #     Returns:
+    #         TYPE: Description
+    #     """
+    #     sgp_params = self.sgp_layer.init_hypers()
+    #     lik_params = self.emi_layer.init_hypers()
+    #     ssm_params = {'sn': np.log(0.001)}
+    #     init_params = dict(sgp_params)
+    #     init_params.update(lik_params)
+    #     init_params.update(ssm_params)
+    #     return init_params
+
+    # def get_hypers(self):
+    #     """Summary
+
+    #     Returns:
+    #         TYPE: Description
+    #     """
+    #     sgp_params = self.sgp_layer.get_hypers()
+    #     emi_params = self.emi_layer.get_hypers()
+    #     ssm_params = {'sn': self.sn}
+    #     params = dict(sgp_params)
+    #     params.update(emi_params)
+    #     params.update(ssm_params)
+    #     return params
+
+
+class SGP_Layer_rank_one(object):
+    """Summary
+
+    Attributes:
+        Din (TYPE): Description
+        Dout (TYPE): Description
+        Kuu (TYPE): Description
+        Kuuinv (TYPE): Description
+        ls (TYPE): Description
+        M (TYPE): Description
+        mu (TYPE): Description
+        N (TYPE): Description
+        sf (int): Description
+        Splusmm (TYPE): Description
+        Su (TYPE): Description
+        Suinv (TYPE): Description
+        SuinvMu (TYPE): Description
+        t1 (TYPE): Description
+        t2 (TYPE): Description
+        zu (TYPE): Description
+    """
+
+    def __init__(self, no_train, input_size, output_size, no_pseudo):
         """Summary
 
         Args:
-            inputs (TYPE): Description
+            no_train (TYPE): Description
+            input_size (TYPE): Description
+            output_size (TYPE): Description
+            no_pseudo (TYPE): Description
+        """
+        self.Din = Din = input_size
+        self.Dout = Dout = output_size
+        self.M = M = no_pseudo
+        self.N = N = no_train
+
+        # factor variables
+        self.variances = np.zeros([N, Dout])
+        self.variances.fill(1e20)
+        self.means = np.zeros([N, Dout])
+
+        # pep variables
+        self.gamma = np.zeros([Dout, M])
+        self.beta = np.zeros([Dout, M, M])
+        
+        # numpy variable for inducing points, Kuuinv, Kuu and its gradients
+        self.zu = np.zeros([M, Din])
+        self.Kuu = np.zeros([M, M])
+        self.Kuuinv = np.zeros([M, M])
+
+        # variables for the hyperparameters
+        self.ls = np.zeros([Din, ])
+        self.sf = 0
+
+    def forward_prop_thru_post(self, x):
+        """Summary
+
+        Args:
+            x (TYPE): Description
 
         Returns:
             TYPE: Description
         """
-        if not self.updated:
-            self.sgp_layer.update_posterior()
-            self.updated = True
-        mf, vf = self.sgp_layer.forward_prop_thru_post(inputs)
-        return mf, vf
+        Kuuinv = self.Kuuinv
+        A = np.einsum('ab,db->da', Kuuinv, self.mu)
+        B = np.einsum(
+            'ab,dbc->dac',
+            Kuuinv, np.einsum('dab,bc->dac', self.Su, Kuuinv)) - Kuuinv
+        kff = np.exp(2 * self.sf)
+        kfu = compute_kernel(2 * self.ls, 2 * self.sf, x, self.zu)
+        mout = np.einsum('nm,dm->nd', kfu, A)
+        Bpsi2 = np.einsum('dab,na,nb->nd', B, kfu, kfu)
+        vout = kff + Bpsi2
+        return mout, vout
 
-    def sample_f(self, inputs, no_samples=1):
+    def sample(self, x):
         """Summary
 
         Args:
-            inputs (TYPE): Description
-            no_samples (int, optional): Description
+            x (TYPE): Description
 
         Returns:
             TYPE: Description
         """
-        if not self.updated:
-            self.sgp_layer.update_posterior()
-            self.updated = True
-        K = no_samples
-        fs = np.zeros((inputs.shape[0], self.Dout, K))
-        # TODO: remove for loop here
-        for k in range(K):
-            fs[:, :, k] = self.sgp_layer.sample(inputs)
-        return fs
+        Su = self.Su
+        mu = self.mu
+        Lu = np.linalg.cholesky(Su)
+        epsilon = np.random.randn(self.Dout, self.M)
+        u_sample = mu + np.einsum('dab,db->da', Lu, epsilon)
 
-    def predict_y(self, inputs):
+        kff = compute_kernel(2 * self.ls, 2 * self.sf, x, x)
+        kff += np.diag(JITTER * np.ones(x.shape[0]))
+        kfu = compute_kernel(2 * self.ls, 2 * self.sf, x, self.zu)
+        qfu = np.dot(kfu, self.Kuuinv)
+        mf = np.einsum('nm,dm->nd', qfu, u_sample)
+        vf = kff - np.dot(qfu, kfu.T)
+        Lf = np.linalg.cholesky(vf)
+        epsilon = np.random.randn(x.shape[0], self.Dout)
+        f_sample = mf + np.einsum('ab,bd->ad', Lf, epsilon)
+        return f_sample
+
+    def compute_kuu(self):
         """Summary
-
-        Args:
-            inputs (TYPE): Description
 
         Returns:
             TYPE: Description
         """
-        if not self.updated:
-            self.sgp_layer.update_posterior()
-            self.updated = True
-        mf, vf = self.sgp_layer.forward_prop_thru_post(inputs)
-        my, vy = self.emi_layer.output_probabilistic(mf, vf)
-        return my, vy
+        # update kuu and kuuinv
+        ls = self.ls
+        sf = self.sf
+        Dout = self.Dout
+        M = self.M
+        zu = self.zu
+        self.Kuu = compute_kernel(2 * ls, 2 * sf, zu, zu)
+        self.Kuu += np.diag(JITTER * np.ones((M, )))
+        self.Kuuinv = np.linalg.inv(self.Kuu)
 
-    def update_hypers(self, params):
+    def update_posterior(self, x_train=None, new_hypers=False):
+        """Summary
+
+        Returns:
+            TYPE: Description
+        """
+        # compute the posterior approximation
+        if new_hypers and x_train is not None:
+            Kfu = compute_kernel(2*self.ls, 2*self.sf, x_train, self.zu)
+            KuuinvKuf = np.dot(self.Kuuinv, Kfu.T)
+            self.Kfu = Kfu
+            self.KuuinvKuf = KuuinvKuf
+            self.Kff_diag = compute_kernel_diag(2*self.ls, 2*self.sf, x_train)
+
+        KuuinvKuf_div_var = np.einsum('an,nd->dan', self.KuuinvKuf, 1.0 / self.variances)
+        T2u = np.einsum('dan,bn->dab', KuuinvKuf_div_var, self.KuuinvKuf)
+        T1u = np.einsum('bn,nd->db', self.KuuinvKuf, self.means / self.variances)
+        Vinv = self.Kuuinv + T2u
+        self.Suinv = Vinv
+        self.Su = np.linalg.inv(Vinv)
+        self.mu = np.einsum('dab,db->da', self.Su, T1u)
+        self.gamma = np.einsum('ab,db->da', self.Kuuinv, self.mu)
+        self.beta = self.Kuuinv - np.einsum('ab,dbc->dac', 
+            self.Kuuinv,
+            np.einsum('dab,bc->dac', self.Su, self.Kuuinv))
+        
+    def init_hypers(self, x_train=None, key_suffix=''):
+        """Summary
+
+        Args:
+            x_train (None, optional): Description
+            key_suffix (str, optional): Description
+
+        Returns:
+            TYPE: Description
+        """
+        # dict to hold hypers, inducing points and parameters of q(U)
+        N = self.N
+        M = self.M
+        Din = self.Din
+        Dout = self.Dout
+
+        if x_train is None:
+            ls = np.log(np.ones((Din, )) + 0.1 * np.random.rand(Din, ))
+            sf = np.log(np.array([1]))
+            zu = np.tile(np.linspace(-1, 1, M).reshape((M, 1)), (1, Din))
+        else:
+            if N < 10000:
+                centroids, label = kmeans2(x_train, M, minit='points')
+            else:
+                randind = np.random.permutation(N)
+                centroids = x_train[randind[0:M], :]
+            zu = centroids
+
+            if N < 10000:
+                X1 = np.copy(x_train)
+            else:
+                randind = np.random.permutation(N)
+                X1 = X[randind[:5000], :]
+
+            x_dist = cdist(X1, X1, 'euclidean')
+            triu_ind = np.triu_indices(N)
+            ls = np.zeros((Din, ))
+            d2imed = np.median(x_dist[triu_ind])
+            for i in range(Din):
+                ls[i] = np.log(d2imed + 1e-16)
+            sf = np.log(np.array([0.5]))
+
+        params = dict()
+        params['sf' + key_suffix] = sf
+        params['ls' + key_suffix] = ls
+        params['zu' + key_suffix] = zu
+
+        return params
+
+    def get_hypers(self, key_suffix=''):
+        """Summary
+
+        Args:
+            key_suffix (str, optional): Description
+
+        Returns:
+            TYPE: Description
+        """
+        params = {}
+        M = self.M
+        Din = self.Din
+        Dout = self.Dout
+        params['ls' + key_suffix] = self.ls
+        params['sf' + key_suffix] = self.sf
+        params_zu_i = self.zu
+        params['zu' + key_suffix] = self.zu
+        return params
+
+    def update_hypers(self, params, x_train, key_suffix=''):
         """Summary
 
         Args:
             params (TYPE): Description
+            key_suffix (str, optional): Description
 
         Returns:
             TYPE: Description
         """
-        self.sgp_layer.update_hypers(params)
-        self.emi_layer.update_hypers(params)
-        self.sn = params['sn']
+        self.ls = params['ls' + key_suffix]
+        self.sf = params['sf' + key_suffix]
+        self.zu = params['zu' + key_suffix]
 
-    def init_hypers(self):
+        # update Kuu given new hypers
+        self.compute_kuu()
+        # compute mu and Su for each layer
+        self.update_posterior(x_train, new_hypers=True)
+
+    def compute_cavity(self, idxs, alpha):
+        # deletion
+        p_i = self.KuuinvKuf[:, idxs].T[:, np.newaxis, :]
+        k_i = self.Kfu[idxs, :]
+        k_ii = self.Kff_diag[idxs][:, np.newaxis]
+        gamma = self.gamma
+        beta = self.beta
+        h_si = p_i - np.einsum('dab,nb->nda', beta, k_i)
+        variance_i = self.variances[idxs, :]
+        mean_i = self.means[idxs, :]
+        dlogZd_dmi2 = 1.0 / (variance_i/alpha - 
+            np.sum(k_i[:, np.newaxis, :] * h_si, axis=2))
+        dlogZd_dmi = -dlogZd_dmi2 * (mean_i - 
+            np.sum(k_i[:, np.newaxis, :] * gamma, axis=2))
+        hd1 = h_si * dlogZd_dmi[:, :, np.newaxis]
+        hd2h = np.einsum('nda,ndb->ndab', h_si, h_si) * dlogZd_dmi2[:, :, np.newaxis, np.newaxis]
+        gamma_si = gamma + hd1
+        beta_si = beta - hd2h
+
+        # projection
+        h = p_i - np.einsum('ndab,nb->nda', beta_si, k_i)
+        m_si_i = np.einsum('na,nda->nd', k_i, gamma_si)
+        v_si_ii = k_ii - np.einsum('na,ndab,nb->nd', k_i, beta_si, k_i)
+
+        return m_si_i, v_si_ii, [h, beta_si, gamma_si]
+
+    def update_factor(self, idxs, mcav, vcav, dm, dm2, dv, alpha, prop_info):
+        h, beta_si, gamma_si = prop_info[0], prop_info[1], prop_info[2]
+        k_i = self.Kfu[idxs, :]
+        variance_i = self.variances[idxs, :]
+        mean_i = self.means[idxs, :]
+        
+        var_i_new = -1.0 / dm2 - np.sum(k_i[:, np.newaxis, :] * h, axis=2)
+        mean_i_new = mcav - dm / dm2
+
+        var_new_parallel = 1 / (1 / var_i_new + 1 / variance_i * (1 - alpha))
+        mean_div_var_i_new = (mean_i_new / var_i_new + 
+            mean_i / variance_i * (1 - alpha))
+        mean_new_parallel = mean_div_var_i_new * var_new_parallel
+
+        # rho = 0.5
+        # n1_new = 1.0 / var_new_parallel
+        # n2_new = mean_new_parallel / var_new_parallel
+        # n1_ori = 1.0 / variance_i
+        # n2_ori = mean_i / variance_i
+        # n1_damped = rho * n1_new + (1.0 - rho) * n1_ori
+        # n2_damped = rho * n2_new + (1.0 - rho) * n2_ori
+        # var_new_parallel = 1.0 / n1_damped
+        # mean_new_parallel = var_new_parallel * n2_damped
+
+        self.variances[idxs, :] = var_new_parallel
+        self.means[idxs, :] = mean_new_parallel
+
+    def backprop_grads_reg(self, idxs, m, v, dm, dm2, dv, x, alpha, prop_info):
+        N = self.N
+        Nb = idxs.shape[0]
+        sf2 = np.exp(2 * self.sf)
+        Dout = self.Dout
+        Kuu = self.Kuu
+        Kuuinv = self.Kuuinv
+        Su = self.Su
+        mu = self.mu
+        Suinv = self.Suinv
+        p_i = self.KuuinvKuf[:, idxs].T
+        h, beta_si, gamma_si = prop_info[0], prop_info[1], prop_info[2]
+        kfu = self.Kfu[idxs, :]
+        variance_i = self.variances[idxs, :]
+        mean_i = self.means[idxs, :]
+       
+        # compute cavity covariance
+        betacavKuu = np.einsum('ndab,bc->ndac', beta_si, Kuu)
+        mcav = np.einsum('ab,ndb->nda', Kuu, gamma_si)
+        Sucav = Kuu - np.einsum('ab,ndbc->ndac', Kuu, betacavKuu)
+        signSu, logdetSu = np.linalg.slogdet(Su)
+        signKuu, logdetKuu = np.linalg.slogdet(Kuu)
+        Suinvm = np.einsum('dab,db->da', Suinv, mu)
+        term1 = 0.5 * (np.sum(logdetSu) - Dout * logdetKuu + np.sum(mu * Suinvm))
+
+        variance_i = self.variances[idxs, :]
+        mean_i = self.means[idxs, :]
+        tn = 1.0 / variance_i
+        gn = mean_i
+        wnScav = np.einsum('na,ndab->ndb', p_i, Sucav)
+        wnScavwn = np.einsum('ndb,nb->nd', wnScav, p_i)
+        wnScavSinvm = np.sum(wnScav * Suinvm, axis=2)
+        wnS = np.einsum('na,dab->ndb', p_i, Su)
+        wnSwn = np.sum(wnS * p_i[:, np.newaxis, :], axis=2)
+        mwn = np.sum(mu * p_i[:, np.newaxis, :], axis=2)
+        oneminuswnSwn = 1 - alpha * tn * wnSwn
+
+        term2a = 0.5 * alpha * tn**2 * gn**2 * wnScavwn
+        term2b = - gn * tn * wnScavSinvm
+        term2c = 0.5 * tn * mwn**2 / oneminuswnSwn
+        term2d = -0.5 / alpha * np.log(oneminuswnSwn)
+        term2 = N / Nb * np.sum(term2a + term2b + term2c + term2d)
+
+        sgp_contrib = - term1 - term2
+
+        KuuinvMcav = np.einsum('ab,ndb->nda', Kuuinv, mcav)
+        dmiKuuinvMcav = dm[:, :, np.newaxis] * KuuinvMcav
+        dKuu_via_mi = -np.einsum('nda,nb->ab', dmiKuuinvMcav, p_i)
+        
+        VcavKuuinvKufi = np.einsum('ndab,nb->nda', Sucav, p_i)
+        KuuinvVcavKuuinvKufi = np.einsum('ab,ndb->nda', Kuuinv, VcavKuuinvKufi)
+        p_idlogZ_dvi = p_i[:, np.newaxis, :] * dv[:, :, np.newaxis]
+        temp1 = - np.einsum('nda,ndb->ab', KuuinvVcavKuuinvKufi, p_idlogZ_dvi)
+        temp2 = np.transpose(temp1, [0, 1])
+        temp3 = np.einsum('na,ndb->ab', p_i, p_idlogZ_dvi)
+        dKuu_via_vi = temp1 + temp2 + temp3
+        dKuu_via_logZ = dKuu_via_mi + dKuu_via_vi
+
+        dKfu_via_mi = dmiKuuinvMcav
+        dKfu_via_vi = 2 * dv[:, :, np.newaxis] * (-p_i[:, np.newaxis, :] + KuuinvVcavKuuinvKufi)
+        dKfu_via_logZ = np.sum(dKfu_via_mi + dKfu_via_vi, axis=1)
+        dsf2, dls, dzu = compute_kfu_derivatives(
+            dKfu_via_logZ, kfu, np.exp(self.ls), sf2, x, self.zu)
+        dls = dls * np.exp(self.ls)
+        dsf2 += np.sum(dv)
+        dsf = 2 * sf2 * dsf2
+
+        # compute the gradients
+        Vmm = Su + np.einsum('da,db->dab', mu, mu)
+        S = self.Dout * Kuuinv - np.sum(np.einsum('ab,dbc->dac', 
+            Kuuinv, np.einsum('dab,bc->dac', Vmm, Kuuinv)), axis=0)
+        S = 0.5 * S + dKuu_via_logZ
+        dhyp = d_trace_MKzz_dhypers(
+            2*self.ls, 2*self.sf, self.zu, S, 
+            Kuu - np.diag(JITTER * np.ones(self.M)))
+
+        grads = {}
+        grads['sf'] = 2*dhyp[0] + dsf
+        grads['ls'] = 2*dhyp[1] + dls
+        grads['zu'] = dhyp[2] + dzu
+
+        return sgp_contrib, grads
+
+
+class SGPR_rank_one(Base_SGPR):
+    """Summary
+
+    Attributes:
+        Din (TYPE): Description
+        Dout (TYPE): Description
+        lik_layer (TYPE): Description
+        M (TYPE): Description
+        N (TYPE): Description
+        sgp_layer (TYPE): Description
+        updated (bool): Description
+        x_train (TYPE): Description
+    """
+
+    def __init__(self, x_train, y_train, no_pseudo, lik='Gaussian'):
         """Summary
 
-        Returns:
-            TYPE: Description
-        """
-        sgp_params = self.sgp_layer.init_hypers()
-        lik_params = self.emi_layer.init_hypers()
-        ssm_params = {'sn': np.log(0.001)}
-        init_params = dict(sgp_params)
-        init_params.update(lik_params)
-        init_params.update(ssm_params)
-        return init_params
+        Args:
+            x_train (TYPE): Description
+            y_train (TYPE): Description
+            no_pseudo (TYPE): Description
+            lik (str, optional): Description
 
-    def get_hypers(self):
+        Raises:
+            NotImplementedError: Description
+        """
+        super(SGPR_rank_one, self).__init__(x_train, y_train, no_pseudo, lik)
+        self.sgp_layer = SGP_Layer_rank_one(self.N, self.Din, self.Dout, self.M)
+
+    def objective_function(self, params, mb_size, alpha=1.0, prop_mode=PROP_MM):
         """Summary
-
+        
+        Args:
+            params (TYPE): Description
+            mb_size (TYPE): Description
+            alpha (float, optional): Description
+            prop_mode (TYPE, optional): Description
+        
         Returns:
             TYPE: Description
         """
-        sgp_params = self.sgp_layer.get_hypers()
-        emi_params = self.emi_layer.get_hypers()
-        ssm_params = {'sn': self.sn}
-        params = dict(sgp_params)
-        params.update(emi_params)
-        params.update(ssm_params)
-        return params
+        N = self.N
+        if mb_size >= N:
+            idxs = np.arange(N)
+            xb = self.x_train
+            yb = self.y_train
+        else:
+            idxs = np.random.choice(N, mb_size, replace=False)
+            xb = self.x_train[idxs, :]
+            yb = self.y_train[idxs, :]
+        # update model with new hypers
+        self.update_hypers(params)
+        # run power-EP and compute grads
+        no_ep_sweeps = 5 # TODO: put this in config
+        parallel = True # TODO: put this in config
+        energy, grad_all = self.run_pep(idxs, no_ep_sweeps, alpha, parallel, 
+            compute_energy=True)
+        return energy, grad_all
+
+    def run_pep(self, train_idxs, no_sweeps, alpha, parallel, compute_energy=False, display_steps=10):
+        if parallel:
+            return self.run_pep_parallel(
+                train_idxs, no_sweeps, alpha, compute_energy, display_steps)
+        else:
+            # TODO
+            return self.run_pep_sequential(
+                train_idxs, no_sweeps, alpha, compute_energy, display_steps)
+
+    def run_pep_parallel(self, idxs, no_sweeps, alpha, compute_energy, display_steps):
+        batch_size = idxs.shape[0]
+        scale_logZ = - self.N * 1.0 / batch_size / alpha
+        # scale_logZ = 0
+        xb = self.x_train[idxs, :]
+        yb = self.y_train[idxs, :]
+        energy = {}
+        grad_all = {}
+        for k in range(no_sweeps):
+            # if k % display_steps == 0:
+            #     print 'PEP, epoch: %d / %d' % (k, no_sweeps)
+            find_log_lik = compute_energy and (k == no_sweeps-1)
+            m_cav, v_cav, prop_info = self.sgp_layer.compute_cavity(idxs, alpha)
+            logZ, dm, dv, dm2 = self.lik_layer.compute_log_Z(
+                m_cav, v_cav, yb, alpha, compute_dm2=True)
+            # dm *= 0
+            # dm2 *= 0
+            # dm2 += 1e-16
+            # dv *= 0
+            self.sgp_layer.update_factor(
+                idxs, m_cav, v_cav, dm, dm2, dv, alpha, prop_info)
+            self.sgp_layer.update_posterior(None, new_hypers=False)
+
+            if find_log_lik:
+                N = self.N
+                lik_contrib = scale_logZ * np.sum(logZ)
+                dm_s = scale_logZ * dm
+                dv_s = scale_logZ * dv
+                dm2_s = scale_logZ * dm2
+                sgp_contrib, sgp_grad = self.sgp_layer.backprop_grads_reg(
+                    idxs, m_cav, v_cav, dm_s, dm2_s, dv_s, xb, alpha, prop_info)
+                lik_grad = self.lik_layer.backprop_grads(
+                    m_cav, v_cav, dm, dv, alpha, scale_logZ)
+                energy = sgp_contrib + lik_contrib
+
+                grad_all = {}
+                for key in sgp_grad.keys():
+                    grad_all[key] = sgp_grad[key]
+
+                for key in lik_grad.keys():
+                    grad_all[key] = lik_grad[key]
+
+                energy /= N
+                for key in grad_all.keys():
+                    grad_all[key] /= N
+
+        return energy, grad_all
+
+    def run_pep_sequential(self, idxs, no_sweeps, alpha, compute_energy, 
+        display_steps):
+        batch_size = idxs.shape[0]
+        scale_logZ = - self.N * 1.0 / batch_size / alpha
+        xb = self.x_train[idxs, :]
+        yb = self.y_train[idxs, :]
+        for k in range(no_sweeps):
+            if k % display_steps == 0:
+                print 'PEP, epoch: %d / %d' % (k, no_sweeps)
+            find_log_lik = compute_energy and (k == no_sweeps-1)
+            for i in range(batch_size):
+                m_cav, v_cav, prop_info = self.sgp_layer.compute_cavity(
+                    [idxs[i]], alpha)
+                logZ, dm, dv, dm2 = self.lik_layer.compute_log_Z(
+                    m_cav, v_cav, yb[i], alpha, compute_dm2=True)
+                self.sgp_layer.update_factor(
+                    [idxs[i]], m_cav, v_cav, dm, dm2, dv, alpha, prop_info)
+                self.sgp_layer.update_posterior(None, new_hypers=False)
+
+    def update_hypers(self, params):
+        """Summary
+        
+        Args:
+            params (TYPE): Description
+        """
+        self.sgp_layer.update_hypers(params, self.x_train)
+        self.lik_layer.update_hypers(params)
+

@@ -21,6 +21,16 @@ def compute_kernel(lls, lsf, x, z):
     k = sf * np.exp(-0.5 * r2)
     return k
 
+def compute_kernel_diag(lls, lsf, x):
+    ls = np.exp(lls)
+    sf = np.exp(lsf)
+
+    if x.ndim == 1:
+        x = x[ None, : ]
+
+    k = sf * np.ones((x.shape[0], ))
+    return k
+
 
 def grad_x(lls2, lsf2, x, z):
     ls2 = np.exp(lls2)

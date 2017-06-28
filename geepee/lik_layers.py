@@ -101,7 +101,7 @@ class Gauss_Layer(Lik_Layer):
         super(Gauss_Layer, self).__init__(N, D)
         self.sn = 0
 
-    def compute_log_Z(self, mout, vout, y, alpha=1.0):
+    def compute_log_Z(self, mout, vout, y, alpha=1.0, compute_dm2=False):
         """Summary
 
         Args:
@@ -126,8 +126,11 @@ class Gauss_Layer(Lik_Layer):
                                            - 0.5 * alpha * np.log(2 * np.pi * sn2))
             dlogZ_dm = (y - mout) / vout
             dlogZ_dv = -0.5 / vout + 0.5 * (y - mout)**2 / vout**2
-
-            return logZ, dlogZ_dm, dlogZ_dv
+            if compute_dm2:
+                dlogZ_dm2 = - 1 / vout
+                return logZ, dlogZ_dm, dlogZ_dv, dlogZ_dm2
+            else:
+                return logZ, dlogZ_dm, dlogZ_dv
         elif mout.ndim == 3:
             sn2 = np.exp(2.0 * self.sn)
             vout += sn2 / alpha
@@ -297,7 +300,7 @@ class Probit_Layer(Lik_Layer):
             self.__gh_points = np.polynomial.hermite.hermgauss(T)
         return self.__gh_points
 
-    def compute_log_Z(self, mout, vout, y, alpha=1.0):
+    def compute_log_Z(self, mout, vout, y, alpha=1.0, compute_dm2=False):
         """Summary
 
         Args:
@@ -326,6 +329,10 @@ class Probit_Layer(Lik_Layer):
                 dt_dv = -0.5 * y * mout / (1 + vout)**1.5
                 dlogZ_dm = dlogZ_dt * dt_dm
                 dlogZ_dv = dlogZ_dt * dt_dv
+
+                if compute_dm2:
+                    beta = dt_dm / y
+                    dlogZ_dm2 = - (beta**2 + mout * y * beta / (1 + vout))
             else:
                 gh_x, gh_w = self._gh_points(GH_DEGREE)
                 gh_x = gh_x[:, np.newaxis, np.newaxis]
@@ -347,6 +354,13 @@ class Probit_Layer(Lik_Layer):
                 dZdv = np.sum(gh_w * (a * gh_x), axis=0) * y * \
                     alpha / np.pi / np.sqrt(2) / np.sqrt(2 * vout)
                 dlogZ_dv = dZdv / Ztilted + eps
+
+                if compute_dm2:
+                    b = (alpha-1)*pdfs**(alpha-2)*np.exp(-ts**2)/np.sqrt(2*np.pi) \
+                        - pdfs**(alpha-1) * y * ts * np.exp(-ts**2/2)
+                    dZdm2 = np.sum(gh_w * b, axis=0) * alpha / np.pi / np.sqrt(2)
+                    dlogZ_dm2 = -dZdm**2 / Ztilted**2 + dZdm2 / Ztilted + eps
+
         elif mout.ndim == 3:
             if alpha == 1.0:
                 t = y * mout / np.sqrt(1 + vout)
@@ -396,7 +410,10 @@ class Probit_Layer(Lik_Layer):
         else:
             raise RuntimeError('invalid ndim, ndim=%d' % mout.ndim)
 
-        return logZ, dlogZ_dm, dlogZ_dv
+        if compute_dm2:
+            return logZ, dlogZ_dm, dlogZ_dv, dlogZ_dm2
+        else:
+            return logZ, dlogZ_dm, dlogZ_dv
 
     def compute_log_lik_exp(self, m, v, y):
         if m.ndim == 2:
@@ -438,7 +455,6 @@ class Probit_Layer(Lik_Layer):
             dv = np.sum(grad_cdfs * dts_dv, axis=0) / m.shape[0]
 
         return loglik, dm, dv
-
 
     def output_probabilistic(self, mf, vf, alpha=1.0):
         """Summary

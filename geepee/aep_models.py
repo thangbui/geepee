@@ -759,6 +759,24 @@ class SGPLVM(Base_SGPLVM):
                 dx, mcav, vcav, eps)
             lik_grad_hyper = lik_layer.backprop_grads(
                 m, v, dm, dv, alpha, scale_logZ)
+        elif prop_mode == PROP_LIN:
+            # TODO
+            # propagate x cavity forward
+            res, res_s = sgp_layer.forward_prop_thru_cav(mcav, vcav, PROP_LIN)
+            m, v, kfu, x, eps = res[0], res[1], res[2], res[3], res[4]
+            m_s, v_s, kfu_s, x_s, eps_s = (
+                res_s[0], res_s[1], res_s[2], res_s[3], res_s[4])
+            # compute logZ and gradients
+            logZ, dm, dv = lik_layer.compute_log_Z(m, v, yb, alpha)
+            logZ_scale = scale_logZ * logZ
+            dm_scale = scale_logZ * dm
+            dv_scale = scale_logZ * dv
+            sgp_grad_hyper, dx = sgp_layer.backprop_grads_lvm_mc(
+                m_s, v_s, dm_scale, dv_scale, kfu_s, x_s, alpha)
+            sgp_grad_input = sgp_layer.backprop_grads_reparam(
+                dx, mcav, vcav, eps)
+            lik_grad_hyper = lik_layer.backprop_grads(
+                m, v, dm, dv, alpha, scale_logZ)
         else:
             raise NotImplementedError('propagation mode not implemented')
 

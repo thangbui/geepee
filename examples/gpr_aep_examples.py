@@ -1,8 +1,8 @@
 print "importing stuff..."
 import numpy as np
 import pdb
-# import matplotlib
-# matplotlib.use('Agg')
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pylab as plt
 from scipy import special
 
@@ -186,7 +186,7 @@ def run_step_1D():
 
     def plot(m):
         xx = np.linspace(-3, 3, 100)[:, None]
-        mean, var = m.predict_f(xx)
+        mean, var = m.predict_y(xx)
         zu = m.sgp_layer.zu
         mean_u, var_u = m.predict_f(zu)
         plt.figure()
@@ -211,9 +211,10 @@ def run_step_1D():
     print "create model and optimize ..."
     M = 20
     model = aep.SGPR(X, Y, M, lik='Gaussian')
-    model.optimise(method='L-BFGS-B', alpha=0.01, maxiter=2000)
+    model.optimise(method='L-BFGS-B', alpha=0.9, maxiter=2000)
     plot(model)
-    plt.show()
+    plt.savefig('/tmp/aep_gpr_step.pdf')
+    # plt.show()
 
 
 def run_spiral():
@@ -309,9 +310,9 @@ def run_boston():
 if __name__ == '__main__':
     # run_regression_1D()
     # run_banana()
-    # run_step_1D()
+    run_step_1D()
     # run_spiral()
     # run_boston()
 
     # run_regression_1D_stoc()
-    run_banana_stoc()
+    # run_banana_stoc()
