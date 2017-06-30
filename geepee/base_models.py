@@ -59,7 +59,8 @@ class Base_Model(object):
     def optimise(
             self, method='L-BFGS-B', tol=None, reinit_hypers=True,
             callback=None, maxfun=100000, maxiter=1000, alpha=0.5,
-            mb_size=None, adam_lr=0.001, prop_mode=PROP_MM, disp=True, **kargs):
+            mb_size=None, adam_lr=0.001, prop_mode=PROP_MM, disp=True, 
+            return_cost=False, **kargs):
         """Summary
         
         Args:
@@ -98,8 +99,13 @@ class Base_Model(object):
                     maxiter=maxiter,
                     args=(params_args, self, mb_size, alpha, prop_mode),
                     disp=disp,
-                    callback=callback)
-                final_params = results
+                    callback=callback,
+                    return_cost=return_cost)
+                if return_cost:
+                    final_params = results[0]
+                    costs = results[1]
+                else:
+                    final_params = results
             else:
                 options = {'maxfun': maxfun, 'maxiter': maxiter,
                            'disp': disp, 'gtol': 1e-6, 'ftol': 1e-6}
@@ -116,11 +122,16 @@ class Base_Model(object):
 
         except KeyboardInterrupt:
             print 'Caught KeyboardInterrupt ...'
-            final_params = objective_wrapper.previous_x    
+            final_params = objective_wrapper.previous_x
+            costs = []    
 
         final_params = unflatten_dict(final_params, params_args)
         self.update_hypers(final_params)
-        return final_params
+        # TODO return cost for lbfgs
+        if return_cost and method.lower() == 'adam':
+            return final_params, costs
+        else:
+            return final_params
 
     def set_fixed_params(self, params):
         """Summary

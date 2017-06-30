@@ -97,22 +97,45 @@ def plot_prediction_MM(model, y_train, y_test, plot_title=''):
     ax.plot(np.arange(T_train), y_train[:, 0], 'k+-')
     ttest = np.arange(T_train, T_train+T)
     # pdb.set_trace()
-    ax.plot(ttest, my[:, 0], '-', color='r')
+    ax.plot(ttest, my[:, 0], '-', color='b')
     ax.fill_between(
         ttest, 
         my[:, 0] + 2*np.sqrt(vy_noiseless[:, 0]),
         my[:, 0] - 2*np.sqrt(vy_noiseless[:, 0]),
-        alpha=0.3, edgecolor='r', facecolor='r')
+        alpha=0.3, edgecolor='b', facecolor='b')
     ax.fill_between(
         ttest, 
         my[:, 0] + 2*np.sqrt(vy[:, 0]),
         my[:, 0] - 2*np.sqrt(vy[:, 0]),
-        alpha=0.1, edgecolor='r', facecolor='r')
-    ax.plot(ttest, y_test, 'bo')
+        alpha=0.1, edgecolor='b', facecolor='b')
+    ax.plot(ttest, y_test, 'ro')
     ax.set_xlim([T_train-5, T_train + T])
     plt.title(plot_title)
-    # plt.savefig('/tmp/kink_pred_MM_'+plot_title+'.pdf')
-    plt.savefig('/tmp/kink_pred_MM_'+plot_title+'.png')
+    plt.savefig('/tmp/kink_pred_MM_'+plot_title+'.pdf')
+    # plt.savefig('/tmp/kink_pred_MM_'+plot_title+'.png')
+
+def find_rank(arr):
+    a = np.array(arr)
+    r = np.array(a.argsort().argsort(), dtype=float)
+    f = a==a
+    for i in xrange(len(a)):
+        if not f[i]: 
+            continue
+        s = a == a[i]
+        ls = np.sum(s)
+        if ls > 1:
+            tr = np.sum(r[s])
+            r[s] = float(tr)/ls
+            f[s] = False
+    return r
+
+def compute_log_lik(noise, y_test, prediction):
+    loglik = - 0.5 * (prediction - y_test)**2 / noise
+    weights = np.arange(y_test.shape[0])**2 + 1
+    loglik *= weights
+    loglik_sum = np.sum(loglik, axis=1)
+    ranks = find_rank(loglik_sum)
+    return loglik, (ranks + 1) / np.max(ranks)
 
 def plot_prediction_MC(model, y_train, y_test, plot_title=''):
     T = y_test.shape[0]
@@ -123,15 +146,20 @@ def plot_prediction_MC(model, y_train, y_test, plot_title=''):
     ax.plot(np.arange(T_train), y_train[:, 0], 'k+-')
     ttest = np.arange(T_train, T_train+T)
     ttest = np.reshape(ttest, [T, 1])
-    for k in range(my.shape[1]):
-        ax.plot(ttest, my[:, k, 0], '-', color='r', alpha=0.3)
+    loglik, ranks = compute_log_lik(np.exp(2*model.sn), y_test, my[:, :, 0].T)
+    red = 0.1
+    green = 0. * red
+    blue = 1. - red
+    color = np.array([red, green, blue]).T
+    for k in np.argsort(ranks):
+        ax.plot(ttest, my[:, k, 0], '-', color=color*ranks[k], alpha=0.5)
     # ax.plot(np.tile(ttest, [1, my.shape[1]]), my[:, :, 0], '-x', color='r', alpha=0.3)
     # ax.plot(np.tile(ttest, [1, my.shape[1]]), x_samples[:, :, 0], 'x', color='m', alpha=0.3)
-    ax.plot(ttest, y_test, 'bo')
+    ax.plot(ttest, y_test, 'ro')
     ax.set_xlim([T_train-5, T_train + T])
     plt.title(plot_title)
-    # plt.savefig('/tmp/kink_pred_MC_'+plot_title+'.pdf')
-    plt.savefig('/tmp/kink_pred_MC_'+plot_title+'.png')
+    plt.savefig('/tmp/kink_pred_MC_'+plot_title+'.pdf')
+    # plt.savefig('/tmp/kink_pred_MC_'+plot_title+'.png')
 
 
 # generate a dataset from the kink function above
@@ -162,8 +190,8 @@ plot_latent(model_vfe, y_train, 'VFE')
 plot_prediction_MM(model_vfe, y_train, y_test, 'VFE')
 plot_prediction_MC(model_vfe, y_train, y_test, 'VFE')
 
-alphas = [0.001, 0.05, 0.2, 0.5, 1.0]
-# alphas = [0.001, 0.5, 1]
+# alphas = [0.001, 0.05, 0.2, 0.5, 1.0]
+alphas = [0.001, 0.5, 1]
 for alpha in alphas:
     print 'alpha = %.3f' % alpha
     # create AEP model

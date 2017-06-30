@@ -266,15 +266,16 @@ def run_banana_pep_training(stoc=False):
     Ytrain = np.loadtxt('./examples/data/banana_Y_train.txt',
                         delimiter=',').reshape(-1, 1)
     Ytrain[np.where(Ytrain == 0)[0]] = -1
-    M = 50
-    alpha = 0.01
+    M = 100
+    alpha = 1
     model_pep = pep.SGPR_rank_one(Xtrain, Ytrain, M, lik='Probit')
     if stoc:
         mb_size = M
+        mb_size = Xtrain.shape[0]
         fname = '/tmp/gpr_pep_cla_stoc.pdf'
         adam_lr = 0.005
     else:
-        mb_size = N
+        mb_size = Xtrain.shape[0]
         fname = '/tmp/gpr_pep_cla.pdf'
         adam_lr = 0.05
     model_pep.optimise(method='adam', mb_size=mb_size, adam_lr=adam_lr, alpha=alpha, maxiter=2000)
@@ -351,7 +352,7 @@ if __name__ == '__main__':
     # run_banana()
     # run_step_1D()
     # run_regression_1D_pep_training(stoc=False)
-    run_regression_1D_pep_training(stoc=True)
+    # run_regression_1D_pep_training(stoc=True)
     # run_regression_1D_pep_inference()
     run_banana_pep_training(stoc=True)
     # run_banana_pep_training(stoc=False)

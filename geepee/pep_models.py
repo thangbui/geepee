@@ -1668,15 +1668,16 @@ class SGP_Layer_rank_one(object):
             mean_i / variance_i * (1 - alpha))
         mean_new_parallel = mean_div_var_i_new * var_new_parallel
 
-        # rho = 0.5
-        # n1_new = 1.0 / var_new_parallel
-        # n2_new = mean_new_parallel / var_new_parallel
-        # n1_ori = 1.0 / variance_i
-        # n2_ori = mean_i / variance_i
-        # n1_damped = rho * n1_new + (1.0 - rho) * n1_ori
-        # n2_damped = rho * n2_new + (1.0 - rho) * n2_ori
-        # var_new_parallel = 1.0 / n1_damped
-        # mean_new_parallel = var_new_parallel * n2_damped
+        # if alpha == 1:
+        #     rho = 0.5
+        #     n1_new = 1.0 / var_new_parallel
+        #     n2_new = mean_new_parallel / var_new_parallel
+        #     n1_ori = 1.0 / variance_i
+        #     n2_ori = mean_i / variance_i
+        #     n1_damped = rho * n1_new + (1.0 - rho) * n1_ori
+        #     n2_damped = rho * n2_new + (1.0 - rho) * n2_ori
+        #     var_new_parallel = 1.0 / n1_damped
+        #     mean_new_parallel = var_new_parallel * n2_damped
 
         self.variances[idxs, :] = var_new_parallel
         self.means[idxs, :] = mean_new_parallel
@@ -1818,7 +1819,7 @@ class SGPR_rank_one(Base_SGPR):
         # update model with new hypers
         self.update_hypers(params)
         # run power-EP and compute grads
-        no_ep_sweeps = 5 # TODO: put this in config
+        no_ep_sweeps = 1 # TODO: put this in config
         parallel = True # TODO: put this in config
         energy, grad_all = self.run_pep(idxs, no_ep_sweeps, alpha, parallel, 
             compute_energy=True)
