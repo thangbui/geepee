@@ -331,7 +331,7 @@ class Probit_Layer(Lik_Layer):
                 dlogZ_dv = dlogZ_dt * dt_dv
 
                 if compute_dm2:
-                    beta = dt_dm / y
+                    beta = dlogZ_dm / y
                     dlogZ_dm2 = - (beta**2 + mout * y * beta / (1 + vout))
             else:
                 gh_x, gh_w = self._gh_points(GH_DEGREE)

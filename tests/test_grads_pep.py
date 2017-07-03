@@ -8,13 +8,13 @@ matplotlib.use('Agg')
 import matplotlib.pylab as plt
 
 from .context import pep, vfe
+from .context import pep_tmp as pep
 from test_utils import check_grad
 
 np.random.seed(42)
 
 def test_gpr_pep_gaussian():
     N_train = 20
-    alpha = 0.2
     M = 5
     D = 2
     Q = 3
@@ -23,7 +23,9 @@ def test_gpr_pep_gaussian():
     model = pep.SGPR_rank_one(x_train, y_train, M, lik='Gaussian')
     params = model.init_hypers(y_train)
     print 'gpr pep gaussian'
-    check_grad(params, model, stochastic=False, alpha=alpha)
+    for alpha in np.linspace(0.05, 1, 20):
+        print alpha
+        check_grad(params, model, stochastic=False, alpha=alpha)
 
 def compared_gpr_aep_gaussian_collapsed():
     # make sure that the number of pep sweeps is large in the pep model
@@ -62,8 +64,10 @@ def test_gpr_pep_probit():
     y_train = 2 * np.random.randint(0, 2, size=(N_train, Q)) - 1
     model = pep.SGPR_rank_one(x_train, y_train, M, lik='Probit')
     params = model.init_hypers(y_train)
-    print 'gpr aep probit stoc'
-    check_grad(params, model, stochastic=False, alpha=alpha)
+    print 'gpr aep probit'
+    for alpha in np.linspace(0.05, 1, 20):
+        print alpha
+        check_grad(params, model, stochastic=False, alpha=alpha)
 
 
 # TODO
@@ -149,7 +153,7 @@ if __name__ == '__main__':
 
     # compared_gpr_aep_gaussian_collapsed()
 
-    for i in range(5):
+    for i in range(1):
         test_gpr_pep_gaussian()
         test_gpr_pep_probit()
 

@@ -8,7 +8,47 @@ from scipy import special
 import time
 
 from .datautils import step, spiral
-from .context import pep, aep
+from .context import pep, aep, vfe
+from .context import pep_tmp
+
+def test_gpr_gaussian_energy():
+    N_train = 200
+    M = 10
+    D = 2
+    Q = 1
+    y_train = np.random.randn(N_train, Q)
+    x_train = np.random.randn(N_train, D)
+    model_vfe = vfe.SGPR_collapsed(x_train, y_train, M)
+    params = model_vfe.init_hypers(y_train)
+    # params = model_vfe.optimise(disp=False)
+    logZ_vfe, _ = model_vfe.objective_function(params, N_train, alpha=0.0001)
+    print 'vfe', logZ_vfe
+
+    alphas = np.linspace(0.001, 1, 20)
+    for alpha in alphas:
+        model_pep = pep_tmp.SGPR_rank_one(x_train, y_train, M, lik='Gaussian')
+        logZ_pep, _ = model_pep.objective_function(params, N_train, alpha=alpha)
+        print alpha, logZ_pep
+
+def test_gpr_probit_energy():
+    N_train = 20
+    M = 10
+    D = 2
+    Q = 3
+    x_train = np.random.randn(N_train, D)
+    y_train = 2 * np.random.randint(0, 2, size=(N_train, Q)) - 1
+    model_vfe = vfe.SGPR(x_train, y_train, M, lik='Probit')
+    params = model_vfe.init_hypers(y_train)
+    # model_vfe.set_fixed_params(['ls', 'sf', 'zu'])
+    # params = model_vfe.optimise(disp=False)
+    logZ_vfe, _ = model_vfe.objective_function(params, N_train)
+    print 'vfe', logZ_vfe
+
+    alphas = np.linspace(0.001, 1, 20)
+    for alpha in alphas:
+        model_pep = pep_tmp.SGPR_rank_one(x_train, y_train, M, lik='Probit')
+        logZ_pep, _ = model_pep.objective_function(params, N_train, alpha=alpha)
+        print alpha, logZ_pep
 
 def run_regression_1D_pep_training(stoc=False):
     np.random.seed(42)
@@ -278,7 +318,21 @@ def run_banana_pep_training(stoc=False):
         mb_size = Xtrain.shape[0]
         fname = '/tmp/gpr_pep_cla.pdf'
         adam_lr = 0.05
-    model_pep.optimise(method='adam', mb_size=mb_size, adam_lr=adam_lr, alpha=alpha, maxiter=2000)
+    from context import utils
+    import scipy.stats as stats
+    from scipy.misc import logsumexp
+    def callback(params, i, args):
+        if i % 10 == 0:
+            params_dict = utils.unflatten_dict(params, args[0])
+            model_pep.update_hypers(params_dict)
+            mf, vf = model_pep.predict_f(Xtrain)
+            K = 20
+            fs = (np.random.randn(K, mf.shape[0]) * np.sqrt(vf[:, 0]) + mf[:, 0]).T
+            log_factor = stats.norm.logcdf(np.tile(Ytrain.reshape((Ytrain.shape[0], 1)), (1, K)) * fs)
+            ll = logsumexp(log_factor - np.log(K), 1)
+            print i, 1 - np.mean(ll > np.log(0.5))
+    # model_pep.optimise(method='adam', mb_size=mb_size, adam_lr=adam_lr, alpha=alpha, maxiter=2000)
+    model_pep.optimise(method='adam', mb_size=mb_size, adam_lr=adam_lr, alpha=alpha, maxiter=2000, callback=callback)
     plot(model_pep)
     plt.savefig(fname)
 
@@ -354,5 +408,7 @@ if __name__ == '__main__':
     # run_regression_1D_pep_training(stoc=False)
     # run_regression_1D_pep_training(stoc=True)
     # run_regression_1D_pep_inference()
-    run_banana_pep_training(stoc=True)
-    # run_banana_pep_training(stoc=False)
+    # run_banana_pep_training(stoc=True)
+    run_banana_pep_training(stoc=False)
+    # test_gpr_gaussian_energy()
+    # test_gpr_probit_energy()

@@ -104,7 +104,7 @@ def adam(func, init_params, callback=None, maxiter=1000,
             print 'iter %d \t obj %.3f' % (i, f)
             # print '%.3f' % f
         if callback:
-            callback(x)
+            callback(x, i, args)
         m = (1 - b1) * g + b1 * m  # First  moment estimate.
         v = (1 - b2) * (g**2) + b2 * v  # Second moment estimate.
         mhat = m / (1 - b1**(i + 1))    # Bias correction.

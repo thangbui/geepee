@@ -1819,7 +1819,7 @@ class SGPR_rank_one(Base_SGPR):
         # update model with new hypers
         self.update_hypers(params)
         # run power-EP and compute grads
-        no_ep_sweeps = 1 # TODO: put this in config
+        no_ep_sweeps = 10 # TODO: put this in config
         parallel = True # TODO: put this in config
         energy, grad_all = self.run_pep(idxs, no_ep_sweeps, alpha, parallel, 
             compute_energy=True)

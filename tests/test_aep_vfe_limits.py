@@ -198,5 +198,5 @@ if __name__ == '__main__':
     # test_gplvm_probit_MC(True)
     # test_gplvm_probit_MC(False)
     
-    test_gpssm_linear_gaussian_kink_MM(True)
+    # test_gpssm_linear_gaussian_kink_MM(True)
     # test_gpssm_linear_gaussian_kink_MM(False)
