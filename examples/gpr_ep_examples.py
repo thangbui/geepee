@@ -92,7 +92,6 @@ def run_regression_1D_pep_training(stoc=False):
     plot(model_pep)
     plt.savefig(fname)
 
-
 def run_regression_1D_pep_inference():
     np.random.seed(42)
 
@@ -206,7 +205,6 @@ def run_regression_1D():
 
     # plt.show()
 
-
 def run_banana():
 
     def gridParams():
@@ -306,8 +304,8 @@ def run_banana_pep_training(stoc=False):
     Ytrain = np.loadtxt('./examples/data/banana_Y_train.txt',
                         delimiter=',').reshape(-1, 1)
     Ytrain[np.where(Ytrain == 0)[0]] = -1
-    M = 100
-    alpha = 1
+    M = 20
+    alpha = 0.05
     model_pep = pep.SGPR_rank_one(Xtrain, Ytrain, M, lik='Probit')
     if stoc:
         mb_size = M
@@ -322,7 +320,7 @@ def run_banana_pep_training(stoc=False):
     import scipy.stats as stats
     from scipy.misc import logsumexp
     def callback(params, i, args):
-        if i % 10 == 0:
+        if i % 100 == 0:
             params_dict = utils.unflatten_dict(params, args[0])
             model_pep.update_hypers(params_dict)
             mf, vf = model_pep.predict_f(Xtrain)

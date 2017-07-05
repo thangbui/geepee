@@ -13,10 +13,13 @@ import subprocess
 processes = set()
 max_processes = 12
 
-datasets = ['australian', 'breast', 'crabs', 'iono', 'pima','sonar']
-Ms = [5, 10, 20, 50, 100]
+# datasets = ['australian', 'breast', 'crabs', 'iono', 'pima','sonar']
+# Ms = [5, 10, 20, 50, 100]
 
-no_epochs = 2000
+datasets = ['crabs']
+Ms = [5]
+
+no_epochs = 3000
 mb_size = 1000
 lrate = 0.001
 

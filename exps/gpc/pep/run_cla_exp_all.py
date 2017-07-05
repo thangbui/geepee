@@ -14,17 +14,17 @@ processes = set()
 max_processes = 10
 
 # datasets = ['australian'] # on dirichlet
-# datasets= ['breast'] # on grothendieck
-# datasets = ['crabs'] # on neumann
-# datasets = ['iono'] # on boole
-# datasets = ['pima'] # on goedel
-datasets = ['sonar'] # on dirichlet
+# datasets = ['breast'] # on grothendieck
+# datasets = ['crabs'] # on neumann - DONE
+# datasets = ['iono'] # on boole - DONE
+# datasets = ['pima'] # on goedel - DONE
+datasets = ['sonar'] # on dirichlet - DONE
 
 # datasets = ['australian', 'breast', 'crabs', 'iono', 'pima','sonar']
 Ms = [5, 10, 20, 50, 100]
 alphas = [0.001, 0.01, 0.1, 0.2, 0.4, 0.5, 0.6, 0.8, 1]
 
-no_epochs = 2000
+no_epochs = 3000
 mb_size = 1000
 lrate = 0.001
 

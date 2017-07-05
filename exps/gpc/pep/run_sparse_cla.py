@@ -2,6 +2,7 @@ import sys
 sys.path.append('../../../')
 sys.path.append('../../utils/')
 import geepee.pep_models as pep
+from geepee.utils import unflatten_dict
 import math
 import numpy as np
 from metrics import *
@@ -84,12 +85,17 @@ nosplits = np.loadtxt(nosplits_file, dtype=np.int8)
 
 # prepare output files
 output_path = '/scratch/tdb40/geepee_gpc_pep_results/'
-outname1 = output_path + name + '_pep_' + str(M) + '_' + str(alpha) + '.error'
-if not os.path.exists(os.path.dirname(outname1)):
-    os.makedirs(os.path.dirname(outname1))
-outfile1 = open(outname1, 'w')
-outname2 = output_path + name + '_pep_' + str(M) + '_' + str(alpha) + '.nll'
-outfile2 = open(outname2, 'w')
+test_iters = np.array([100, 500, 1000, 2000, 3000])
+outfile1s, outfile2s = [], []
+for i in test_iters:
+    outname1 = output_path + name + '_pep_' + str(M) + '_' + str(alpha) + '_iter_' + str(i) +'.error'
+    if not os.path.exists(os.path.dirname(outname1)):
+        os.makedirs(os.path.dirname(outname1))
+    outfile1 = open(outname1, 'w')
+    outname2 = output_path + name + '_pep_' + str(M) + '_' + str(alpha) + '_iter_' + str(i) + '.nll'
+    outfile2 = open(outname2, 'w')
+    outfile1s.append(outfile1)
+    outfile2s.append(outfile2)
 outname3 = output_path + name + '_pep_' + str(M) + '_' + str(alpha) + '.time'
 outfile3 = open(outname3, 'w')
 
@@ -104,6 +110,7 @@ for i in range(nosplits):
     y_train = y[index_train, :]
     X_test = X[index_test, :]
     y_test = y[index_test, :]
+    y_test = y_test[:, 0]
 
     if normalise_x:
         # we normalise the train input
@@ -115,42 +122,52 @@ for i in range(nosplits):
 
     # We create the sparse gp object
     model = pep.SGPR_rank_one(X_train, y_train, M, lik='probit')
+
+    def callback(params, iteration, args):
+        global X_test
+        global y_test
+        if (iteration + 1) in test_iters:
+            idx = np.where(test_iters == (iteration + 1))[0][0]
+            outfile1 = outfile1s[idx]
+            outfile2 = outfile2s[idx]
+            params_dict = unflatten_dict(params, args[0])
+            model.update_hypers(params_dict)
+            # We make predictions for the test set
+            mf, vf = model.predict_f(X_test)
+            mf, vf = mf[:, 0], vf[:, 0]
+            # We compute the test error and log lik
+            test_nll = compute_nll(y_test, mf, vf, 'cdf')
+            outfile2.write('%.6f\n' % test_nll)
+            outfile2.flush()
+            os.fsync(outfile2.fileno())
+
+            test_error = compute_error(y_test, mf, vf, 'cdf')
+            outfile1.write('%.6f\n' % test_error)
+            outfile1.flush()
+            os.fsync(outfile1.fileno())
     
     # train
     t0 = time.time()
     final_params, energies = model.optimise(
         method='adam', 
         mb_size=no_points_per_mb, 
-        adam_lr=lrate, 
-        alpha=alpha, 
+        adam_lr=lrate,
+        alpha=alpha,
         maxiter=no_epochs,
-        return_cost=True)
+        return_cost=True,
+        callback=callback)
     t1 = time.time()
 
     outfile3.write('%.6f\n' % (t1-t0))
     outfile3.flush()
     os.fsync(outfile3.fileno())
 
-    # We make predictions for the test set
-    mf, vf = model.predict_f(X_test)
-    mf, vf = mf[:, 0], vf[:, 0]
-    y_test = y_test[:, 0]
-    # We compute the test error and log lik
-    test_nll = compute_nll(y_test, mf, vf, 'cdf')
-    outfile2.write('%.6f\n' % test_nll)
-    outfile2.flush()
-    os.fsync(outfile2.fileno())
-
-    test_error = compute_error(y_test, mf, vf, 'cdf')
-    outfile1.write('%.6f\n' % test_error)
-    outfile1.flush()
-    os.fsync(outfile1.fileno())
-
     outname4 = output_path + name + '_pep_' + str(M) + '_' + str(alpha) + '_' + str(i) + '.energy'
     np.savetxt(outname4, energies, '%.5f')
 
     print 'finishing split', i
 
-outfile1.close()
-outfile2.close()
+for i, idx in enumerate(test_iters):
+    outfile1s[i].close()
+    outfile2s[i].close()
 outfile3.close()
