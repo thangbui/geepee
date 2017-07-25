@@ -8,17 +8,14 @@ from scipy.stats.kde import gaussian_kde
 
 from geepee.kernels import *
 
-import pdb
-
-
 np.random.seed(100)
 
 def figsize(scale):
-    fig_width_pt = 469.755                          # Get this from LaTeX using \the\textwidth
+    fig_width_pt = 488.13                          # Get this from LaTeX using \the\textwidth
     inches_per_pt = 1.0/72.27                       # Convert pt to inch
-    golden_mean = (np.sqrt(5.0)-1.0)/2.0            # Aesthetic ratio (you could change this)
-    fig_width = fig_width_pt*inches_per_pt*scale    # width in inches
-    fig_height = fig_width*golden_mean              # height in inches
+    ratio = 2.2
+    fig_width = fig_width_pt*inches_per_pt    # width in inches
+    fig_height = fig_width*scale              # height in inches
     fig_size = [fig_width,fig_height]
     return fig_size
 
@@ -44,27 +41,6 @@ mpl.rcParams.update(pgf_with_latex)
 
 import matplotlib.pyplot as plt
 import matplotlib.mlab as mlab
-# plt.style.use('ggplot')
-
-# I make my own newfig and savefig functions
-def newfig(width):
-    plt.clf()
-    fig = plt.figure(figsize=figsize(width))
-
-    gs = gridspec.GridSpec(2, 2,
-                       width_ratios=[1,4],
-                       height_ratios=[4,1]
-                       )
-
-    ax1 = plt.subplot(gs[0])
-    ax2 = plt.subplot(gs[1])
-    ax3 = plt.subplot(gs[3])
-
-    return fig, (ax1, ax2, ax3)
-
-def savefig(filename):
-    # plt.savefig('{}.pgf'.format(filename))
-    plt.savefig('{}.pdf'.format(filename))
 
 
 # These are the "Tableau 20" colors as RGB.    
@@ -85,11 +61,10 @@ def chol2inv(chol):
 def matrixInverse(M):
     return chol2inv(spla.cholesky(M, lower=False))
 
-
 # hyperparameters
 lls = np.array([np.log(1)])
 lsf = 0
-lsn = np.log(0.01)
+lsn = np.log(0.02)
 
 # draw a function
 N_train = 100
@@ -114,7 +89,6 @@ Qffplus_inv = matrixInverse(Qffplus)
 mu = np.dot(Kfu.T, np.dot(Qffplus_inv, y_train))
 Vu = Kuu - np.dot(Kfu.T, np.dot(Qffplus_inv, Kfu))
 
-
 # making prediction
 N_test = 400
 x_test = np.linspace(-6, 7, N_test)
@@ -127,72 +101,66 @@ Vt = Ktt - np.dot(KtuKuuinv, Ktu.T) + np.dot(KtuKuuinv, np.dot(Vu, KtuKuuinv.T))
 mt = np.reshape(mt, (N_test, ))
 vt = np.sqrt(np.diag(Vt).reshape((N_test, )))
 
-def compute_m_v_mm(mx, vx):
-    E0 = compute_kernel(lls, lsf, mx, mx)
-    E1, E2 = compute_psi_weave(lls, lsf, mx, vx, z)
-    mx = np.dot(E1, np.dot(Kuuinv, mu))
-
-    B = np.dot(Kuuinv, np.dot(Vu + np.outer(mu, mu), Kuuinv)) - Kuuinv
-    vx = E0 + np.exp(lsn) - mx**2 + np.sum(B * E2)
-    vx = vx
-    return mx[0, 0], vx[0, 0]
-
-
-def compute_m_v_mm_approx(mx, vx):
-    E0 = compute_kernel(lls, lsf, mx, mx)
-    E1, E2 = compute_psi_weave(lls, lsf, mx, vx, z)
-    E2 = np.diag(np.diag(E2[0, :, :]) - E1**2) + np.outer(E1, E1)
-    mx = np.dot(E1, np.dot(Kuuinv, mu))
-
-    B = np.dot(Kuuinv, np.dot(Vu + np.outer(mu, mu), Kuuinv)) - Kuuinv
-    vx = E0 + np.exp(lsn) - mx**2 + np.sum(B * E2)
-    vx = vx
-    return mx[0, 0], vx[0, 0]
-
-
 def compute_m_v_lin(mx, vx):
     ksu = compute_kernel(lls, lsf, mx, z)
-    kss = np.exp(lls) * np.ones((mx.shape[0], 1))
+    kss = np.exp(lsf) * np.ones((mx.shape[0], 1))
 
     ms = np.dot(ksu, np.dot(Kuuinv, mu))
     Kuuinv_kus = np.dot(Kuuinv, ksu.T)
 
     vs = kss - np.sum(ksu * Kuuinv_kus.T, axis=1, keepdims=True)
-    vs = vs + np.sum(Kuuinv_kus.T * np.dot(Vu, Kuuinv_kus), axis=1, keepdims=True)
+    vs = vs + np.sum(Kuuinv_kus * np.dot(Vu, Kuuinv_kus))
 
-    dK = grad_x(lls, lsf, mx, z)
+    dK = -grad_x(lls, lsf, mx, z)
+
+    # Kp = compute_kernel(lls, lsf, mx+1e-5, z)
+    # Km = compute_kernel(lls, lsf, mx-1e-5, z)
+    # gK = (Kp - Km) / 2 / 1e-5
+    # pdb.set_trace()
+
     g = np.einsum('nmd,ma->nd', dK, np.dot(Kuuinv, mu))
     
     m = ms
+    # pdb.set_trace()
     v = g*vx*g + vs
+    print m, v
 
     return m[0, 0], v[0, 0]
 
 m_ins = [-4, -1, 0, 1.2, 5.5]
-v_ins = [0.2, 1.5, 0.04, 0.3, 0.4]
+v_ins = [0.002, 1.5, 0.04, 0.3, 0.4]
+
+
+fig = plt.figure(figsize=figsize(1))
+
+gs1 = gridspec.GridSpec(3, 1)
+gs1.update(top=0.99, bottom=0.68, hspace=0.0)
+ax1 = plt.subplot(gs1[0, :])
+ax2 = plt.subplot(gs1[1:, :], sharex=ax1)
+
+gs2 = gridspec.GridSpec(5, 1)
+gs2.update(top=0.60, bottom=0.05, hspace=0.0)
+ax3 = plt.subplot(gs2[0, :])
+ax4 = plt.subplot(gs2[1, :], sharex=ax3)
+ax5 = plt.subplot(gs2[2, :], sharex=ax3)
+ax6 = plt.subplot(gs2[3, :], sharex=ax3)
+ax7 = plt.subplot(gs2[4, :], sharex=ax3)
+
+axs_mm = [ax3, ax4, ax5, ax6, ax7]
+
+ax2.fill_between(x_test.reshape((N_test, )), mt - 2.0*vt, mt + 2.0*vt, color='black', alpha=0.3)
+ax2.plot(x_test.reshape((N_test, )), mt, color='black')
+ax2.set_ylim([-2.5, 2.5])
+
+ax1.yaxis.set_major_locator(plt.NullLocator())
 
 for i, val in enumerate(m_ins):
     print i
-    fig, ax = newfig(1)
-
-    ax[0].xaxis.set_major_locator(plt.NullLocator())
-    ax[2].yaxis.set_major_locator(plt.NullLocator())
-
-    ax[0].set_ylabel('y', rotation=90)
-    ax[2].set_xlabel('x')
-
-    ax[1].fill_between(x_test.reshape((N_test, )), mt - 2.0*vt, mt + 2.0*vt, color='black', alpha=0.3)
-    ax[1].plot(x_test.reshape((N_test, )), mt, color='black')
-    ax[1].set_ylim([-3, 3])
-    ax[1].set_xlim([-6, 7])
-    ax[2].set_xlim([-6, 7])
-    ax[0].set_ylim([-3, 3])
 
     xplot = x_test.reshape((N_test, ))
-    pdfs = mlab.normpdf(xplot, val, v_ins[i])
-    ax[2].plot(xplot, pdfs, color=tableau20[i*2])
-    ax[2].fill_between(xplot, 0, pdfs, color=tableau20[i*2], alpha=0.4)
-    ax[2].set_xlim([-6, 7])
+    pdfs = mlab.normpdf(xplot, val, np.sqrt(v_ins[i]))
+    ax1.plot(xplot, pdfs/np.max(pdfs), color=tableau20[i*2])
+    ax1.fill_between(xplot, 0, pdfs/np.max(pdfs), color=tableau20[i*2], alpha=0.4)
 
     # draw samples
     N_samples = 2000
@@ -201,7 +169,6 @@ for i, val in enumerate(m_ins):
     m_in = m_ins[i] * np.ones((1, 1))
     v_in = v_ins[i] * np.ones((1, 1))
     for n in range(N_samples):
-
         x_in = m_in + np.sqrt(v_in) * np.random.randn()
         Ktu = compute_kernel(lls, lsf, x_in, z)
         Ktt = compute_kernel(lls, lsf, x_in, x_in)
@@ -213,33 +180,37 @@ for i, val in enumerate(m_ins):
 
         youts[n] = y_out
 
-        ax[1].plot(x_in, y_out, 'o', color=tableau20[i*2], alpha=0.1)
-
     y, binEdges=np.histogram(youts, bins=50, normed=True)
 
     mypdf = gaussian_kde(youts)
     yplot = np.linspace(-3, 2, 200)
-    ax[0].plot(mypdf(yplot), yplot, '-', color='k')
-    ax[0].set_ylim([-3, 3])
+    axs_mm[i].plot(yplot, mypdf(yplot), '-', color='k')
 
     m_in = m_ins[i] * np.ones((1, 1))
     v_in = v_ins[i] * np.ones((1, 1))
-    m_out_app, v_out_app = compute_m_v_mm_approx(m_in, v_in)
-    m_out, v_out = compute_m_v_mm(m_in, v_in)
-    m_out_lin, v_out_lin = compute_m_v_lin(m_in, v_in)
-    
-    N_plot = 100
+    m_out, v_out = compute_m_v_lin(m_in, v_in)
+    N_plot = 300
     xplot = np.linspace(-3, 3, N_plot).reshape((N_plot, ))
-    pdfs = mlab.normpdf(xplot, m_out, v_out)
-    pdfs_app = mlab.normpdf(xplot, m_out_app, v_out_app)
-    pdfs_lin = mlab.normpdf(xplot, m_out_lin, v_out_lin)
-    ax[0].plot(pdfs, xplot, color=tableau20[i*2], linewidth=2)
-    ax[0].plot(pdfs_app, xplot, '--', color=tableau20[i*2], linewidth=2)
-    ax[0].plot(pdfs_lin, xplot, '-.', color=tableau20[i*2], linewidth=2)
-    ax[0].fill_betweenx(xplot, pdfs, 0, color=tableau20[i*2], alpha=0.4)
-    ax[0].set_ylim([-3, 3])
-    
-    savefig('/tmp/prop_mm_' + str(i))
+    pdfs = mlab.normpdf(xplot, m_out, np.sqrt(v_out))
+    axs_mm[i].plot(xplot, pdfs, color=tableau20[i*2], linewidth=2)
+    axs_mm[i].fill_between(xplot, 0, pdfs, color=tableau20[i*2], alpha=0.4)
+    axs_mm[i].set_xlim([-2.5, 2.5])
 
+    axs_mm[i].yaxis.set_major_locator(plt.NullLocator())
+    axs_mm[i].set_ylabel('p(f(x))')
+
+ax7.set_xlabel('f')
+ax2.set_xlabel('x')
+ax2.set_ylabel('f')
+ax1.set_ylabel('p(x)')
+ax1.set_xlim([-6, 7])
+
+plt.setp(ax1.get_xticklabels(), visible=False)
+plt.setp(ax3.get_xticklabels(), visible=False)
+plt.setp(ax4.get_xticklabels(), visible=False)
+plt.setp(ax5.get_xticklabels(), visible=False)
+plt.setp(ax6.get_xticklabels(), visible=False)
+    
+plt.savefig('/tmp/prop_lin.pdf', bbox_inches='tight')
 
 

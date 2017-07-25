@@ -16,7 +16,7 @@ def test_gauss_emis_log_tilted():
 
     # generate some datapoints for testing
     N = 5
-    alpha = 0.5
+    alpha = 0.0005
     Dout = 3
     Din = 2
     y_train = np.random.randn(N, Dout)
@@ -209,8 +209,36 @@ def test_gauss_emis_log_lik():
                   % (a, b, grad_input['vx'][a, b], dab, (grad_input['vx'][a, b] - dab) / dab))
 
 
+def test_gauss_emis_limit():
+
+    # generate some datapoints for testing
+    N = 5
+    alpha = 0.00001
+    Dout = 3
+    Din = 2
+    y_train = np.random.randn(N, Dout)
+    # params  tied
+    model = lik.Gauss_Emis(y_train, Dout, Din)
+
+    params = {'C': np.random.randn(Dout, Din),
+              'R': np.random.randn(Dout)}
+    mx = np.random.randn(N, Din)
+    vx = np.random.rand(N, Din)
+    scale = 1
+
+    model.update_hypers(params)
+    logZ1, _, _ = model.compute_emission_tilted(
+        mx, vx, alpha, 1 / alpha)
+
+    logZ2, _, _ = model.compute_emission_log_lik_exp(
+        mx, vx, scale)
+
+    print logZ1, logZ2, logZ1 - logZ2
+
+
 
 if __name__ == '__main__':
     for i in range(10):
-        # test_gauss_emis_log_tilted()
+        test_gauss_emis_log_tilted()
         test_gauss_emis_log_lik()
+    test_gauss_emis_limit()

@@ -123,6 +123,10 @@ class SGPR_collapsed(Base_Model):
         for p in self.fixed_params:
             grad_all[p] = np.zeros_like(grad_all[p])
 
+        energy /= N
+        for key in grad_all.keys():
+            grad_all[key] /= N
+
         return energy, grad_all
 
     def predict_f(self, inputs, alpha=0.01, marginal=True):
@@ -398,7 +402,7 @@ class SGP_Layer(Base_SGP_Layer):
 
     #TODO
     @profile
-    def backprop_grads_lvm_mc(self, m, v, dm, dv, kfu, x, alpha=1.0):
+    def backprop_grads_lvm_mc(self, m, v, dm, dv, kfu, x):
         """Summary
         
         Args:
@@ -408,7 +412,6 @@ class SGP_Layer(Base_SGP_Layer):
             dv (TYPE): Description
             kfu (TYPE): Description
             x (TYPE): Description
-            alpha (float, optional): Description
         
         Returns:
             TYPE: Description
@@ -421,24 +424,17 @@ class SGP_Layer(Base_SGP_Layer):
         diag_ind = np.diag_indices(M)
         mu = self.mu
         Su = self.Su
+        Suinv = self.Suinv
         Spmm = self.Splusmm
-        muhat = self.muhat
-        Suhat = self.Suhat
-        Spmmhat = self.Splusmmhat
         Kuuinv = self.Kuuinv
         Kuu = self.Kuu
         kfuKuuinv = np.dot(kfu, Kuuinv)
         dm = dm.reshape(m.shape)
         dv = dv.reshape(v.shape)
-
-        beta = (N - alpha) * 1.0 / N
-        scale_poste = N * 1.0 / alpha - 1.0
-        scale_cav = - N * 1.0 / alpha
-        scale_prior = 1
-
+        
         # compute grads wrt kfu
-        dkfu_m = np.einsum('nd,dm->nm', dm, self.Ahat)
-        dkfu_v = 2 * np.einsum('nd,dab,na->nb', dv, self.Bhat_det, kfu)
+        dkfu_m = np.einsum('nd,dm->nm', dm, self.A)
+        dkfu_v = 2 * np.einsum('nd,dab,na->nb', dv, self.B_det, kfu)
         dkfu = dkfu_m + dkfu_v
         dsf2, dls, dzu, dx = compute_kfu_derivatives(
             dkfu, kfu, ls, sf2, x, self.zu, grad_x=True)
@@ -447,49 +443,25 @@ class SGP_Layer(Base_SGP_Layer):
         dsf2 += dv_sum
         dsf = 2 * sf2 * dsf2
 
-        # compute grads wrt theta1 and theta2
-        SKuuinvKuf = np.einsum('dab,nb->nda', Suhat, kfuKuuinv)
-        dSinv_via_v = - np.einsum('nda,nd,ndb->dab',
-                                  SKuuinvKuf, dv, SKuuinvKuf)
-        dSinv_via_m = - np.einsum('nda,nd,db->dab', SKuuinvKuf, dm, muhat)
-        dSinv = dSinv_via_m + dSinv_via_v
-        dSinvM = np.einsum('nda,nd->da', SKuuinvKuf, dm)
-        dtheta1 = beta * dSinv
-        dtheta2 = beta * dSinvM
-
-        dtheta1 = -0.5 * scale_poste * Spmm - 0.5 * scale_cav * beta * Spmmhat + dtheta1
-        dtheta2 = scale_poste * mu + scale_cav * beta * muhat + dtheta2
-        dtheta1T = np.transpose(dtheta1, [0, 2, 1])
-        dtheta1_R = np.einsum(
-            'dab,dbc->dac', self.theta_1_R, dtheta1 + dtheta1T)
-
-        deta1_R = np.zeros([self.Dout, M * (M + 1) / 2])
-        deta2 = dtheta2
-        for d in range(self.Dout):
-            dtheta1_R_d = dtheta1_R[d, :, :]
-            theta1_R_d = self.theta_1_R[d, :, :]
-            dtheta1_R_d[diag_ind] = dtheta1_R_d[
-                diag_ind] * theta1_R_d[diag_ind]
-            dtheta1_R_d = dtheta1_R_d[triu_ind]
-            deta1_R[d, :] = dtheta1_R_d.reshape(
-                (dtheta1_R_d.shape[0], ))
+        # compute grads wrt mean and covariance matrix via log lik exp term
+        dmu = np.einsum('nd,nm->dm', dm, kfuKuuinv)
+        dSu = np.einsum('na,nd,nb->dab', kfuKuuinv, dv, kfuKuuinv)
+        # add in contribution from the KL term
+        dmu += np.einsum('ab,db->da', Kuuinv, mu)
+        dSu += 0.5 * (Kuuinv - Suinv)
+        deta1_R, deta2, dKuuinv_via_u = self.compute_posterior_grad_u(dmu, dSu)
 
         # get contribution of Ahat and Bhat to Kuu and add to Minner
-        dAhat = np.einsum('nd,nm->dm', dm, kfu)
-        dKuuinv_m = np.einsum('da,db->ab', dAhat, muhat)
-        KuuinvSmmd = np.einsum('ab,dbc->dac', Kuuinv, Suhat)
-        dBhat = np.einsum('nd,na,nb->dab', dv, kfu, kfu)
-        dKuuinv_v_1 = 2 * np.einsum('dab,dac->bc', KuuinvSmmd, dBhat) \
-            - np.sum(dBhat, axis=0)
-        dKuuinv_v_2 = np.sum(dSinv, axis=0)
-        dKuuinv = dKuuinv_m + dKuuinv_v_1 + dKuuinv_v_2
-
-        Minner = scale_poste * np.sum(Spmm, axis=0) + scale_cav * \
-            np.sum(Spmmhat, axis=0) - 2.0 * dKuuinv
-        M_all = 0.5 * (scale_prior * self.Dout * Kuuinv +
-                       np.dot(Kuuinv, np.dot(Minner, Kuuinv)))
+        dA = np.einsum('nd,nm->dm', dm, kfu)
+        dKuuinv_m = np.einsum('da,db->ab', dA, mu)
+        KuuinvS = np.einsum('ab,dbc->dac', Kuuinv, Su)
+        dB = np.einsum('nd,na,nb->dab', dv, kfu, kfu)
+        dKuuinv_v = 2 * np.einsum('dab,dac->bc', KuuinvS, dB) - np.sum(dB, axis=0)
+        dKuuinv_KL = - 0.5 * self.Dout * Kuu + 0.5 * np.sum(Spmm, axis=0)
+        dKuuinv = dKuuinv_m + dKuuinv_v + dKuuinv_via_u + dKuuinv_KL
+        M_inner = - np.dot(Kuuinv, np.dot(dKuuinv, Kuuinv))
         dhyp = d_trace_MKzz_dhypers(
-            2 * self.ls, 2 * self.sf, self.zu, M_all,
+            2 * self.ls, 2 * self.sf, self.zu, M_inner,
             self.Kuu - np.diag(JITTER * np.ones(self.M)))
 
         dzu += dhyp[2]
@@ -653,6 +625,10 @@ class SGPR(Base_SGPR):
         for p in self.fixed_params:
             grad_all[p] = np.zeros_like(grad_all[p])
 
+        energy /= N
+        for key in grad_all.keys():
+            grad_all[key] /= N
+
         return energy, grad_all
 
     def predict_f(self, inputs):
@@ -806,32 +782,31 @@ class SGPLVM(Base_SGPLVM):
             # propagate x forward
             mout, vout, psi1, psi2 = sgp_layer.forward_prop_thru_post(mx, vx, return_info=True)
             # compute logZ and gradients
-            logZ, dm, dv = self.lik_layer.compute_log_lik_exp(mout, vout, yb)    
+            logZ, dm, dv = lik_layer.compute_log_lik_exp(mout, vout, yb)    
             logZ_scale = scale_log_lik * logZ
             dm_scale = scale_log_lik * dm
             dv_scale = scale_log_lik * dv
             sgp_grad_hyper, sgp_grad_input = sgp_layer.backprop_grads_lvm_mm(
                 mout, vout, dm_scale, dv_scale, psi1, psi2, mx, vx)
-            lik_grad_hyper = self.lik_layer.backprop_grads_log_lik_exp(
+            lik_grad_hyper = lik_layer.backprop_grads_log_lik_exp(
                 mout, vout, dm, dv, yb, scale_log_lik)
         elif prop_mode == PROP_MC:
-            # TODO
             # propagate x forward
-            res, res_s = sgp_layer.forward_prop_thru_cav(mx, vx, PROP_MC)
+            res, res_s = sgp_layer.forward_prop_thru_post(mx, vx, PROP_MC, return_info=True)
             m, v, kfu, x, eps = res[0], res[1], res[2], res[3], res[4]
             m_s, v_s, kfu_s, x_s, eps_s = (
                 res_s[0], res_s[1], res_s[2], res_s[3], res_s[4])
             # compute logZ and gradients
-            logZ, dm, dv = lik_layer.compute_log_Z(m, v, yb, alpha)
-            logZ_scale = scale_logZ * logZ
-            dm_scale = scale_logZ * dm
-            dv_scale = scale_logZ * dv
+            logZ, dm, dv = lik_layer.compute_log_lik_exp(m, v, yb)
+            logZ_scale = scale_log_lik * logZ
+            dm_scale = scale_log_lik * dm
+            dv_scale = scale_log_lik * dv
             sgp_grad_hyper, dx = sgp_layer.backprop_grads_lvm_mc(
-                m_s, v_s, dm_scale, dv_scale, kfu_s, x_s, alpha)
+                m_s, v_s, dm_scale, dv_scale, kfu_s, x_s)
             sgp_grad_input = sgp_layer.backprop_grads_reparam(
                 dx, mx, vx, eps)
-            lik_grad_hyper = lik_layer.backprop_grads(
-                m, v, dm, dv, alpha, scale_logZ)
+            lik_grad_hyper = lik_layer.backprop_grads_log_lik_exp(
+                m, v, dm, dv, yb, scale_log_lik)
         else:
             raise NotImplementedError('propagation mode not implemented')
 
@@ -859,9 +834,13 @@ class SGPLVM(Base_SGPLVM):
         sgp_KL_term = self.sgp_layer.compute_KL()
         x_KL_term = scale_x * x_KL_term
         energy = logZ_scale + x_KL_term + sgp_KL_term
-
+        # energy = logZ_scale + x_KL_term
         for p in self.fixed_params:
             grad_all[p] = np.zeros_like(grad_all[p])
+
+        energy /= N
+        for key in grad_all.keys():
+            grad_all[key] /= N
 
         return energy, grad_all
 
@@ -950,17 +929,19 @@ class SGPSSM(Base_SGPSSM):
             yb = self.y_train[emi_idxs, :]
         batch_size_dyn = dyn_idxs.shape[0]
         scale_log_lik_dyn = - (N - 1) * 1.0 / batch_size_dyn
+        # scale_log_lik_dyn = 0
         batch_size_emi = emi_idxs.shape[0]
         scale_log_lik_emi = - N * 1.0 / batch_size_emi
+        # scale_log_lik_emi = 0
 
         # update model with new hypers
         self.update_hypers(params)
         # compute posterior
         post_m, post_v = self.get_posterior_x(emi_idxs)
         idxs_prev = dyn_idxs + 1
-        post_t_m, post_t_v = post_m[0:-1, :], post_v[0:-1, :]
+        post_t_m, post_t_v = post_m[1:, :], post_v[1:, :]
         idxs_next = dyn_idxs
-        post_tm1_m, post_tm1_v = post_m[1:, :], post_v[1:, :]
+        post_tm1_m, post_tm1_v = post_m[0:-1, :], post_v[0:-1, :]
         if self.Dcon_dyn > 0:
             post_tm1_mc = np.hstack((post_tm1_m, self.x_control[idxs_next, :]))
             post_tm1_vc = np.hstack(
@@ -985,7 +966,6 @@ class SGPSSM(Base_SGPSSM):
             sgp_grad_hyper, sgp_grad_input = dyn_layer.backprop_grads_lvm_mm(
                 mprop, vprop, dmprop, dvprop,
                 psi1, psi2, post_tm1_mc, post_tm1_vc)
-
             if self.gp_emi:
                 # deal with the emission factors here
                 mout, vout, psi1, psi2 = emi_layer.forward_prop_thru_post(
@@ -1003,36 +983,35 @@ class SGPSSM(Base_SGPSSM):
         elif prop_mode == PROP_MC:
             # TODO
             # deal with the transition/dynamic factors here
-            res, res_s = dyn_layer.forward_prop_thru_cav(
-                cav_tm1_mc, cav_tm1_vc, PROP_MC)
+            res, res_s = dyn_layer.forward_prop_thru_post(
+                post_tm1_mc, post_tm1_vc, PROP_MC, return_info=True)
             m, v, kfu, x, eps = res[0], res[1], res[2], res[3], res[4]
             m_s, v_s, kfu_s, x_s, eps_s = (
                 res_s[0], res_s[1], res_s[2], res_s[3], res_s[4])
-            logZ_dyn, dmprop, dvprop, dmt, dvt, dsn = self.compute_transition_tilted(
-                m, v, cav_t_m, cav_t_v, alpha, scale_logZ_dyn)
+            logZ_dyn, dmprop, dvprop, dmt, dvt, dsn = self.compute_transition_log_lik_exp(
+                m, v, post_t_m, post_t_v, scale_log_lik_dyn)
             sgp_grad_hyper, dx = dyn_layer.backprop_grads_lvm_mc(
-                m_s, v_s, dmprop, dvprop, kfu_s, x_s, alpha)
+                m_s, v_s, dmprop, dvprop, kfu_s, x_s)
             sgp_grad_input = dyn_layer.backprop_grads_reparam(
-                dx, cav_tm1_mc, cav_tm1_vc, eps)
+                dx, post_tm1_mc, post_tm1_vc, eps)
             if self.gp_emi:
                 # deal with the emission factors here
-                res, res_s = emi_layer.forward_prop_thru_cav(
-                    cav_up_mc, cav_up_vc, PROP_MC)
+                res, res_s = emi_layer.forward_prop_thru_post(
+                    post_up_mc, post_up_vc, PROP_MC, return_info=True)
                 m, v, kfu, x, eps = res[0], res[1], res[2], res[3], res[4]
                 m_s, v_s, kfu_s, x_s, eps_s = (
                     res_s[0], res_s[1], res_s[2], res_s[3], res_s[4])
                 # compute logZ and gradients
-                logZ_emi, dm, dv = lik_layer.compute_log_Z(
-                    m, v, yb, alpha)
-                logZ_emi = scale_logZ_emi * logZ_emi
-                dm_scale = scale_logZ_emi * dm
-                dv_scale = scale_logZ_emi * dv
+                logZ_emi, dm, dv = lik_layer.compute_log_lik_exp(m, v, yb)
+                logZ_emi = scale_log_lik_emi * logZ_emi
+                dm_scale = scale_log_lik_emi * dm
+                dv_scale = scale_log_lik_emi * dv
                 emi_grad_hyper, dx = emi_layer.backprop_grads_lvm_mc(
-                    m_s, v_s, dm_scale, dv_scale, kfu_s, x_s, alpha)
+                    m_s, v_s, dm_scale, dv_scale, kfu_s, x_s)
                 emi_grad_input = emi_layer.backprop_grads_reparam(
-                    dx, cav_up_mc, cav_up_vc, eps)
-                lik_grad_hyper = lik_layer.backprop_grads(
-                    m, v, dm, dv, alpha, scale_logZ_emi)
+                    dx, post_up_mc, post_up_vc, eps)
+                lik_grad_hyper = lik_layer.backprop_grads_log_lik_exp(
+                    m, v, dm, dv, yb, scale_log_lik_emi)
         else:
             raise NotImplementedError('propgation mode not implemented')
 
@@ -1053,12 +1032,13 @@ class SGPSSM(Base_SGPSSM):
 
         dm_up = emi_grad_input['mx'][:, :self.Din]
         dv_up = emi_grad_input['vx'][:, :self.Din]
-        dm_prev, dv_prev = dmt, dvt
-        dm_next = sgp_grad_input['mx'][:, :self.Din]
-        dv_next = sgp_grad_input['vx'][:, :self.Din]
+        dm_next, dv_next = dmt, dvt
+        dm_prev = sgp_grad_input['mx'][:, :self.Din]
+        dv_prev = sgp_grad_input['vx'][:, :self.Din]
 
         # compute entropy
         scale_entropy = - N * 1.0 / batch_size_emi
+        # scale_entropy = 0
         x_entrop = batch_size_emi * self.Din * (0.5 + 0.5 * np.log(2*np.pi))
         x_entrop += np.sum(0.5 * np.log(post_v))
         x_entrop *= scale_entropy
@@ -1087,8 +1067,13 @@ class SGPSSM(Base_SGPSSM):
         else:
             emi_KL = 0
         energy = logZ_dyn + logZ_emi + x_entrop + dyn_KL + emi_KL
+        # print logZ_dyn, logZ_emi, x_entrop, dyn_KL, emi_KL
         for p in self.fixed_params:
             grad_all[p] = np.zeros_like(grad_all[p])
+
+        energy /= N
+        for key in grad_all.keys():
+            grad_all[key] /= N
 
         return energy, grad_all
 
@@ -1119,23 +1104,15 @@ class SGPSSM(Base_SGPSSM):
             dvprop = dvt
             dsn = scale * np.sum(-1 - 2*term_2)
         elif m_prop.ndim == 3:
-            # TODO
-            logZ_max = np.max(logZ, axis=0)
-            exp_term = np.exp(logZ - logZ_max)
-            sumexp = np.sum(exp_term, axis=0)
-            logZ_lse = logZ_max + np.log(sumexp)
-            logZ_lse -= np.log(m_prop.shape[0])
-            logZ = scale * np.sum(logZ_lse)
-            dlogZ = scale * exp_term / sumexp
-            dlogZ_dm = dlogZ * m_diff / v_sum
-            dlogZ_dv = dlogZ * (-0.5 / v_sum + 0.5 * m_diff**2 / v_sum**2)
-            dmt = -np.sum(dlogZ_dm, axis=0)
-            dmprop = dlogZ_dm
-            dvt = np.sum(dlogZ_dv, axis=0)
-            dvprop = dlogZ_dv
-            dv_sum = np.sum(dlogZ_dv)
-            dsn = dv_sum * 2 * sn2 / alpha + \
-                scale * m_prop.shape[1] * self.Din * (1 - alpha)
+            K = m_prop.shape[0]
+            term_1 = - 0.5 * np.log(2 * np.pi * sn2)
+            term_2 = - 0.5 / sn2 * (m_t**2 + v_t - 2 * m_t * m_prop + m_prop**2 + v_prop)
+            logZ = scale * np.sum(term_1 + term_2) / K
+            dmprop = scale / sn2 * (m_t - m_prop) / K
+            dmt = - np.sum(dmprop, axis=0)
+            dvprop = - scale * 0.5 / sn2 * np.ones_like(v_prop) / K
+            dvt = np.sum(dvprop, axis=0)
+            dsn = scale * np.sum(-1 - 2*term_2) / K
         else:
             raise RuntimeError('invalid ndim, ndim=%d' % mout.ndim)
 

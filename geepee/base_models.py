@@ -8,7 +8,7 @@ from scipy.spatial.distance import cdist
 
 from config import *
 from utils import ObjectiveWrapper, flatten_dict, unflatten_dict, adam
-from utils import profile, PCA_reduce
+from utils import profile, PCA_reduce, matrixInverse
 from lik_layers import Gauss_Layer, Probit_Layer, Gauss_Emis
 from kernels import *
 
@@ -59,7 +59,8 @@ class Base_Model(object):
     def optimise(
             self, method='L-BFGS-B', tol=None, reinit_hypers=True,
             callback=None, maxfun=100000, maxiter=1000, alpha=0.5,
-            mb_size=None, adam_lr=0.001, prop_mode=PROP_MM, disp=True, **kargs):
+            mb_size=None, adam_lr=0.001, prop_mode=PROP_MM, disp=True, 
+            return_cost=False, **kargs):
         """Summary
         
         Args:
@@ -98,11 +99,16 @@ class Base_Model(object):
                     maxiter=maxiter,
                     args=(params_args, self, mb_size, alpha, prop_mode),
                     disp=disp,
-                    callback=callback)
-                final_params = results
+                    callback=callback,
+                    return_cost=return_cost)
+                if return_cost:
+                    final_params = results[0]
+                    costs = results[1]
+                else:
+                    final_params = results
             else:
                 options = {'maxfun': maxfun, 'maxiter': maxiter,
-                           'disp': disp, 'gtol': 1e-8}
+                           'disp': disp, 'gtol': 1e-6, 'ftol': 1e-6}
                 results = minimize(
                     fun=objective_wrapper,
                     x0=init_params_vec,
@@ -116,11 +122,16 @@ class Base_Model(object):
 
         except KeyboardInterrupt:
             print 'Caught KeyboardInterrupt ...'
-            final_params = objective_wrapper.previous_x    
+            final_params = objective_wrapper.previous_x
+            costs = []    
 
         final_params = unflatten_dict(final_params, params_args)
         self.update_hypers(final_params)
-        return final_params
+        # TODO return cost for lbfgs
+        if return_cost and method.lower() == 'adam':
+            return final_params, costs
+        else:
+            return final_params
 
     def set_fixed_params(self, params):
         """Summary
@@ -247,10 +258,7 @@ class Base_SGP_Layer(object):
                 # return self._forward_prop_random_thru_post_lin(mx, vx,
                 # return_info)
             elif mode == PROP_MC:
-                raise NotImplementedError(
-                    'Prediction with sampling not implemented TODO')
-                # return self._forward_prop_random_thru_post_mc(mx, vx,
-                # return_info)
+                return self._forward_prop_random_thru_post_mc(mx, vx, return_info)
             else:
                 raise NotImplementedError('unknown propagation mode')
 
@@ -298,7 +306,7 @@ class Base_SGP_Layer(object):
         else:
             return mout, vout
 
-    def _forward_prop_random_thru_post_mc(self, mx, vx):
+    def _forward_prop_random_thru_post_mc(self, mx, vx, return_info=False):
         """Propagate uncertain inputs thru posterior, using simple Monte Carlo
         
         Args:
@@ -461,10 +469,12 @@ class Base_SGP_Layer(object):
         if self.nat_param:
             self.Suinv = self.Kuuinv + self.theta_1
             self.Su = np.linalg.inv(self.Suinv)
+            # self.Su = matrixInverse(self.Suinv)
             self.mu = np.einsum('dab,db->da', self.Su, self.theta_2)
         else:
             self.Su = self.theta_1
             self.Suinv = np.linalg.inv(self.Su)
+            # self.Suinv = matrixInverse(self.Su)
             self.mu = self.theta_2
         self.Splusmm = self.Su + np.einsum('da,db->dab', self.mu, self.mu)
         self.A = np.einsum('ab,db->da', self.Kuuinv, self.mu)
@@ -608,9 +618,9 @@ class Base_SGP_Layer(object):
         params_zu_i = self.zu
 
         for d in range(Dout):
-            Rd = self.theta_1_R[d, :, :]
+            Rd = np.copy(self.theta_1_R[d, :, :])
             Rd[diag_ind] = np.log(Rd[diag_ind])
-            params_eta1_R[d, :] = Rd[triu_ind]
+            params_eta1_R[d, :] = np.copy(Rd[triu_ind])
 
         params['zu' + key_suffix] = self.zu
         params['eta1_R' + key_suffix] = params_eta1_R
@@ -636,7 +646,7 @@ class Base_SGP_Layer(object):
             theta_m_d = params['eta2' + key_suffix][d, :]
             theta_R_d = params['eta1_R' + key_suffix][d, :]
             R = np.zeros((M, M))
-            R[triu_ind] = theta_R_d.reshape(theta_R_d.shape[0], )
+            R[triu_ind] = np.copy(theta_R_d.reshape(theta_R_d.shape[0], ))
             R[diag_ind] = np.exp(R[diag_ind])
             self.theta_1_R[d, :, :] = R
             self.theta_1[d, :, :] = np.dot(R.T, R)
@@ -838,7 +848,7 @@ class Base_SGPLVM(Base_Model):
         # TODO: alternatitve method for non real-valued data
         post_m = PCA_reduce(y_train, self.Din)
         post_m_mean = np.mean(post_m, axis=0)
-        post_m_std = np.std(post_m, axis=0)
+        post_m_std = np.std(post_m, axis=0) + 1e-5
         post_m = (post_m - post_m_mean) / post_m_std
         post_v = 0.1 * np.ones_like(post_m)
         x_params = {}
@@ -1119,7 +1129,15 @@ class Base_SDGPR(Base_Model):
         """
         pass
 
-    def predict_f(self, inputs):
+    def predict_f(self, inputs, prop_mode=PROP_MM, no_samples=200):
+        if prop_mode == PROP_MM:
+            return self.predict_f_mm(inputs)
+        elif prop_mode == PROP_MC:
+            return self.predict_f_mc(inputs, no_samples)
+        else:
+            raise NotImplementedError('prop_mode %s unknown' % prop_mode)
+
+    def predict_f_mm(self, inputs):
         """Summary
         
         Args:
@@ -1138,6 +1156,32 @@ class Base_SDGPR(Base_Model):
             else:
                 mf, vf = layer.forward_prop_thru_post(mf, vf)
         return mf, vf
+
+    def predict_f_mc(self, inputs, no_samples):
+        """Summary
+        
+        Args:
+            inputs (TYPE): Description
+        
+        Returns:
+            TYPE: Description
+        """
+        if not self.updated:
+            for layer in self.sgp_layers:
+                layer.update_posterior()
+            self.updated = True
+        samples = inputs
+        for i, layer in enumerate(self.sgp_layers):
+            mf, vf = layer.forward_prop_thru_post(samples)
+            if i == 0:
+                eps = np.random.randn(no_samples, mf.shape[0], mf.shape[1])   
+                samples = np.sqrt(vf) * eps + mf
+                samples = np.reshape(samples, [no_samples*mf.shape[0], mf.shape[1]])
+            else:
+                eps = np.random.randn(mf.shape[0], mf.shape[1])   
+                samples = np.sqrt(vf) * eps + mf
+        samples = np.reshape(samples, [no_samples, inputs.shape[0], layer.Dout])
+        return samples, mf, vf
 
     def predict_f_with_input_grad(self, inputs):
         """Summary
@@ -1403,14 +1447,20 @@ class Base_SGPSSM(Base_Model):
         Returns:
             TYPE: Description
         """
-        # TODO
-        if not self.updated:
-            self.dyn_layer.update_posterior()
-            self.updated = True
         mf, vf = self.dyn_layer.forward_prop_thru_post(inputs)
         return mf, vf
 
-    def predict_forward(self, T, x_control=None):
+    def predict_forward(self, T, x_control=None, prop_mode=PROP_MM, no_samples=200):
+        if prop_mode == PROP_MM:
+            return self.predict_forward_mm(T, x_control)
+        elif prop_mode == PROP_LIN:
+            raise NotImplementedError('TODO')
+        elif prop_mode == PROP_MC:
+            return self.predict_forward_mc(T, x_control, no_samples)
+        else:
+            raise NotImplementedError('unknown prop mode %s' % prop_mode)
+
+    def predict_forward_mm(self, T, x_control):
         """Summary
         
         Args:
@@ -1420,11 +1470,6 @@ class Base_SGPSSM(Base_Model):
         Returns:
             TYPE: Description
         """
-        if not self.updated:
-            self.dyn_layer.update_posterior()
-            if self.gp_emi:
-                self.emi_layer.update_posterior()
-            self.updated = True
         mx = np.zeros((T, self.Din))
         vx = np.zeros((T, self.Din))
         my = np.zeros((T, self.Dout))
@@ -1456,6 +1501,46 @@ class Base_SGPSSM(Base_Model):
             vtm1 = vt
         return mx, vx, my, vy_noiseless, vy
 
+    def predict_forward_mc(self, T, x_control, no_samples):
+        """Summary
+        
+        Args:
+            T (TYPE): Description
+            x_control (None, optional): Description
+        
+        Returns:
+            TYPE: Description
+        """
+        x = np.zeros((T, no_samples, self.Din))
+        my = np.zeros((T, no_samples, self.Dout))
+        vy = np.zeros((T, no_samples, self.Dout))
+        post_m, post_v = self.get_posterior_x()
+        mtm1 = post_m[[-1], :]
+        vtm1 = post_v[[-1], :]
+        eps = np.random.randn(no_samples, self.Din)
+        x_samples = eps * np.sqrt(vtm1) + mtm1
+        for t in range(T):
+            if self.Dcon_dyn > 0:
+                xc_samples = np.hstack((x_samples, np.tile(x_control[[t], :], [no_samples, 1])))
+            else:
+                xc_samples = x_samples
+            mt, vt = self.dyn_layer.forward_prop_thru_post(xc_samples)
+            eps = np.random.randn(no_samples, self.Din)
+            x_samples = eps * np.sqrt(vt) + mt
+            if self.Dcon_emi > 0:
+                xc_samples = np.hstack((x_samples, np.tile(x_control[[t], :]), [no_samples, 1]))
+            else:
+                xc_samples = x_samples
+            if self.gp_emi:
+                mft, vft = self.emi_layer.forward_prop_thru_post(xc_samples)
+                myt, vyt_n = self.lik_layer.output_probabilistic(mft, vft)
+            else:
+                myt, _, vyt_n = self.emi_layer.output_probabilistic(xc_samples, np.zeros_like(x_samples))
+                vyt_n = np.diagonal(vyt_n, axis1=1, axis2=2)
+            x[t, :, :] = x_samples
+            my[t, :, :], vy[t, :, :] = myt, vyt_n
+        return x, my, vy
+
     def predict_y(self, inputs):
         """Summary
         
@@ -1465,12 +1550,6 @@ class Base_SGPSSM(Base_Model):
         Returns:
             TYPE: Description
         """
-        # TODO
-        if not self.updated:
-            self.dyn_layer.update_posterior()
-            if self.gp_emi:
-                self.emi_layer.update_posterior()
-            self.updated = True
         mf, vf = self.dyn_layer.forward_prop_thru_post(inputs)
         if self.gp_emi:
             mg, vg = self.emi_layer.forward_prop_thru_post(mf, vf)
@@ -1502,11 +1581,6 @@ class Base_SGPSSM(Base_Model):
         Returns:
             TYPE: Description
         """
-        if not self.updated:
-            self.dyn_layer.update_posterior()
-            if self.gp_emi:
-                self.emi_layer.update_posterior()
-            self.updated = True
         mx, vx = self.get_posterior_x()
         if self.Dcon_emi > 0:
             mx = np.hstack((mx, self.x_control))
@@ -1531,32 +1605,35 @@ class Base_SGPSSM(Base_Model):
         """
         # initialise latent variables and emission using a Gaussian LDS
         print 'init latent variable using LDS...'
-        from pylds.models import DefaultLDS
-        model = DefaultLDS(self.Dout, self.Din, self.Dcon_dyn)
-        model.add_data(y_train, inputs=self.x_control)
-        # Initialize with a few iterations of Gibbs
-        for _ in range(100):
-            model.resample_model()
-        # run EM
-        for _ in range(100):
-            model.EM_step()
+        if self.Din == self.Dout:
+            post_m = np.copy(y_train)
+        else:
+            from pylds.models import DefaultLDS
+            model = DefaultLDS(self.Dout, self.Din, self.Dcon_dyn)
+            model.add_data(y_train, inputs=self.x_control)
+            # Initialize with a few iterations of Gibbs
+            for _ in range(100):
+                model.resample_model()
+            # run EM
+            for _ in range(100):
+                model.EM_step()
 
-        s = model.states_list.pop()
-        s.info_E_step()
-        post_m = s.smoothed_mus
-        # post_v = np.diagonal(s.smoothed_sigmas, axis1=1, axis2=2)
-        # scale = np.std(post_m, axis=0)
-        # post_m = (post_m - np.mean(post_m, axis=0)) / scale
+            s = model.states_list.pop()
+            s.info_E_step()
+            post_m = s.smoothed_mus
+            # post_v = np.diagonal(s.smoothed_sigmas, axis1=1, axis2=2)
+            # scale = np.std(post_m, axis=0)
+            # post_m = (post_m - np.mean(post_m, axis=0)) / scale
         post_m = post_m
         post_v = 0.1 * np.ones_like(post_m)
-        ssm_params = {'sn': np.log(0.01)}
+        ssm_params = {'sn': np.log(0.01)*np.ones(1)}
         if self.nat_param:
             post_2 = 1.0 / post_v
             post_1 = post_2 * post_m
             ssm_params['x_factor_1'] = post_1 / 3
             ssm_params['x_factor_2'] = np.log(post_2 / 3) / 2
         else:
-            ssm_params['x_factor_1'] = post_m
+            ssm_params['x_factor_1'] = np.copy(post_m)
             ssm_params['x_factor_2'] = np.log(post_v) / 2    
         # learn a GP mapping between hidden states
         print 'init latent function using GPR...'
@@ -1565,11 +1642,14 @@ class Base_SGPSSM(Base_Model):
         if self.Dcon_dyn > 0:
             x = np.hstack((x, self.x_control[:self.N - 1, :]))
         from vfe_models import SGPR
+        # from aep_models import SGPR
         reg = SGPR(x, y, self.M, 'Gaussian', self.nat_param)
-        reg.set_fixed_params(['sn', 'sf', 'ls', 'zu'])
-        # reg.set_fixed_params(['sn', 'sf'])
-        reg.optimise(method='L-BFGS-B', alpha=0.5, maxiter=500, disp=False)
+        # reg.set_fixed_params(['sn', 'sf', 'ls', 'zu'])
+        reg.set_fixed_params(['sn', 'sf'])
+        opt_params = reg.optimise(method='L-BFGS-B', maxiter=500, disp=False)
+        reg.update_hypers(opt_params)
         dyn_params = reg.sgp_layer.get_hypers(key_suffix='_dynamic')
+        
         # dyn_params['ls_dynamic'] -= np.log(5)
         # dyn_params['ls_dynamic'][self.Din:] = np.log(1)
 
@@ -1583,14 +1663,18 @@ class Base_SGPSSM(Base_Model):
             # TODO: deal with different likelihood here
             reg = SGPR(x, y, self.M, 'Gaussian', self.nat_param)
             reg.set_fixed_params(['sn', 'sf', 'ls', 'zu'])
-            reg.optimise(method='L-BFGS-B', alpha=0.5, maxiter=5000, disp=True)
+            opt_params = reg.optimise(method='L-BFGS-B', alpha=0.5, maxiter=5000, disp=False)
+            reg.update_hypers(opt_params)
             emi_params = reg.sgp_layer.get_hypers(key_suffix='_emission')
             # emi_params['ls_emission'] -= np.log(5)
             lik_params = self.lik_layer.init_hypers(key_suffix='_emission')
         else:
             emi_params = self.emi_layer.init_hypers(key_suffix='_emission')
             if isinstance(self.emi_layer, Gauss_Emis):
-                emi_params['C_emission'] = s.C
+                if self.Din == self.Dout:
+                    emi_params['C_emission'] = np.eye(self.Din)
+                else:
+                    emi_params['C_emission'] = s.C
         init_params = dict(dyn_params)
         init_params.update(emi_params)
         if self.gp_emi:
@@ -1653,12 +1737,11 @@ class Base_SGPSSM(Base_Model):
             grad_2 = - dm * post_1 / post_2**2 - dv / post_2**2
             scale_x = 3.0 * np.ones((idxs.shape[0], 1))
             scale_x[np.where(idxs == 0)[0]] = 2
-            scale_x[np.where(idxs == self.N)[0]] = 2
+            scale_x[np.where(idxs == self.N-1)[0]] = 2
             grad_1 = grad_1 * scale_x
             grad_2 = grad_2 * scale_x
             grads_x_1[idxs, :] = grad_1
             grads_x_2[idxs, :] = grad_2 * 2 * self.x_factor_2[idxs, :]
-            
         else:
             grads_x_1[idxs, :] += dm
             grads_x_2[idxs, :] += dv

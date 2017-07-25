@@ -1,6 +1,7 @@
 import numpy as np
 from scipy import special
 from scipy.stats import norm
+import pdb
 
 from config import *
 
@@ -100,7 +101,7 @@ class Gauss_Layer(Lik_Layer):
         super(Gauss_Layer, self).__init__(N, D)
         self.sn = 0
 
-    def compute_log_Z(self, mout, vout, y, alpha=1.0):
+    def compute_log_Z(self, mout, vout, y, alpha=1.0, compute_dm2=False):
         """Summary
 
         Args:
@@ -125,8 +126,11 @@ class Gauss_Layer(Lik_Layer):
                                            - 0.5 * alpha * np.log(2 * np.pi * sn2))
             dlogZ_dm = (y - mout) / vout
             dlogZ_dv = -0.5 / vout + 0.5 * (y - mout)**2 / vout**2
-
-            return logZ, dlogZ_dm, dlogZ_dv
+            if compute_dm2:
+                dlogZ_dm2 = - 1 / vout
+                return logZ, dlogZ_dm, dlogZ_dv, dlogZ_dm2
+            else:
+                return logZ, dlogZ_dm, dlogZ_dv
         elif mout.ndim == 3:
             sn2 = np.exp(2.0 * self.sn)
             vout += sn2 / alpha
@@ -191,9 +195,9 @@ class Gauss_Layer(Lik_Layer):
         Raises:
             RuntimeError: Description
         """
+        sn2 = np.exp(2.0 * self.sn)
         # real valued data, gaussian lik
         if mout.ndim == 2:
-            sn2 = np.exp(2.0 * self.sn)
             term1 = -0.5 * np.log(2 * np.pi * sn2)
             term2 = -0.5 / sn2 * (y**2 - 2 * y * mout + mout**2 + vout)
             de_dm = 1.0 / sn2 * (y - mout)
@@ -203,23 +207,31 @@ class Gauss_Layer(Lik_Layer):
 
             return exptn_sum, de_dm, de_dv
         elif mout.ndim == 3:
-            # TODO
+            term1 = - 0.5 * np.log(2*np.pi*sn2)
+            term2 = - 0.5 * ((y - mout) ** 2 + vout) / sn2
+            sumterm = term1 + term2
+            logZ = np.sum(np.mean(sumterm, axis=0))
+            dlogZ_dm = (y - mout) / sn2 / mout.shape[0]
+            dlogZ_dv = - 0.5 / sn2 * np.ones_like(vout) / mout.shape[0]
             return logZ, dlogZ_dm, dlogZ_dv
         else:
             raise RuntimeError('invalid ndim, ndim=%d' % mout.ndim)
 
     def backprop_grads_log_lik_exp(self, m, v, dm, dv, y, scale=1.0):
         # real valued data, gaussian lik
+        sn2 = np.exp(2.0 * self.sn)
         if m.ndim == 2:
-            sn2 = np.exp(2.0 * self.sn)
             term1 = -1
             term2 = 1 / sn2 * (y**2 - 2 * y * m + m**2 + v)
             dsn = term1 + term2
             dsn = scale * np.sum(dsn)
             return {'sn': dsn}
-        elif mout.ndim == 3:
-            # TODO
-            return logZ, dlogZ_dm, dlogZ_dv
+        elif m.ndim == 3:
+            term1 = - 1
+            term2 =  ((y - m) ** 2 + v) / sn2
+            dsn = term1 + term2
+            dsn = scale * np.sum(dsn) / m.shape[0]
+            return {'sn': dsn}
         else:
             raise RuntimeError('invalid ndim, ndim=%d' % mout.ndim)
 
@@ -288,7 +300,7 @@ class Probit_Layer(Lik_Layer):
             self.__gh_points = np.polynomial.hermite.hermgauss(T)
         return self.__gh_points
 
-    def compute_log_Z(self, mout, vout, y, alpha=1.0):
+    def compute_log_Z(self, mout, vout, y, alpha=1.0, compute_dm2=False):
         """Summary
 
         Args:
@@ -317,6 +329,10 @@ class Probit_Layer(Lik_Layer):
                 dt_dv = -0.5 * y * mout / (1 + vout)**1.5
                 dlogZ_dm = dlogZ_dt * dt_dm
                 dlogZ_dv = dlogZ_dt * dt_dv
+
+                if compute_dm2:
+                    beta = dlogZ_dm / y
+                    dlogZ_dm2 = - (beta**2 + mout * y * beta / (1 + vout))
             else:
                 gh_x, gh_w = self._gh_points(GH_DEGREE)
                 gh_x = gh_x[:, np.newaxis, np.newaxis]
@@ -338,6 +354,13 @@ class Probit_Layer(Lik_Layer):
                 dZdv = np.sum(gh_w * (a * gh_x), axis=0) * y * \
                     alpha / np.pi / np.sqrt(2) / np.sqrt(2 * vout)
                 dlogZ_dv = dZdv / Ztilted + eps
+
+                if compute_dm2:
+                    b = (alpha-1)*pdfs**(alpha-2)*np.exp(-ts**2)/np.sqrt(2*np.pi) \
+                        - pdfs**(alpha-1) * y * ts * np.exp(-ts**2/2)
+                    dZdm2 = np.sum(gh_w * b, axis=0) * alpha / np.pi / np.sqrt(2)
+                    dlogZ_dm2 = -dZdm**2 / Ztilted**2 + dZdm2 / Ztilted + eps
+
         elif mout.ndim == 3:
             if alpha == 1.0:
                 t = y * mout / np.sqrt(1 + vout)
@@ -387,7 +410,10 @@ class Probit_Layer(Lik_Layer):
         else:
             raise RuntimeError('invalid ndim, ndim=%d' % mout.ndim)
 
-        return logZ, dlogZ_dm, dlogZ_dv
+        if compute_dm2:
+            return logZ, dlogZ_dm, dlogZ_dv, dlogZ_dm2
+        else:
+            return logZ, dlogZ_dm, dlogZ_dv
 
     def compute_log_lik_exp(self, m, v, y):
         if m.ndim == 2:
@@ -396,8 +422,6 @@ class Probit_Layer(Lik_Layer):
             gh_w = gh_w[:, np.newaxis, np.newaxis] / np.sqrt(np.pi)
             v_expand = v[np.newaxis, :, :]
             m_expand = m[np.newaxis, :, :]
-            # m_expand = np.zeros_like(m_expand)
-            # v_expand = np.ones_like(v_expand)
             ts = gh_x * np.sqrt(2 * v_expand) + m_expand
             logcdfs = norm.logcdf(ts * y)
             prods = gh_w * logcdfs
@@ -410,13 +434,27 @@ class Probit_Layer(Lik_Layer):
             dts_dv = 0.5 * gh_x * np.sqrt(2 / v_expand)
             dm = np.sum(grad_cdfs * dts_dm, axis=0)
             dv = np.sum(grad_cdfs * dts_dv, axis=0)
-            # dm = np.zeros_like(dm)
-            # dv = np.zeros_like(dv) 
         else:
-            raise NotImplementedError('TODO')
+            gh_x, gh_w = self._gh_points(GH_DEGREE)
+            gh_x = gh_x[:, np.newaxis, np.newaxis, np.newaxis]
+            gh_w = gh_w[:, np.newaxis, np.newaxis, np.newaxis] / np.sqrt(np.pi)
+            v_expand = v[np.newaxis, :, :, :]
+            m_expand = m[np.newaxis, :, :, :]
+            ts = gh_x * np.sqrt(2 * v_expand) + m_expand
+            logcdfs = norm.logcdf(ts * y)
+            prods = gh_w * logcdfs
+            prods_mean = np.mean(prods, axis=1)
+            loglik = np.sum(prods_mean)
+
+            pdfs = norm.pdf(ts * y)
+            cdfs = norm.cdf(ts * y)
+            grad_cdfs = y * gh_w * pdfs / cdfs
+            dts_dm = 1
+            dts_dv = 0.5 * gh_x * np.sqrt(2 / v_expand)
+            dm = np.sum(grad_cdfs * dts_dm, axis=0) / m.shape[0]
+            dv = np.sum(grad_cdfs * dts_dv, axis=0) / m.shape[0]
 
         return loglik, dm, dv
-
 
     def output_probabilistic(self, mf, vf, alpha=1.0):
         """Summary
@@ -556,16 +594,18 @@ class Gauss_Emis():
         R = self.R
         Dout = self.Dout
         Vy = np.diag(R / alpha) + np.einsum('da,na,ab->ndb', C, vx, C.T)
-        Ly = np.linalg.cholesky(Vy)
         Ydiff = self.y[idxs, :] - np.einsum('da,na->nd', C, mx)
-
         VinvY = np.linalg.solve(Vy, Ydiff)
         quad_term = -0.5 * np.sum(Ydiff * VinvY)
-        Vlogdet_term = - np.sum(np.log(np.diagonal(Ly, axis1=1, axis2=2)))
-        Rlogdet_term = 0.5 * Nb * (1 - alpha) * np.sum(np.log(R))
-        const_term = - Nb * Dout * \
-            (0.5 * alpha * np.log(2 * np.pi) + np.log(alpha))
+        CVC = np.einsum('da,na,ab->ndb', C, vx, C.T)
+        CVCR = CVC / R
+        I = np.tile(np.eye(Dout)[np.newaxis, :, :], [Nb, 1, 1])
+        ICVCR = I + alpha * CVCR
+        Vlogdet_term = -0.5 * np.sum(np.linalg.slogdet(ICVCR)[1])
+        const_term = - Nb * Dout * 0.5 * alpha * np.log(2 * np.pi)
+        Rlogdet_term = - 0.5 * Nb * alpha * np.sum(np.log(R))
         logZ = const_term + Rlogdet_term + Vlogdet_term + quad_term
+        # print const_term / alpha, Rlogdet_term / alpha, Vlogdet_term / alpha, quad_term / alpha
 
         Vyinv = np.linalg.inv(Vy)
         dR = (-0.5 * np.sum(np.diagonal(Vyinv, axis1=1, axis2=2), axis=0)
@@ -616,6 +656,7 @@ class Gauss_Emis():
         CRC = np.dot(C.T, np.dot(np.diag(1 / R), C))
         term4 = - 0.5 * np.sum(np.sum(vx, axis=0) * np.diag(CRC))
         logZ = term1 + term2 + term3 + term4
+        # print term1, term2, term3, term4
 
         dR2 = - 0.5 * Nb / R
         dR3 = 0.5 * np.sum((yb - Cmx)**2, axis=0) / R**2

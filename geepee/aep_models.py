@@ -36,7 +36,7 @@ class SGP_Layer(Base_SGP_Layer):
         Suhatinv (TYPE): Description
     """
     def __init__(self, no_train, input_size, output_size, no_pseudo, 
-        nat_param=False):
+        nat_param=True):
         """Initialisation
         
         Args:
@@ -660,6 +660,10 @@ class SGPR(Base_SGPR):
         for p in self.fixed_params:
             grad_all[p] = np.zeros_like(grad_all[p])
 
+        energy /= N
+        for key in grad_all.keys():
+            grad_all[key] /= N
+
         return energy, grad_all
 
 
@@ -741,6 +745,24 @@ class SGPLVM(Base_SGPLVM):
         elif prop_mode == PROP_MC:
             # propagate x cavity forward
             res, res_s = sgp_layer.forward_prop_thru_cav(mcav, vcav, PROP_MC)
+            m, v, kfu, x, eps = res[0], res[1], res[2], res[3], res[4]
+            m_s, v_s, kfu_s, x_s, eps_s = (
+                res_s[0], res_s[1], res_s[2], res_s[3], res_s[4])
+            # compute logZ and gradients
+            logZ, dm, dv = lik_layer.compute_log_Z(m, v, yb, alpha)
+            logZ_scale = scale_logZ * logZ
+            dm_scale = scale_logZ * dm
+            dv_scale = scale_logZ * dv
+            sgp_grad_hyper, dx = sgp_layer.backprop_grads_lvm_mc(
+                m_s, v_s, dm_scale, dv_scale, kfu_s, x_s, alpha)
+            sgp_grad_input = sgp_layer.backprop_grads_reparam(
+                dx, mcav, vcav, eps)
+            lik_grad_hyper = lik_layer.backprop_grads(
+                m, v, dm, dv, alpha, scale_logZ)
+        elif prop_mode == PROP_LIN:
+            # TODO
+            # propagate x cavity forward
+            res, res_s = sgp_layer.forward_prop_thru_cav(mcav, vcav, PROP_LIN)
             m, v, kfu, x, eps = res[0], res[1], res[2], res[3], res[4]
             m_s, v_s, kfu_s, x_s, eps_s = (
                 res_s[0], res_s[1], res_s[2], res_s[3], res_s[4])
@@ -959,7 +981,12 @@ class SDGPR(Base_SDGPR):
         for p in self.fixed_params:
             grad_all[p] = np.zeros_like(grad_all[p])
 
+        energy /= N
+        for key in grad_all.keys():
+            grad_all[key] /= N
+
         return energy, grad_all
+
 
 class SGPSSM(Base_SGPSSM):
     """Summary
@@ -1167,12 +1194,14 @@ class SGPSSM(Base_SGPSSM):
         phi_cavity_x = self.compute_phi_cavity_x(alpha)
         x_contrib = phi_prior_x + phi_poste_x + phi_cavity_x
         energy = logZ_dyn + logZ_emi + x_contrib + dyn_contrib + emi_contrib
+        # print logZ_dyn, logZ_emi, x_contrib, dyn_contrib, emi_contrib
+        # print phi_prior_x, phi_poste_x, phi_cavity_x
         for p in self.fixed_params:
             grad_all[p] = np.zeros_like(grad_all[p])
 
-        # energy /= self.N
-        # for key in grad_all.keys():
-        #     grad_all[key] /= self.N
+        energy /= N
+        for key in grad_all.keys():
+            grad_all[key] /= N
 
         return energy, grad_all
 
@@ -1306,10 +1335,13 @@ class SGPSSM(Base_SGPSSM):
         v_sum = v_t + v_prop + sn2 / alpha
         m_diff = m_t - m_prop
         exp_term = -0.5 * m_diff**2 / v_sum
-        const_term = -0.5 * np.log(2 * np.pi * v_sum)
-        alpha_term = 0.5 * (1 - alpha) * np.log(2 *
-                                                np.pi * sn2) - 0.5 * np.log(alpha)
+        # const_term = -0.5 * np.log(2 * np.pi * v_sum)
+        # alpha_term = 0.5 * (1 - alpha) * np.log(2 *
+        #                                         np.pi * sn2) - 0.5 * np.log(alpha)
+        alpha_term = - 0.5 * alpha * np.log(2 * np.pi * sn2)
+        const_term = - 0.5 * np.log(1 + alpha * (v_t + v_prop) / sn2)
         logZ = exp_term + const_term + alpha_term
+
         if m_prop.ndim == 2:
             logZ = scale * np.sum(logZ)
             dvt = scale * (-0.5 / v_sum + 0.5 * m_diff**2 / v_sum**2)
@@ -1378,6 +1410,7 @@ class SGPSSM(Base_SGPSSM):
         post_1 = self.x_post_1
         post_2 = self.x_post_2
         phi_post = 0.5 * (post_1**2 / post_2 - np.log(post_2))
+        # print np.sum(phi_post)
         scale_x_post = - (1.0 - 1.0 / alpha) * np.ones((self.N, 1))
         scale_x_post[0:self.N - 1] = scale_x_post[0:self.N - 1] + 1 / alpha
         scale_x_post[1:self.N] = scale_x_post[1:self.N] + 1 / alpha
@@ -1392,11 +1425,11 @@ class SGPSSM(Base_SGPSSM):
         Returns:
             TYPE: Description
         """
-        scale = -1.0 / alpha
+        scale = - 1.0 / alpha
         cav_1 = self.x_post_1 - alpha * self.x_factor_1
         cav_2 = self.x_post_2 - alpha * self.x_factor_2
         phi_cav = 0.5 * (cav_1**2 / cav_2 - np.log(cav_2))
-
+        # print np.sum(phi_cav)
         scale_x_cav = scale * np.ones((self.N, 1))
         scale_x_cav[0:self.N - 1] = scale_x_cav[0:self.N - 1] + scale
         scale_x_cav[1:self.N] = scale_x_cav[1:self.N] + scale
@@ -1575,6 +1608,10 @@ class SDGPR_H(Base_Model):
 
         for p in self.fixed_params:
             grad_all[p] = np.zeros_like(grad_all[p])
+
+        energy /= N
+        for key in grad_all.keys():
+            grad_all[key] /= N
 
         return energy, grad_all
 

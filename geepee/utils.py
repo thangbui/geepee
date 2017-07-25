@@ -91,21 +91,27 @@ def unflatten_dict(params, params_args):
 
 
 def adam(func, init_params, callback=None, maxiter=1000,
-         step_size=0.001, b1=0.9, b2=0.999, eps=1e-8, args=None, disp=True):
+         step_size=0.001, b1=0.9, b2=0.999, eps=1e-8, 
+         args=None, disp=True, return_cost=False):
     """Adam as described in http://arxiv.org/pdf/1412.6980.pdf."""
     x = init_params
     m = np.zeros_like(x)
     v = np.zeros_like(x)
+    fs = []
     for i in range(maxiter):
         f, g = func(x, *args)
         if disp and i % 10 == 0:
-            # print 'iter %d \t obj %.3f' % (i, f)
-            print '%.3f' % f
+            print 'iter %d \t obj %.3f' % (i, f)
+            # print '%.3f' % f
         if callback:
-            callback(x)
+            callback(x, i, args)
         m = (1 - b1) * g + b1 * m  # First  moment estimate.
         v = (1 - b2) * (g**2) + b2 * v  # Second moment estimate.
         mhat = m / (1 - b1**(i + 1))    # Bias correction.
         vhat = v / (1 - b2**(i + 1))
         x = x - step_size * mhat / (np.sqrt(vhat) + eps)
-    return x
+        fs.append(f)
+    if return_cost:
+        return x, np.array(fs)
+    else:
+        return x
