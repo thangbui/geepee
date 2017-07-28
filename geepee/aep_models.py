@@ -1231,9 +1231,8 @@ class SGPSSM(Base_SGPSSM):
             4.0 * grads_x_2[[0, -1], :] * self.x_factor_2[[0, -1], :])
         return grads
 
-    def compute_logZ_grad_x(
-            self, alpha, cav_1, cav_2, dmcav_up, dvcav_up,
-            dmcav_prev, dvcav_prev, dmcav_next, dvcav_next, emi_idxs):
+    def compute_logZ_grad_x(self, alpha, cav_1, cav_2, dmcav_up, dvcav_up,
+        dmcav_prev, dvcav_prev, dmcav_next, dvcav_next, emi_idxs):
         """Summary
         
         Args:
@@ -1396,7 +1395,7 @@ class SGPSSM(Base_SGPSSM):
         t2 = self.x_prior_2
         m = t1 / t2
         v = 1.0 / t2
-        return 0.5 * self.Din * (m**2 / v + np.log(v))
+        return 0.5 * self.Din * (m**2 / v + np.log(v) + np.log(2*np.pi))
 
     def compute_phi_posterior_x(self, alpha):
         """Summary
@@ -1409,7 +1408,7 @@ class SGPSSM(Base_SGPSSM):
         """
         post_1 = self.x_post_1
         post_2 = self.x_post_2
-        phi_post = 0.5 * (post_1**2 / post_2 - np.log(post_2))
+        phi_post = 0.5 * (post_1**2 / post_2 - np.log(post_2) + np.log(2*np.pi))
         # print np.sum(phi_post)
         scale_x_post = - (1.0 - 1.0 / alpha) * np.ones((self.N, 1))
         scale_x_post[0:self.N - 1] = scale_x_post[0:self.N - 1] + 1 / alpha
@@ -1428,7 +1427,7 @@ class SGPSSM(Base_SGPSSM):
         scale = - 1.0 / alpha
         cav_1 = self.x_post_1 - alpha * self.x_factor_1
         cav_2 = self.x_post_2 - alpha * self.x_factor_2
-        phi_cav = 0.5 * (cav_1**2 / cav_2 - np.log(cav_2))
+        phi_cav = 0.5 * (cav_1**2 / cav_2 - np.log(cav_2) + np.log(2*np.pi))
         # print np.sum(phi_cav)
         scale_x_cav = scale * np.ones((self.N, 1))
         scale_x_cav[0:self.N - 1] = scale_x_cav[0:self.N - 1] + scale

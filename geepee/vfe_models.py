@@ -1045,9 +1045,13 @@ class SGPSSM(Base_SGPSSM):
         dv_entrop = scale_entropy * 0.5 / post_v
 
         # TODO ignore x prior term for now
-        prior_contrib = 0
-        dm0 = 0
-        dv0 = 0
+        post_m_0, post_v_0 = self.get_posterior_x(np.array([0]))
+        prior_contrib = 0.5 * self.Din * np.log(2*np.pi*self.prior_var)
+        prior_contrib += 0.5 / self.prior_var * np.sum(
+            self.prior_mean**2 - 2 * self.prior_mean * post_m_0 + post_m_0**2 + post_v_0**2)
+        dm0 = (post_m_0 - self.prior_mean) / self.prior_var
+        dv0 = post_v_0 / self.prior_var
+        grads_x_prior = self.compute_posterior_grad_x(dm0, dv0, np.array([0]))
 
         # aggregate gradients for x param
         dm = dm_up
@@ -1058,7 +1062,7 @@ class SGPSSM(Base_SGPSSM):
         dv[0:-1, :] += dv_prev
         grads_x = self.compute_posterior_grad_x(dm, dv, emi_idxs)
         for key in grads_x.keys():
-            grad_all[key] = grads_x[key]
+            grad_all[key] = grads_x[key] + grads_x_prior[key]
 
         # compute objective
         dyn_KL = dyn_layer.compute_KL()
@@ -1066,8 +1070,8 @@ class SGPSSM(Base_SGPSSM):
             emi_KL = emi_layer.compute_KL()
         else:
             emi_KL = 0
-        energy = logZ_dyn + logZ_emi + x_entrop + dyn_KL + emi_KL
-        # print logZ_dyn, logZ_emi, x_entrop, dyn_KL, emi_KL
+        energy = logZ_dyn + logZ_emi + x_entrop + dyn_KL + emi_KL + prior_contrib
+        # print logZ_dyn, logZ_emi, (x_entrop + prior_contrib), dyn_KL, emi_KL
         for p in self.fixed_params:
             grad_all[p] = np.zeros_like(grad_all[p])
 

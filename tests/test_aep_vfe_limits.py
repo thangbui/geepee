@@ -160,8 +160,7 @@ def test_gpssm_linear_gaussian_kink_MM(nat_param=True):
     N_train = 100
     process_noise = 0.2
     obs_noise = 0.1
-    alpha = 0.00000001
-    M = 4
+    M = 5
     Q = 1
     D = 1
     (xtrue, x, y) = kink(N_train, process_noise, obs_noise)
@@ -169,15 +168,16 @@ def test_gpssm_linear_gaussian_kink_MM(nat_param=True):
     model_vfe = vfe.SGPSSM(y_train, Q, M, lik='Gaussian', gp_emi=False, nat_param=nat_param)
     
     # init hypers, inducing points and q(u) params
-    # params = model_vfe.init_hypers(y_train)
+    params = model_vfe.init_hypers(y_train)
     params = model_vfe.optimise(method='adam', maxiter=500, adam_lr=0.08, disp=False)
     logZ_vfe, _ = model_vfe.objective_function(params, N_train)
+    print 'gpssm gaussian vfe %.4f' % (logZ_vfe)
 
-    model_aep = aep.SGPSSM(y_train, Q, M, lik='Gaussian', gp_emi=False)
-    logZ_aep, _ = model_aep.objective_function(params, N_train, alpha=alpha)
-
-    d = np.abs(logZ_aep - logZ_vfe)
-    print 'gpssm gaussian MM aep %.4f, vfe %.4f, diff %.4f' % (logZ_aep, logZ_vfe, d)
+    for alpha in [0.00000001, 0.0001, 0.01, 0.1, 0.2, 0.3, 0.5, 0.8, 1.0]:
+    # for alpha in [0.00000001]:
+        model_aep = aep.SGPSSM(y_train, Q, M, lik='Gaussian', gp_emi=False)
+        logZ_aep, _ = model_aep.objective_function(params, N_train, alpha=alpha)
+        print 'gpssm gaussian MM alpha %.8f aep %.4f' % (alpha, logZ_aep)
 
 if __name__ == '__main__':
     # test_gpr_gaussian(True)
@@ -198,5 +198,5 @@ if __name__ == '__main__':
     # test_gplvm_probit_MC(True)
     # test_gplvm_probit_MC(False)
     
-    # test_gpssm_linear_gaussian_kink_MM(True)
+    test_gpssm_linear_gaussian_kink_MM(True)
     # test_gpssm_linear_gaussian_kink_MM(False)
