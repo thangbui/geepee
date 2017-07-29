@@ -19,8 +19,8 @@ K = 20
 # K = 1
 
 M = 20
-no_epochs = 20000
-lrate = 0.0008
+no_epochs = 40000
+lrate = 0.0005
 command_list = []
 
 
