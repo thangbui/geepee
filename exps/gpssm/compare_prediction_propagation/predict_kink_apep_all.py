@@ -11,10 +11,9 @@ np.random.seed(0)
 
 
 def predict_using_trained_models():    
-    # alphas = [0.0001, 0.01, 0.05, 0.2, 0.5, 0.8, 1.0]
+    alphas = [0.0001, 0.01, 0.05, 0.2, 0.5, 0.8, 1.0]
     M = 20
-    alphas = [0.5]
-    K = 1
+    K = 20
     T_test = 20
     mm_se = np.zeros((K, T_test, len(alphas)))
     mm_ll = np.zeros((K, T_test, len(alphas)))
@@ -60,7 +59,7 @@ def predict_using_trained_models():
     mc_se_error = np.std(mc_se, axis=0) / np.sqrt(K)
     mc_ll_mean = np.mean(mc_ll, axis=0)
     mc_ll_error = np.std(mc_ll, axis=0) / np.sqrt(K)
-    
+
     np.savetxt('res/kink_mm_se_mean.txt', mm_se_mean, fmt='%.5f', delimiter=',')
     np.savetxt('res/kink_mm_se_error.txt', mm_se_error, fmt='%.5f', delimiter=',')
     np.savetxt('res/kink_mm_ll_mean.txt', mm_ll_mean, fmt='%.5f', delimiter=',')
