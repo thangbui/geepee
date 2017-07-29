@@ -1532,10 +1532,10 @@ class Base_SGPSSM(Base_Model):
             else:
                 xc_samples = x_samples
             if self.gp_emi:
-                mft, vft = self.emi_layer.forward_prop_thru_post(xc_samples)
+                mft, vft = self.emi_layer.forward_prop_thru_post(mt, vt)
                 myt, vyt_n = self.lik_layer.output_probabilistic(mft, vft)
             else:
-                myt, _, vyt_n = self.emi_layer.output_probabilistic(xc_samples, np.zeros_like(x_samples))
+                myt, _, vyt_n = self.emi_layer.output_probabilistic(mt, vt)
                 vyt_n = np.diagonal(vyt_n, axis1=1, axis2=2)
             x[t, :, :] = x_samples
             my[t, :, :], vy[t, :, :] = myt, vyt_n
