@@ -11,7 +11,7 @@ np.random.seed(0)
 
 
 def predict_using_trained_models():    
-    alphas = [0.0001, 0.01, 0.05, 0.2, 0.5, 0.8, 1.0]
+    alphas = [0.001, 0.01, 0.1, 0.2, 0.4, 0.5, 0.6, 0.8, 1]
     M = 20
     K = 20
     T_test = 20
@@ -24,6 +24,7 @@ def predict_using_trained_models():
         y_train = np.reshape(y_train, [y_train.shape[0], 1])
         y_test = np.loadtxt('data/kink_test_%d.txt'%k)
         y_test = np.reshape(y_test, [y_test.shape[0], 1])
+        y_test = y_test[:, 0]
         
         for i, alpha in enumerate(alphas):
             # for prop_mode in [PROP_MM, PROP_MC]:
@@ -37,7 +38,6 @@ def predict_using_trained_models():
                 _, _, my_MM, _, vy_MM = model_aep.predict_forward(T_test, prop_mode=PROP_MM)
                 _, my_MC, vy_MC = model_aep.predict_forward(T_test, prop_mode=PROP_MC, no_samples=500)
                 
-                y_test = y_test[:, 0]
 
                 my_MM = my_MM[:, 0]
                 vy_MM = vy_MM[:, 0]
