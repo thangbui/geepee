@@ -125,7 +125,6 @@ def test_gplvm_probit_MC(nat_param=True):
 
     d = np.abs(logZ_aep - logZ_vfe)
     print 'gplvm probit MC aep %.4f, vfe %.4f, diff %.4f' % (logZ_aep, logZ_vfe, d)
-    
 
 def test_gpssm_linear_gaussian_kink_MM(nat_param=True):
     np.random.seed(0)

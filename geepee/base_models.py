@@ -1625,7 +1625,7 @@ class Base_SGPSSM(Base_Model):
             # scale = np.std(post_m, axis=0)
             # post_m = (post_m - np.mean(post_m, axis=0)) / scale
         post_m = post_m
-        post_v = 0.1 * np.ones_like(post_m)
+        post_v = 0.05 * np.ones_like(post_m)
         ssm_params = {'sn': np.log(0.01)*np.ones(1)}
         if self.nat_param:
             post_2 = 1.0 / post_v
@@ -1645,8 +1645,10 @@ class Base_SGPSSM(Base_Model):
         # from aep_models import SGPR
         reg = SGPR(x, y, self.M, 'Gaussian', self.nat_param)
         # reg.set_fixed_params(['sn', 'sf', 'ls', 'zu'])
-        reg.set_fixed_params(['sn', 'sf'])
-        opt_params = reg.optimise(method='L-BFGS-B', maxiter=500, disp=False)
+        # reg.set_fixed_params(['sn', 'sf'])
+        np.random.seed(42)
+        # opt_params = reg.optimise(method='L-BFGS-B', maxiter=500, disp=False)
+        opt_params = reg.optimise(method='adam', maxiter=500, disp=False)
         reg.update_hypers(opt_params)
         dyn_params = reg.sgp_layer.get_hypers(key_suffix='_dynamic')
         
