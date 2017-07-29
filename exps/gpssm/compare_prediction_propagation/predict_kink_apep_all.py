@@ -9,6 +9,53 @@ import pdb
 from scipy.misc import logsumexp
 np.random.seed(0)
 
+import matplotlib as mpl
+import matplotlib.gridspec as gridspec
+mpl.use('pgf')
+
+def figsize(scale):
+    fig_width_pt = 488.13                          # Get this from LaTeX using \the\textwidth
+    inches_per_pt = 1.0/72.27                       # Convert pt to inch
+    golden_mean = (np.sqrt(5.0)-1.0)/2.8            # Aesthetic ratio (you could change this)
+    fig_width = fig_width_pt*inches_per_pt*scale    # width in inches
+    fig_height = fig_width*golden_mean              # height in inches
+    fig_size = [fig_width,fig_height]
+    return fig_size
+
+pgf_with_latex = {                      # setup matplotlib to use latex for output
+    "pgf.texsystem": "pdflatex",        # change this if using xetex or lautex
+    "text.usetex": True,                # use LaTeX to write all text
+    "font.family": "serif",
+    "font.serif": [],                   # blank entries should cause plots to inherit fonts from the document
+    "font.sans-serif": [],
+    "font.monospace": [],
+    "axes.labelsize": 10,               # LaTeX default is 10pt font.
+    "text.fontsize": 10,
+    "legend.fontsize": 8,               # Make the legend/label fonts a little smaller
+    "xtick.labelsize": 8,
+    "ytick.labelsize": 8,
+    "figure.figsize": figsize(0.9),     # default fig size of 0.9 textwidth
+    "pgf.preamble": [
+        r"\usepackage[utf8x]{inputenc}",    # use utf8 fonts becasue your computer can handle it :)
+        r"\usepackage[T1]{fontenc}",        # plots will be generated using this preamble
+        ]
+    }
+mpl.rcParams.update(pgf_with_latex)
+
+import matplotlib.pyplot as plt
+import matplotlib.mlab as mlab
+
+# These are the "Tableau 20" colors as RGB.    
+tableau20 = [(31, 119, 180), (174, 199, 232), (255, 127, 14), (255, 187, 120),    
+             (44, 160, 44), (152, 223, 138), (214, 39, 40), (255, 152, 150),    
+             (148, 103, 189), (197, 176, 213), (140, 86, 75), (196, 156, 148),    
+             (227, 119, 194), (247, 182, 210), (127, 127, 127), (199, 199, 199),    
+             (188, 189, 34), (219, 219, 141), (23, 190, 207), (158, 218, 229)]    
+  
+# Scale the RGB values to the [0, 1] range, which is the format matplotlib accepts.    
+for i in range(len(tableau20)):    
+    r, g, b = tableau20[i]    
+    tableau20[i] = (r / 255., g / 255., b / 255.)
 
 def predict_using_trained_models():    
     alphas = [0.001, 0.01, 0.1, 0.2, 0.4, 0.5, 0.6, 0.8, 1]
@@ -69,5 +116,43 @@ def predict_using_trained_models():
     np.savetxt('res/kink_mc_ll_mean.txt', mc_ll_mean, fmt='%.5f', delimiter=',')
     np.savetxt('res/kink_mc_ll_error.txt', mc_ll_error, fmt='%.5f', delimiter=',')           
 
+
+def plot_res():
+    mm_se_mean = np.loadtxt('res/kink_mm_se_mean.txt', delimiter=',')
+    mm_se_error = np.loadtxt('res/kink_mm_se_error.txt', delimiter=',')
+    mc_se_mean = np.loadtxt('res/kink_mc_se_mean.txt', delimiter=',')
+    mc_se_error = np.loadtxt('res/kink_mc_se_error.txt', delimiter=',')
+    mm_ll_mean = np.loadtxt('res/kink_mm_ll_mean.txt', delimiter=',')
+    mm_ll_error = np.loadtxt('res/kink_mm_ll_error.txt', delimiter=',')
+    mc_ll_mean = np.loadtxt('res/kink_mc_ll_mean.txt', delimiter=',')
+    mc_ll_error = np.loadtxt('res/kink_mc_ll_error.txt', delimiter=',')
+
+    alphas = [0.001, 0.01, 0.1, 0.2, 0.4, 0.5, 0.6, 0.8, 1]
+    plt.figure(figsize=figsize(1))
+    for i, alpha in enumerate(alphas):
+        plt.plot(np.cumsum(mm_se_mean[:, i]), color=tableau20[2*i], label=str(alpha))
+    plt.legend()
+    plt.savefig('/tmp/test1.pdf', bbox_inches='tight')
+
+    plt.figure(figsize=figsize(1))
+    for i, alpha in enumerate(alphas):
+        plt.plot(np.cumsum(mc_se_mean[:, i]), color=tableau20[2*i], label=str(alpha))
+    plt.legend()
+    plt.savefig('/tmp/test2.pdf', bbox_inches='tight')
+
+    plt.figure(figsize=figsize(1))
+    for i, alpha in enumerate(alphas):
+        plt.plot(np.cumsum(mm_ll_mean[:, i]), color=tableau20[2*i], label=str(alpha))
+    plt.legend()
+    plt.savefig('/tmp/test3.pdf', bbox_inches='tight')
+
+    plt.figure(figsize=figsize(1))
+    for i, alpha in enumerate(alphas):
+        plt.plot(np.cumsum(mc_ll_mean[:, i]), color=tableau20[2*i], label=str(alpha))
+    plt.legend()
+    plt.savefig('/tmp/test4.pdf', bbox_inches='tight')
+
+
 if __name__ == '__main__':
-    predict_using_trained_models()
+    # predict_using_trained_models()
+    plot_res()

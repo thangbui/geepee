@@ -15,6 +15,8 @@ max_processes = 10
 
 alphas = [0.001, 0.01, 0.1, 0.2, 0.4, 0.5, 0.6, 0.8, 1]
 K = 20
+# alphas = [0.5]
+# K = 1
 
 M = 20
 no_epochs = 20000
@@ -24,7 +26,7 @@ command_list = []
 
 for alpha in alphas:
 	for index in range(K):
-		cmd = 'OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 python train_kink_apep.py -d ' \
+		cmd = 'OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 python train_lincos_apep.py -d ' \
 			+ str(index) + ' -m ' + str(M) + ' -alpha ' + str(alpha) \
 			+ ' -e ' + str(no_epochs) + ' -l ' + str(lrate)
 		command_list.append(cmd)

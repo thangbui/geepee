@@ -193,7 +193,7 @@ def plot_opt():
                 plt.plot(np.arange(no_iters) + 1, aep_obj, '-', color=tableau20[2 + i*2], label=labels[i])
                 
     plt.yscale('log')
-    # plt.xscale('log')
+    plt.xscale('log')
     plt.xlabel('iteration')
     plt.ylabel('energy')
     plt.legend(loc='upper right', ncol=3)
