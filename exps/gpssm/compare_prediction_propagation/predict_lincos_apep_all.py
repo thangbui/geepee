@@ -69,9 +69,9 @@ def predict_using_trained_models():
     mc_se = np.zeros((K, T_test, len(alphas)))
     mc_ll = np.zeros((K, T_test, len(alphas)))
     for k in range(K):
-        y_train = np.loadtxt('data/kink_train_%d.txt'%k)
+        y_train = np.loadtxt('data/lincos_train_%d.txt'%k)
         y_train = np.reshape(y_train, [y_train.shape[0], 1])
-        y_test = np.loadtxt('data/kink_test_%d.txt'%k)
+        y_test = np.loadtxt('data/lincos_test_%d.txt'%k)
         y_test = np.reshape(y_test, [y_test.shape[0], 1])
         y_test = y_test[:, 0]
         for i, alpha in enumerate(alphas):
@@ -80,7 +80,7 @@ def predict_using_trained_models():
                 print 'k %d, alpha = %.6f, prop_mode %s' % (k, alpha, prop_mode)
                 model_aep = aep.SGPSSM(y_train, 1, M, 
                     lik='Gaussian', prior_mean=0, prior_var=1)
-                model_aep.load_model('trained_models/kink_aep_model_index_%d_M_%d_alpha_%.4f_%s.pickle' % (k, M, alpha, prop_mode))
+                model_aep.load_model('trained_models/lincos_aep_model_index_%d_M_%d_alpha_%.4f_%s.pickle' % (k, M, alpha, prop_mode))
                 
                 # predict using MM and MC, TODO: lin
                 _, _, my_MM, _, vy_MM = model_aep.predict_forward(T_test, prop_mode=PROP_MM)
@@ -118,33 +118,33 @@ def predict_using_trained_models():
     mc_ll_mean = np.mean(mc_ll, axis=0)
     mc_ll_error = np.std(mc_ll, axis=0) / np.sqrt(K)
 
-    np.savetxt('res/kink_mm_se_mean.txt', mm_se_mean, fmt='%.5f', delimiter=',')
-    np.savetxt('res/kink_mm_se_error.txt', mm_se_error, fmt='%.5f', delimiter=',')
-    np.savetxt('res/kink_mm_ll_mean.txt', mm_ll_mean, fmt='%.5f', delimiter=',')
-    np.savetxt('res/kink_mm_ll_error.txt', mm_ll_error, fmt='%.5f', delimiter=',')
-    np.savetxt('res/kink_lin_se_mean.txt', lin_se_mean, fmt='%.5f', delimiter=',')
-    np.savetxt('res/kink_lin_se_error.txt', lin_se_error, fmt='%.5f', delimiter=',')
-    np.savetxt('res/kink_lin_ll_mean.txt', lin_ll_mean, fmt='%.5f', delimiter=',')
-    np.savetxt('res/kink_lin_ll_error.txt', lin_ll_error, fmt='%.5f', delimiter=',')
-    np.savetxt('res/kink_mc_se_mean.txt', mc_se_mean, fmt='%.5f', delimiter=',')
-    np.savetxt('res/kink_mc_se_error.txt', mc_se_error, fmt='%.5f', delimiter=',')
-    np.savetxt('res/kink_mc_ll_mean.txt', mc_ll_mean, fmt='%.5f', delimiter=',')
-    np.savetxt('res/kink_mc_ll_error.txt', mc_ll_error, fmt='%.5f', delimiter=',')           
+    np.savetxt('res/lincos_mm_se_mean.txt', mm_se_mean, fmt='%.5f', delimiter=',')
+    np.savetxt('res/lincos_mm_se_error.txt', mm_se_error, fmt='%.5f', delimiter=',')
+    np.savetxt('res/lincos_mm_ll_mean.txt', mm_ll_mean, fmt='%.5f', delimiter=',')
+    np.savetxt('res/lincos_mm_ll_error.txt', mm_ll_error, fmt='%.5f', delimiter=',')
+    np.savetxt('res/lincos_lin_se_mean.txt', lin_se_mean, fmt='%.5f', delimiter=',')
+    np.savetxt('res/lincos_lin_se_error.txt', lin_se_error, fmt='%.5f', delimiter=',')
+    np.savetxt('res/lincos_lin_ll_mean.txt', lin_ll_mean, fmt='%.5f', delimiter=',')
+    np.savetxt('res/lincos_lin_ll_error.txt', lin_ll_error, fmt='%.5f', delimiter=',')
+    np.savetxt('res/lincos_mc_se_mean.txt', mc_se_mean, fmt='%.5f', delimiter=',')
+    np.savetxt('res/lincos_mc_se_error.txt', mc_se_error, fmt='%.5f', delimiter=',')
+    np.savetxt('res/lincos_mc_ll_mean.txt', mc_ll_mean, fmt='%.5f', delimiter=',')
+    np.savetxt('res/lincos_mc_ll_error.txt', mc_ll_error, fmt='%.5f', delimiter=',')           
 
 
 def plot_res():
-    mm_se_mean = np.loadtxt('res/kink_mm_se_mean.txt', delimiter=',')
-    mm_se_error = np.loadtxt('res/kink_mm_se_error.txt', delimiter=',')
-    lin_se_mean = np.loadtxt('res/kink_lin_se_mean.txt', delimiter=',')
-    lin_se_error = np.loadtxt('res/kink_lin_se_error.txt', delimiter=',')
-    mc_se_mean = np.loadtxt('res/kink_mc_se_mean.txt', delimiter=',')
-    mc_se_error = np.loadtxt('res/kink_mc_se_error.txt', delimiter=',')
-    mm_ll_mean = np.loadtxt('res/kink_mm_ll_mean.txt', delimiter=',')
-    mm_ll_error = np.loadtxt('res/kink_mm_ll_error.txt', delimiter=',')
-    lin_ll_mean = np.loadtxt('res/kink_lin_ll_mean.txt', delimiter=',')
-    lin_ll_error = np.loadtxt('res/kink_lin_ll_error.txt', delimiter=',')
-    mc_ll_mean = np.loadtxt('res/kink_mc_ll_mean.txt', delimiter=',')
-    mc_ll_error = np.loadtxt('res/kink_mc_ll_error.txt', delimiter=',')
+    mm_se_mean = np.loadtxt('res/lincos_mm_se_mean.txt', delimiter=',')
+    mm_se_error = np.loadtxt('res/lincos_mm_se_error.txt', delimiter=',')
+    lin_se_mean = np.loadtxt('res/lincos_lin_se_mean.txt', delimiter=',')
+    lin_se_error = np.loadtxt('res/lincos_lin_se_error.txt', delimiter=',')
+    mc_se_mean = np.loadtxt('res/lincos_mc_se_mean.txt', delimiter=',')
+    mc_se_error = np.loadtxt('res/lincos_mc_se_error.txt', delimiter=',')
+    mm_ll_mean = np.loadtxt('res/lincos_mm_ll_mean.txt', delimiter=',')
+    mm_ll_error = np.loadtxt('res/lincos_mm_ll_error.txt', delimiter=',')
+    lin_ll_mean = np.loadtxt('res/lincos_lin_ll_mean.txt', delimiter=',')
+    lin_ll_error = np.loadtxt('res/lincos_lin_ll_error.txt', delimiter=',')
+    mc_ll_mean = np.loadtxt('res/lincos_mc_ll_mean.txt', delimiter=',')
+    mc_ll_error = np.loadtxt('res/lincos_mc_ll_error.txt', delimiter=',')
 
     alphas = np.array([0.001, 0.01, 0.1, 0.2, 0.4, 0.5, 0.6, 0.8, 1])
     alphas_plot = np.array([0.001, 0.2, 0.5, 0.8])
@@ -190,7 +190,7 @@ def plot_res():
     axs[1].set_xlabel('future step')
     axs[0].set_ylabel('test log likelihood')
     axs[1].set_ylabel('test log likelihood')
-    plt.savefig('/tmp/kink_pred_ll.pdf', bbox_inches='tight')
+    plt.savefig('/tmp/lincos_pred_ll.pdf', bbox_inches='tight')
 
 
 if __name__ == '__main__':

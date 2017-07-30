@@ -14,13 +14,12 @@ processes = set()
 max_processes = 10
 
 alphas = [0.001, 0.01, 0.1, 0.2, 0.4, 0.5, 0.6, 0.8, 1]
-K = 20
+K = 100
 
 M = 20
-no_epochs = 20000
+no_epochs = 30000
 lrate = 0.0008
 command_list = []
-
 
 for alpha in alphas:
 	for index in range(K):

@@ -12,6 +12,8 @@ from utils import profile, PCA_reduce, matrixInverse
 from lik_layers import Gauss_Layer, Probit_Layer, Gauss_Emis
 from kernels import *
 
+import pdb
+
 class Base_Model(object):
     """Summary
     
@@ -253,10 +255,7 @@ class Base_SGP_Layer(object):
             if mode == PROP_MM:
                 return self._forward_prop_random_thru_post_mm(mx, vx, return_info)
             elif mode == PROP_LIN:
-                raise NotImplementedError(
-                    'Prediction with linearisation not implemented TODO')
-                # return self._forward_prop_random_thru_post_lin(mx, vx,
-                # return_info)
+                return self._forward_prop_random_thru_post_lin(mx, vx, return_info)
             elif mode == PROP_MC:
                 return self._forward_prop_random_thru_post_mc(mx, vx, return_info)
             else:
@@ -305,6 +304,27 @@ class Base_SGP_Layer(object):
             return mout, vout, psi1, psi2
         else:
             return mout, vout
+
+    def _forward_prop_random_thru_post_lin(self, mx, vx, return_info=False):
+        """Propagate uncertain inputs thru posterior, using Linearisation
+        
+        Args:
+            mx (float): input means, size K x Din
+            vx (TYPE): input variances, size K x Din
+            return_info (bool, optional): Description
+        
+        Returns:
+            float, size K x Dout: output means
+            float, size K x Dout: output variances
+        """
+        # TODO: return_info
+        mout, vout = self._forward_prop_deterministic_thru_post(mx, False)
+        gx = grad_x(2 * self.ls, 2 * self.sf, mx, self.zu)
+        Kuuinv = self.Kuuinv
+        dA = np.einsum('nad,ab,ob->ndo', gx, Kuuinv, self.mu)
+        gcontrib = np.einsum('ndo,nd->no', dA**2, vx)
+        vout += gcontrib
+        return mout, vout
 
     def _forward_prop_random_thru_post_mc(self, mx, vx, return_info=False):
         """Propagate uncertain inputs thru posterior, using simple Monte Carlo
@@ -1452,15 +1472,15 @@ class Base_SGPSSM(Base_Model):
 
     def predict_forward(self, T, x_control=None, prop_mode=PROP_MM, no_samples=200):
         if prop_mode == PROP_MM:
-            return self.predict_forward_mm(T, x_control)
+            return self.predict_forward_mm_or_lin(T, x_control, PROP_MM)
         elif prop_mode == PROP_LIN:
-            raise NotImplementedError('TODO')
+            return self.predict_forward_mm_or_lin(T, x_control, PROP_LIN)
         elif prop_mode == PROP_MC:
             return self.predict_forward_mc(T, x_control, no_samples)
         else:
             raise NotImplementedError('unknown prop mode %s' % prop_mode)
 
-    def predict_forward_mm(self, T, x_control):
+    def predict_forward_mm_or_lin(self, T, x_control, prop_mode):
         """Summary
         
         Args:
@@ -1482,14 +1502,18 @@ class Base_SGPSSM(Base_Model):
             if self.Dcon_dyn > 0:
                 mtm1 = np.hstack((mtm1, x_control[[t], :]))
                 vtm1 = np.hstack((vtm1, np.zeros((1, self.Dcon_dyn))))
-            mt, vt = self.dyn_layer.forward_prop_thru_post(mtm1, vtm1)
+            mt, vt = self.dyn_layer.forward_prop_thru_post(mtm1, vtm1, 
+                mode=prop_mode)
+            sn2 = np.exp(2 * self.sn)
+            vt = vt + sn2
             if self.Dcon_emi > 0:
                 mtc = np.hstack((mt, x_control[[t], :]))
                 vtc = np.hstack((vt, np.zeros((1, self.Dcon_emi))))
             else:
                 mtc, vtc = mt, vt
             if self.gp_emi:
-                mft, vft = self.emi_layer.forward_prop_thru_post(mtc, vtc)
+                mft, vft = self.emi_layer.forward_prop_thru_post(mtc, vtc,
+                    mode=prop_mode)
                 myt, vyt_n = self.lik_layer.output_probabilistic(mft, vft)
             else:
                 myt, vyt, vyt_n = self.emi_layer.output_probabilistic(mt, vt)
@@ -1525,6 +1549,8 @@ class Base_SGPSSM(Base_Model):
             else:
                 xc_samples = x_samples
             mt, vt = self.dyn_layer.forward_prop_thru_post(xc_samples)
+            sn2 = np.exp(2 * self.sn)
+            vt = vt + sn2
             eps = np.random.randn(no_samples, self.Din)
             x_samples = eps * np.sqrt(vt) + mt
             if self.Dcon_emi > 0:

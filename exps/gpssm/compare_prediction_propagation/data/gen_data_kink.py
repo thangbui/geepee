@@ -39,4 +39,4 @@ def gen_kink(no_splits, T_train, T_test):
         np.savetxt('kink_test_%d.txt'%i, y_test, fmt='%.4f', delimiter=' ')
 
 if __name__ == '__main__':
-    gen_kink(20, 200, 20)  
+    gen_kink(100, 200, 20)  

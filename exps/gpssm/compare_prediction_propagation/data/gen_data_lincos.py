@@ -35,4 +35,4 @@ def gen_lincos(no_splits, T_train, T_test):
         np.savetxt('lincos_test_%d.txt'%i, y_test, fmt='%.4f', delimiter=' ')
 
 if __name__ == '__main__':
-    gen_lincos(20, 200, 20)  
+    gen_lincos(100, 200, 20)  
