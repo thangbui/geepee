@@ -4,8 +4,6 @@ import scipy.stats
 import os, sys
 import pdb
 
-# We first define several utility functions
-
 def lincos(T, process_noise, obs_noise, xprev=None):
     if xprev is None:
         xprev = np.random.randn()
@@ -40,4 +38,8 @@ if __name__ == '__main__':
 
     process_noise = 0.2
     obs_noise = 0.2
+    gen_lincos(100, 200, 20, process_noise, obs_noise)
+
+    process_noise = 0.2
+    obs_noise = 1.0
     gen_lincos(100, 200, 20, process_noise, obs_noise)   

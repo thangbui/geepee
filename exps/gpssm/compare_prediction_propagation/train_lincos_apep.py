@@ -11,7 +11,7 @@ import argparse
 np.random.seed(0)
 
 
-parser = argparse.ArgumentParser(description='run binary classification experiment',
+parser = argparse.ArgumentParser(description='run gpssm experiment',
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('-d', '--data', type=int,
             action="store", dest="data_index",
