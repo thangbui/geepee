@@ -21,11 +21,15 @@ no_epochs = 50000
 lrate = 0.0005
 command_list = []
 
+dyn_noise = 0.2
+emi_noise = 0.2
+# emi_noise = 0.05
+
 for alpha in alphas:
 	for index in range(K):
 		cmd = 'OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 python train_lincos_apep.py -d ' \
 			+ str(index) + ' -m ' + str(M) + ' -alpha ' + str(alpha) \
-			+ ' -e ' + str(no_epochs) + ' -l ' + str(lrate)
+			+ ' -e ' + str(no_epochs) + ' -l ' + str(lrate) + ' -nx ' + str(dyn_noise) + ' -ny ' + str(emi_noise)
 		command_list.append(cmd)
 
 for i, command in enumerate(command_list):

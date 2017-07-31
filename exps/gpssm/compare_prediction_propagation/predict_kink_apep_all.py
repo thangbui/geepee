@@ -16,7 +16,7 @@ mpl.use('pgf')
 def figsize(scale):
     fig_width_pt = 488.13                          # Get this from LaTeX using \the\textwidth
     inches_per_pt = 1.0/72.27                       # Convert pt to inch
-    golden_mean = (np.sqrt(5.0)-1.0)/2.2            # Aesthetic ratio (you could change this)
+    golden_mean = (np.sqrt(5.0)-1.0)/1.8            # Aesthetic ratio (you could change this)
     fig_width = fig_width_pt*inches_per_pt*scale    # width in inches
     fig_height = fig_width*golden_mean              # height in inches
     fig_size = [fig_width,fig_height]
@@ -60,13 +60,10 @@ for i in range(len(tableau20)):
 def predict_using_trained_models():    
     alphas = [0.001, 0.01, 0.1, 0.2, 0.4, 0.5, 0.6, 0.8, 1]
     M = 20
-    K = 20
+    K = 100
     T_test = 20
-    mm_se = np.zeros((K, T_test, len(alphas)))
     mm_ll = np.zeros((K, T_test, len(alphas)))
-    lin_se = np.zeros((K, T_test, len(alphas)))
     lin_ll = np.zeros((K, T_test, len(alphas)))
-    mc_se = np.zeros((K, T_test, len(alphas)))
     mc_ll = np.zeros((K, T_test, len(alphas)))
     for k in range(K):
         y_train = np.loadtxt('data/kink_train_%d.txt'%k)
@@ -96,49 +93,28 @@ def predict_using_trained_models():
                 my_MC = my_MC[:, :, 0].T
                 vy_MC = vy_MC[:, :, 0].T
 
-                mm_se[k, :, i] = (my_MM - y_test)**2
-                mm_ll[k, :, i] = -0.5 * np.log(2*np.pi*vy_MM) - 0.5*(my_MM-y_test)**2/vy_MM
+                mm_ll[k, :, i] = np.cumsum(-0.5 * np.log(2*np.pi*vy_MM) - 0.5*(my_MM-y_test)**2/vy_MM)
 
-                lin_se[k, :, i] = (my_LIN - y_test)**2
-                lin_ll[k, :, i] = -0.5 * np.log(2*np.pi*vy_LIN) - 0.5*(my_LIN-y_test)**2/vy_LIN
+                lin_ll[k, :, i] = np.cumsum(-0.5 * np.log(2*np.pi*vy_LIN) - 0.5*(my_LIN-y_test)**2/vy_LIN)
 
-                mc_se[k, :, i] = (np.mean(my_MC, axis=0) - y_test)**2
-                mc_ll[k, :, i] = logsumexp(-0.5*np.log(2*np.pi*vy_MC) - 0.5*(my_MC-y_test)**2/vy_MC, axis=0) - np.log(my_MC.shape[0])             
+                mc_ll[k, :, i] = logsumexp(np.cumsum(-0.5*np.log(2*np.pi*vy_MC) - 0.5*(my_MC-y_test)**2/vy_MC, axis=1), axis=0) - np.log(my_MC.shape[0])             
 
-    mm_se_mean = np.mean(mm_se, axis=0)
-    mm_se_error = np.std(mm_se, axis=0) / np.sqrt(K)
     mm_ll_mean = np.mean(mm_ll, axis=0)
     mm_ll_error = np.std(mm_ll, axis=0) / np.sqrt(K)
-    lin_se_mean = np.mean(lin_se, axis=0)
-    lin_se_error = np.std(lin_se, axis=0) / np.sqrt(K)
     lin_ll_mean = np.mean(lin_ll, axis=0)
     lin_ll_error = np.std(lin_ll, axis=0) / np.sqrt(K)
-    mc_se_mean = np.mean(mc_se, axis=0)
-    mc_se_error = np.std(mc_se, axis=0) / np.sqrt(K)
     mc_ll_mean = np.mean(mc_ll, axis=0)
     mc_ll_error = np.std(mc_ll, axis=0) / np.sqrt(K)
 
-    np.savetxt('res/kink_mm_se_mean.txt', mm_se_mean, fmt='%.5f', delimiter=',')
-    np.savetxt('res/kink_mm_se_error.txt', mm_se_error, fmt='%.5f', delimiter=',')
     np.savetxt('res/kink_mm_ll_mean.txt', mm_ll_mean, fmt='%.5f', delimiter=',')
     np.savetxt('res/kink_mm_ll_error.txt', mm_ll_error, fmt='%.5f', delimiter=',')
-    np.savetxt('res/kink_lin_se_mean.txt', lin_se_mean, fmt='%.5f', delimiter=',')
-    np.savetxt('res/kink_lin_se_error.txt', lin_se_error, fmt='%.5f', delimiter=',')
     np.savetxt('res/kink_lin_ll_mean.txt', lin_ll_mean, fmt='%.5f', delimiter=',')
     np.savetxt('res/kink_lin_ll_error.txt', lin_ll_error, fmt='%.5f', delimiter=',')
-    np.savetxt('res/kink_mc_se_mean.txt', mc_se_mean, fmt='%.5f', delimiter=',')
-    np.savetxt('res/kink_mc_se_error.txt', mc_se_error, fmt='%.5f', delimiter=',')
     np.savetxt('res/kink_mc_ll_mean.txt', mc_ll_mean, fmt='%.5f', delimiter=',')
     np.savetxt('res/kink_mc_ll_error.txt', mc_ll_error, fmt='%.5f', delimiter=',')           
 
 
 def plot_res():
-    mm_se_mean = np.loadtxt('res/kink_mm_se_mean.txt', delimiter=',')
-    mm_se_error = np.loadtxt('res/kink_mm_se_error.txt', delimiter=',')
-    lin_se_mean = np.loadtxt('res/kink_lin_se_mean.txt', delimiter=',')
-    lin_se_error = np.loadtxt('res/kink_lin_se_error.txt', delimiter=',')
-    mc_se_mean = np.loadtxt('res/kink_mc_se_mean.txt', delimiter=',')
-    mc_se_error = np.loadtxt('res/kink_mc_se_error.txt', delimiter=',')
     mm_ll_mean = np.loadtxt('res/kink_mm_ll_mean.txt', delimiter=',')
     mm_ll_error = np.loadtxt('res/kink_mm_ll_error.txt', delimiter=',')
     lin_ll_mean = np.loadtxt('res/kink_lin_ll_mean.txt', delimiter=',')
@@ -148,20 +124,54 @@ def plot_res():
 
     alphas = np.array([0.001, 0.01, 0.1, 0.2, 0.4, 0.5, 0.6, 0.8, 1])
     alphas_plot = np.array([0.001, 0.2, 0.5, 0.8])
-    alpha_mid = 0.5
+    alpha_mid = 0.001
 
-    fig, axs = plt.subplots(2, 1, figsize=figsize(1), sharex=True)
-    steps = np.arange(20) + 1
+    fig, axs = plt.subplots(4, 1, figsize=figsize(1), sharex=True)
+    T_test = 10
+    steps = np.arange(T_test) + 1
+
     for i, alpha in enumerate(alphas_plot):
         print alpha
         loc = int(np.where(alphas==alpha)[0])
-        loc_mid = int(np.where(alphas==alpha_mid)[0])
-        axs[0].plot(steps, np.cumsum(mc_ll_mean[:, loc_mid] - lin_ll_mean[:, loc]), '-.', color=tableau20[2*loc])
-        axs[0].plot(steps, np.cumsum(mc_ll_mean[:, loc_mid] - mm_ll_mean[:, loc]), '--', color=tableau20[2*loc])
-        axs[0].plot(steps, np.cumsum(mc_ll_mean[:, loc_mid] - mc_ll_mean[:, loc]), '-', color=tableau20[2*loc], label=r'$\alpha=%.3f$'%alpha)
+        res = mm_ll_mean[:T_test, loc]
+        axs[0].plot(steps, res, '--', color=tableau20[2*loc])
+
+        res = lin_ll_mean[:T_test, loc]
+        axs[0].plot(steps, res, '-.', color=tableau20[2*loc])
+
+        res = mc_ll_mean[:T_test, loc]
+        axs[0].plot(steps, res, '-', color=tableau20[2*loc])
+
+    for i, alpha in enumerate(alphas_plot):
+        print alpha
+        loc = int(np.where(alphas==alpha)[0])
+        mid_loc = int(np.where(alphas==alpha_mid)[0])
+        res = mm_ll_mean[:T_test, loc] - mm_ll_mean[:T_test, mid_loc]
+        axs[1].plot(steps, res, '--', color=tableau20[2*loc])
+        axs[1].fill_between(
+            steps, 
+            res + np.sqrt(mm_ll_error[:T_test, loc]),
+            res - np.sqrt(mm_ll_error[:T_test, loc]), 
+            alpha=0.3, facecolor=tableau20[2*loc], edgecolor=tableau20[2*loc])
+
+        res = lin_ll_mean[:T_test, loc] - lin_ll_mean[:T_test, mid_loc]
+        axs[2].plot(steps, res, '-.', color=tableau20[2*loc])
+        axs[2].fill_between(
+            steps, 
+            res + np.sqrt(lin_ll_error[:T_test, loc]),
+            res - np.sqrt(lin_ll_error[:T_test, loc]), 
+            alpha=0.3, facecolor=tableau20[2*loc], edgecolor=tableau20[2*loc])
+
+        res = mc_ll_mean[:T_test, loc] - mc_ll_mean[:T_test, mid_loc]
+        axs[3].plot(steps, res, '-', color=tableau20[2*loc], label=r'$\alpha=%.3f$'%alpha)
+        axs[3].fill_between(
+            steps, 
+            res + np.sqrt(mc_ll_error[:T_test, loc]),
+            res - np.sqrt(mc_ll_error[:T_test, loc]), 
+            alpha=0.3, facecolor=tableau20[2*loc], edgecolor=tableau20[2*loc])
         
     #Get artists and labels for legend and chose which ones to display
-    handles, labels = axs[0].get_legend_handles_labels()
+    handles, labels = axs[3].get_legend_handles_labels()
     display = (0,1,2,3)
 
     #Create custom artists
@@ -170,29 +180,21 @@ def plot_res():
     mcArtist = plt.Line2D((0,1),(0,0), color='k')
 
     #Create legend from custom artist/label lists
-    axs[0].legend([handle for i,handle in enumerate(handles) if i in display]+[mmArtist,linArtist,mcArtist],
+    axs[3].legend([handle for i,handle in enumerate(handles) if i in display]+[mmArtist,linArtist,mcArtist],
               [label for i,label in enumerate(labels) if i in display]+['MM','LIN','MC'],
-              loc='upper left', ncol=2, handlelength=4)
+              loc='lower left', ncol=2, handlelength=4, fontsize=6)
 
-    axs[0].set_xticks([1, 5, 10, 15, 20])
-    axs[0].set_xlim([0.5, 20.5])
+    # axs[2].set_xticks([1, 5, 10, 15, 20])
+    axs[3].set_xlim([0.5, T_test + 0.5])
+    axs[3].set_xlabel('future step')
+    axs[0].set_ylabel('LL')
+    axs[1].set_ylabel(r'LL $\Delta$')
+    axs[2].set_ylabel(r'LL $\Delta$')
+    axs[3].set_ylabel(r'LL $\Delta$')
 
-    steps = np.arange(20) + 1
-    for i, alpha in enumerate(alphas_plot):
-        print alpha
-        loc = int(np.where(alphas==alpha)[0])
-        loc_mid = int(np.where(alphas==alpha_mid)[0])
-        axs[1].plot(steps, np.cumsum(mc_ll_mean[:, loc_mid] - mm_ll_mean[:, loc]), '--', color=tableau20[2*loc])
-        axs[1].plot(steps, np.cumsum(mc_ll_mean[:, loc_mid] - mc_ll_mean[:, loc]), '-', color=tableau20[2*loc])
-        
-    axs[1].set_xticks([1, 5, 10, 15, 20])
-    axs[1].set_xlim([0.5, 20.5])
-    axs[1].set_xlabel('future step')
-    axs[0].set_ylabel('test log likelihood')
-    axs[1].set_ylabel('test log likelihood')
     plt.savefig('/tmp/kink_pred_ll.pdf', bbox_inches='tight')
 
 
 if __name__ == '__main__':
-    # predict_using_trained_models()
+    predict_using_trained_models()
     plot_res()

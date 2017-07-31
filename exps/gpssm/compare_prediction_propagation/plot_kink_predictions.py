@@ -120,7 +120,7 @@ axs[1].set_xlim([T_train - 10 + 0.5, T_train + T_test + 0.5])
 
 # plot LIN prediction TODO
 axs[2].plot(t_train, y_train[:, 0], 'k-')
-axs[2].plot(t_test, my_LIN, '-.', color=tableau20[color_loc], linewidth=1.5)
+axs[2].plot(t_test, my_LIN, '-', color=tableau20[color_loc], linewidth=1.5)
 axs[2].fill_between(
     t_test, 
     my_LIN + 2*np.sqrt(vy_LIN),

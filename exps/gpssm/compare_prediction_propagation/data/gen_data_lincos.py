@@ -21,18 +21,23 @@ def lincos(T, process_noise, obs_noise, xprev=None):
 
     return xtrue, x, y
 
-def gen_lincos(no_splits, T_train, T_test):
+def gen_lincos(no_splits, T_train, T_test, process_noise, obs_noise):
     for i in range(no_splits):
         np.random.seed(i)
         # generate a dataset from the lincos function above
         T = T_train + T_test
-        process_noise = 0.2
-        obs_noise = 0.05
         (xtrue, x, y) = lincos(T, process_noise, obs_noise)
         y_train = y[:T_train]
         y_test = y[T_train:]
-        np.savetxt('lincos_train_%d.txt'%i, y_train, fmt='%.4f', delimiter=' ')
-        np.savetxt('lincos_test_%d.txt'%i, y_test, fmt='%.4f', delimiter=' ')
+        np.savetxt('lincos_train_%d_%.2f_%.2f.txt'%(i, process_noise, obs_noise), y_train, fmt='%.4f', delimiter=' ')
+        np.savetxt('lincos_test_%d_%.2f_%.2f.txt'%(i, process_noise, obs_noise), y_test, fmt='%.4f', delimiter=' ')
 
 if __name__ == '__main__':
-    gen_lincos(100, 200, 20)  
+
+    process_noise = 0.2
+    obs_noise = 0.05
+    gen_lincos(100, 200, 20, process_noise, obs_noise)
+
+    process_noise = 0.2
+    obs_noise = 0.2
+    gen_lincos(100, 200, 20, process_noise, obs_noise)   
