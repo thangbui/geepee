@@ -22,7 +22,8 @@ lrate = 0.0005
 command_list = []
 
 dyn_noise = 0.2
-emi_noise = 1.0
+emi_noise = 2.0
+# emi_noise = 1.0
 # emi_noise = 0.2
 # emi_noise = 0.05
 

@@ -13,10 +13,19 @@ import matplotlib as mpl
 import matplotlib.gridspec as gridspec
 mpl.use('pgf')
 
-def figsize(scale):
+def figsize_1(scale):
     fig_width_pt = 488.13                          # Get this from LaTeX using \the\textwidth
     inches_per_pt = 1.0/72.27                       # Convert pt to inch
     golden_mean = (np.sqrt(5.0)-1.0)/1.8            # Aesthetic ratio (you could change this)
+    fig_width = fig_width_pt*inches_per_pt*scale    # width in inches
+    fig_height = fig_width*golden_mean              # height in inches
+    fig_size = [fig_width,fig_height]
+    return fig_size
+
+def figsize_2(scale):
+    fig_width_pt = 488.13                          # Get this from LaTeX using \the\textwidth
+    inches_per_pt = 1.0/72.27                       # Convert pt to inch
+    golden_mean = (np.sqrt(5.0)-1.0)/1.5            # Aesthetic ratio (you could change this)
     fig_width = fig_width_pt*inches_per_pt*scale    # width in inches
     fig_height = fig_width*golden_mean              # height in inches
     fig_size = [fig_width,fig_height]
@@ -34,7 +43,7 @@ pgf_with_latex = {                      # setup matplotlib to use latex for outp
     "legend.fontsize": 8,               # Make the legend/label fonts a little smaller
     "xtick.labelsize": 8,
     "ytick.labelsize": 8,
-    "figure.figsize": figsize(0.9),     # default fig size of 0.9 textwidth
+    "figure.figsize": figsize_1(0.9),     # default fig size of 0.9 textwidth
     "pgf.preamble": [
         r"\usepackage[utf8x]{inputenc}",    # use utf8 fonts becasue your computer can handle it :)
         r"\usepackage[T1]{fontenc}",        # plots will be generated using this preamble
@@ -59,26 +68,26 @@ for i in range(len(tableau20)):
    
 alphas = np.array([0.001, 0.01, 0.1, 0.2, 0.4, 0.5, 0.6, 0.8, 1])
 M = 20
-np.random.seed(0)
-k = np.random.randint(0, 20)
 # k = 15
-alpha = 0.5
 prop_mode = PROP_MM
-color_loc = int(2*np.where(alphas==alpha)[0])
 T_test = 20
 T_train = 200
 
 dyn_noises = [0.2]
-# emi_noises = [0.05, 0.2]
-emi_noises = [0.2]
+# emi_noises = [0.05, 0.2, 1.0]
+emi_noises = [0.2, 1.0]
 for dyn_noise in dyn_noises:
     for emi_noise in emi_noises:
+        np.random.seed(0)
+        k = np.random.randint(0, 20)
 
         y_train = np.loadtxt('data/lincos_train_%d_%.2f_%.2f.txt'%(k, dyn_noise, emi_noise))
         y_train = np.reshape(y_train, [y_train.shape[0], 1])
         y_test = np.loadtxt('data/lincos_test_%d_%.2f_%.2f.txt'%(k, dyn_noise, emi_noise))
         y_test = np.reshape(y_test, [y_test.shape[0], 1])
 
+        alpha = 0.5
+        color_loc = int(2*np.where(alphas==alpha)[0])
         print 'k %d, alpha = %.6f, prop_mode %s' % (k, alpha, prop_mode)
         model_aep = aep.SGPSSM(y_train, 1, M, 
             lik='Gaussian', prior_mean=0, prior_var=1)
@@ -105,7 +114,7 @@ for dyn_noise in dyn_noises:
         t_test = np.arange(T_train, T_train + T_test) + 1
 
         # plot data and predictions
-        fig, axs = plt.subplots(4, 1, figsize=figsize(1))
+        fig, axs = plt.subplots(4, 1, figsize=figsize_1(1))
         # plot full data
         axs[0].plot(t_train, y_train[:, 0], 'k-')
         axs[0].plot(t_test, y_test, 'k*-', linewidth=2)
@@ -155,16 +164,6 @@ for dyn_noise in dyn_noises:
         plt.savefig('/tmp/lincos_pred_%.2f_%.2f.pdf'%(dyn_noise, emi_noise), bbox_inches='tight')
 
 
-
-        def figsize(scale):
-            fig_width_pt = 488.13                          # Get this from LaTeX using \the\textwidth
-            inches_per_pt = 1.0/72.27                       # Convert pt to inch
-            golden_mean = (np.sqrt(5.0)-1.0)/1.5            # Aesthetic ratio (you could change this)
-            fig_width = fig_width_pt*inches_per_pt*scale    # width in inches
-            fig_height = fig_width*golden_mean              # height in inches
-            fig_size = [fig_width,fig_height]
-            return fig_size
-
         # plot marginals
         alpha_plot = np.array([0.001, 0.2, 0.5, 0.8])
         step_plot = np.array([1, 2, 5, 10, 20]) - 1
@@ -196,7 +195,7 @@ for dyn_noise in dyn_noises:
             vy_MC[i, :, :] = vy_MC_i[:, :, 0].T
 
         yplot = np.linspace(-10, 10, 300).reshape((300, ))
-        fig, axs = plt.subplots(alpha_plot.shape[0], step_plot.shape[0], figsize=figsize(1), sharex=True)
+        fig, axs = plt.subplots(alpha_plot.shape[0], step_plot.shape[0], figsize=figsize_2(1), sharex=True)
         lines = []
         labels = []
         for i, alpha in enumerate(alpha_plot):
