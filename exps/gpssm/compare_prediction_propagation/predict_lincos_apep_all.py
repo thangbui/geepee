@@ -64,7 +64,8 @@ def predict_using_trained_models():
     T_test = 20
     dyn_noises = [0.2]
     # emi_noises = [0.05, 0.2, 1.0]
-    emi_noises = [0.2, 1.0]
+    # emi_noises = [0.2, 1.0]
+    emi_noises = [2.0]
     for dyn_noise in dyn_noises:
         for emi_noise in emi_noises:
             mm_ll = np.zeros((K, T_test, len(alphas)))
@@ -122,7 +123,8 @@ def predict_using_trained_models():
 def plot_res():
     dyn_noises = [0.2]
     # emi_noises = [0.05, 0.2, 1.0]
-    emi_noises = [0.2, 1.0]
+    # emi_noises = [0.2, 1.0]
+    emi_noises = [2.0]
     for dyn_noise in dyn_noises:
         for emi_noise in emi_noises:
             mm_ll_mean = np.loadtxt('res/lincos_mm_ll_mean_%.2f_%.2f.txt'%(dyn_noise, emi_noise), delimiter=',')
@@ -133,7 +135,8 @@ def plot_res():
             mc_ll_error = np.loadtxt('res/lincos_mc_ll_error_%.2f_%.2f.txt'%(dyn_noise, emi_noise), delimiter=',')
 
             alphas = np.array([0.001, 0.01, 0.1, 0.2, 0.4, 0.5, 0.6, 0.8, 1])
-            alphas_plot = np.array([0.001, 0.2, 0.5, 0.8])
+            # alphas_plot = np.array([0.001, 0.2, 0.5, 0.8])
+            alphas_plot = np.array([0.001, 0.2, 0.5, 0.6])
             alpha_mid = 0.001
 
             fig, axs = plt.subplots(4, 1, figsize=figsize(1), sharex=True)

@@ -32,17 +32,17 @@ def gen_lincos(no_splits, T_train, T_test, process_noise, obs_noise):
 
 if __name__ == '__main__':
 
-    process_noise = 0.2
-    obs_noise = 0.05
-    gen_lincos(100, 200, 20, process_noise, obs_noise)
+    # process_noise = 0.2
+    # obs_noise = 0.05
+    # gen_lincos(100, 200, 20, process_noise, obs_noise)
 
-    process_noise = 0.2
-    obs_noise = 0.2
-    gen_lincos(100, 200, 20, process_noise, obs_noise)
+    # process_noise = 0.2
+    # obs_noise = 0.2
+    # gen_lincos(100, 200, 20, process_noise, obs_noise)
 
-    process_noise = 0.2
-    obs_noise = 1.0
-    gen_lincos(100, 200, 20, process_noise, obs_noise) 
+    # process_noise = 0.2
+    # obs_noise = 1.0
+    # gen_lincos(100, 200, 20, process_noise, obs_noise) 
 
     process_noise = 0.2
     obs_noise = 2.0

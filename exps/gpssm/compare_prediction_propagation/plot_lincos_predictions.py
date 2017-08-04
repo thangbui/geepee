@@ -75,7 +75,8 @@ T_train = 200
 
 dyn_noises = [0.2]
 # emi_noises = [0.05, 0.2, 1.0]
-emi_noises = [0.2, 1.0]
+# emi_noises = [0.2, 1.0]
+emi_noises = [2.0]
 for dyn_noise in dyn_noises:
     for emi_noise in emi_noises:
         np.random.seed(0)
