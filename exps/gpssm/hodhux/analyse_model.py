@@ -175,6 +175,7 @@ def plot_prediction_gp_MM(params_fname, fig_fname, M=20):
     labels = ['V', 'm', 'n', 'h']
     plt.figure()
     t = np.arange(T)
+    lims = [[-6, 3], [-1, 6], [1, 7], [-1, 5]]
     for i in range(4):
         yi = y[:, i]
         mi = my[:, i]
@@ -183,6 +184,7 @@ def plot_prediction_gp_MM(params_fname, fig_fname, M=20):
         mip = myp[:, i]
         vip = vyp[:, i]
         vinp = vynp[:, i]
+        vip = vinp
 
         plt.subplot(5, 1, i + 1)
         plt.fill_between(t, mi + 2 * np.sqrt(vi), mi - 2 *
@@ -195,6 +197,7 @@ def plot_prediction_gp_MM(params_fname, fig_fname, M=20):
         plt.axvline(x=T, color='k', linewidth=2)
         plt.ylabel(labels[i])
         plt.xticks([])
+        plt.ylim(lims[i])
         plt.yticks([])
 
     plt.subplot(no_panes, 1, no_panes)
@@ -206,7 +209,8 @@ def plot_prediction_gp_MM(params_fname, fig_fname, M=20):
     plt.xlabel('t')
     plt.savefig(fig_fname)
 
-def plot_prediction_gp_MC(params_fname, fig_fname, M=20):
+
+def plot_prediction_gp_MC(params_fname, fig_fname, M=20, no_samples=100):
     # TODO
     # load dataset
     data = np.loadtxt('hh_data.txt')
@@ -228,32 +232,35 @@ def plot_prediction_gp_MC(params_fname, fig_fname, M=20):
     model_aep.load_model(params_fname)
     print 'ls ', np.exp(model_aep.dyn_layer.ls)
     my, vy, vyn = model_aep.get_posterior_y()
-    _, my_MC, vy_MC = model_aep.predict_forward(T, x_control_test, prop_mode=PROP_MC)
-    pdb.set_trace()
+    _, my_MC, vy_MC = model_aep.predict_forward(T, x_control_test, prop_mode=PROP_MC, no_samples=no_samples)
     cs = ['k', 'r', 'b', 'g']
     labels = ['V', 'm', 'n', 'h']
     plt.figure()
     t = np.arange(T)
+    lims = [[-6, 3], [-1, 6], [1, 7], [-1, 5]]
     for i in range(4):
         yi = y[:, i]
         mi = my[:, i]
         vi = vy[:, i]
         vin = vyn[:, i]
-        mip = myp[:, i]
-        vip = vyp[:, i]
-        vinp = vynp[:, i]
 
-        plt.subplot(5, 1, i + 1)
+        mip = my_MC[:, :, i]
+        vip = vy_MC[:, :, i]
+        
+        plt.subplot(no_panes, 1, i + 1)
         plt.fill_between(t, mi + 2 * np.sqrt(vi), mi - 2 *
                          np.sqrt(vi), color=cs[i], alpha=0.4)
         plt.plot(t, mi, '-', color=cs[i])
-        plt.fill_between(np.arange(T, 2 * T), mip + 2 * np.sqrt(vip),
-                         mip - 2 * np.sqrt(vip), color=cs[i], alpha=0.4)
-        plt.plot(np.arange(T, 2 * T), mip, '-', color=cs[i])
         plt.plot(t, yi, '--', color=cs[i])
+        
+        # for k in range(mip.shape[1]):
+        for k in range(20):
+            plt.plot(np.arange(T, 2*T), mip[:, k], color=cs[i], alpha=0.1)
+
         plt.axvline(x=T, color='k', linewidth=2)
         plt.ylabel(labels[i])
         plt.xticks([])
+        plt.ylim(lims[i])
         plt.yticks([])
 
     plt.subplot(no_panes, 1, no_panes)
@@ -266,17 +273,308 @@ def plot_prediction_gp_MC(params_fname, fig_fname, M=20):
     plt.savefig(fig_fname)
 
 
+def plot_prediction_gp_MM_fixed_function(params_fname, fig_fname, M=20):
+    # load dataset
+    data = np.loadtxt('hh_data.txt')
+    # use the voltage and potasisum current
+    data = data / np.std(data, axis=0)
+    y = data[:, :4]
+    xc = data[:, [-1]]
+    # init hypers
+    Dlatent = 2
+    Dobs = y.shape[1]
+    T = y.shape[0]
+    x_control = xc
+    # x_control_test = np.flipud(x_control)
+    x_control_test = x_control * 1.5
+    no_panes = 5
+    model_aep = aep.SGPSSM(
+        y, Dlatent, M, lik='Gaussian', prior_mean=0, prior_var=1000, 
+        x_control=x_control, gp_emi=True, control_to_emi=True)
+    model_aep.load_model(params_fname)
+    print 'ls ', np.exp(model_aep.dyn_layer.ls)
+    my, vy, vyn = model_aep.get_posterior_y()
+    mxp, vxp, myp, vyp, vynp = model_aep.predict_forward_fixed_function(T, x_control_test, prop_mode=PROP_MM)
+    cs = ['k', 'r', 'b', 'g']
+    labels = ['V', 'm', 'n', 'h']
+    plt.figure()
+    t = np.arange(T)
+    lims = [[-6, 3], [-1, 6], [1, 7], [-1, 5]]
+    for i in range(4):
+        yi = y[:, i]
+        mi = my[:, i]
+        vi = vy[:, i]
+        vin = vyn[:, i]
+        mip = myp[:, i]
+        vip = vyp[:, i]
+        vinp = vynp[:, i]
+        vip = vinp
+
+        plt.subplot(5, 1, i + 1)
+        plt.fill_between(t, mi + 2 * np.sqrt(vi), mi - 2 *
+                         np.sqrt(vi), color=cs[i], alpha=0.4)
+        plt.plot(t, mi, '-', color=cs[i])
+        plt.fill_between(np.arange(T, 2 * T), mip + 2 * np.sqrt(vip),
+                         mip - 2 * np.sqrt(vip), color=cs[i], alpha=0.4)
+        plt.plot(np.arange(T, 2 * T), mip, '-', color=cs[i])
+        plt.plot(t, yi, '--', color=cs[i])
+        plt.axvline(x=T, color='k', linewidth=2)
+        plt.ylabel(labels[i])
+        plt.xticks([])
+        plt.ylim(lims[i])
+        plt.yticks([])
+
+    plt.subplot(no_panes, 1, no_panes)
+    plt.plot(t, x_control, '-', color='m')
+    plt.plot(np.arange(T, 2 * T), x_control_test, '-', color='m')
+    plt.axvline(x=T, color='k', linewidth=2)
+    plt.ylabel('I')
+    plt.yticks([])
+    plt.xlabel('t')
+    plt.savefig(fig_fname)
+
+
+def plot_prediction_gp_MC_fixed_function(params_fname, fig_fname, M=20, no_samples=100):
+    # TODO
+    # load dataset
+    data = np.loadtxt('hh_data.txt')
+    # use the voltage and potasisum current
+    data = data / np.std(data, axis=0)
+    y = data[:, :4]
+    xc = data[:, [-1]]
+    # init hypers
+    Dlatent = 2
+    Dobs = y.shape[1]
+    T = y.shape[0]
+    x_control = xc
+    # x_control_test = np.flipud(x_control)
+    x_control_test = x_control * 1.5
+    no_panes = 5
+    model_aep = aep.SGPSSM(
+        y, Dlatent, M, lik='Gaussian', prior_mean=0, prior_var=1000, 
+        x_control=x_control, gp_emi=True, control_to_emi=True)
+    model_aep.load_model(params_fname)
+    print 'ls ', np.exp(model_aep.dyn_layer.ls)
+    my, vy, vyn = model_aep.get_posterior_y()
+    _, my_MC, vy_MC = model_aep.predict_forward_fixed_function(
+        T, x_control_test, prop_mode=PROP_MC, no_samples=no_samples)
+    cs = ['k', 'r', 'b', 'g']
+    labels = ['V', 'm', 'n', 'h']
+    plt.figure()
+    t = np.arange(T)
+    lims = [[-6, 3], [-1, 6], [1, 7], [-1, 5]]
+    for i in range(4):
+        yi = y[:, i]
+        mi = my[:, i]
+        vi = vy[:, i]
+        vin = vyn[:, i]
+
+        mip = my_MC[:, :, i]
+        vip = vy_MC[:, :, i]
+        
+        plt.subplot(no_panes, 1, i + 1)
+        plt.fill_between(t, mi + 2 * np.sqrt(vi), mi - 2 *
+                         np.sqrt(vi), color=cs[i], alpha=0.4)
+        plt.plot(t, mi, '-', color=cs[i])
+        plt.plot(t, yi, '--', color=cs[i])
+        
+        # for k in range(mip.shape[1]):
+        for k in range(20):
+            plt.plot(np.arange(T, 2*T), mip[:, k], color=cs[i], alpha=0.1)
+
+        plt.axvline(x=T, color='k', linewidth=2)
+        plt.ylabel(labels[i])
+        plt.xticks([])
+        plt.ylim(lims[i])
+        plt.yticks([])
+
+    plt.subplot(no_panes, 1, no_panes)
+    plt.plot(t, x_control, '-', color='m')
+    plt.plot(np.arange(T, 2 * T), x_control_test, '-', color='m')
+    plt.axvline(x=T, color='k', linewidth=2)
+    plt.ylabel('I')
+    plt.yticks([])
+    plt.xlabel('t')
+    plt.savefig(fig_fname)
+
+
+def plot_prediction_gp_MM_fixed_function_fixed_control(params_fname, fig_fname, cval, Tcontrol, M=20):
+    # load dataset
+    data = np.loadtxt('hh_data.txt')
+    # use the voltage and potasisum current
+    data = data / np.std(data, axis=0)
+    y = data[:, :4]
+    xc = data[:, [-1]]
+    # init hypers
+    Dlatent = 2
+    Dobs = y.shape[1]
+    T = y.shape[0]
+    x_control = cval * np.ones([Tcontrol, 1])
+    no_panes = 5
+    model_aep = aep.SGPSSM(
+        y, Dlatent, M, lik='Gaussian', prior_mean=0, prior_var=1000, 
+        x_control=xc, gp_emi=True, control_to_emi=True)
+    model_aep.load_model(params_fname)
+    cs = ['k', 'r', 'b', 'g']
+    labels = ['V', 'm', 'n', 'h']
+    K_samples = 5
+    fig, axs = plt.subplots(5, K_samples+1, figsize=(12, 8))
+    lims = [[-6, 3], [-1, 6], [1, 7], [-1, 5], [-5, 35]]
+    for k in range(K_samples):
+        np.random.seed(k)
+        mxp, vxp, myp, vyp, vynp = model_aep.predict_forward_fixed_function(Tcontrol, x_control, prop_mode=PROP_MM)
+        for i in range(4):
+            mip = myp[:, i]
+            vip = vyp[:, i]
+            vinp = vynp[:, i]
+            vip = vinp
+
+            ax = axs[i, k]
+            ax.fill_between(np.arange(Tcontrol), mip + 2 * np.sqrt(vip),
+                             mip - 2 * np.sqrt(vip), color=cs[i], alpha=0.4)
+            ax.plot(np.arange(Tcontrol), mip, '-', color=cs[i])
+            ax.set_ylabel(labels[i])
+            ax.set_xticks([])
+            ax.set_ylim(lims[i])
+            ax.set_yticks([])
+
+        ax = axs[4, k]
+        ax.plot(np.arange(Tcontrol), x_control, '-', color='m')
+        ax.set_ylabel('I')
+        ax.set_yticks([])
+        ax.set_xlabel('t')
+        ax.set_ylim(lims[-1])
+
+    mxp, vxp, myp, vyp, vynp = model_aep.predict_forward(Tcontrol, x_control, prop_mode=PROP_MM)
+    for i in range(4):
+        mip = myp[:, i]
+        vip = vyp[:, i]
+        vinp = vynp[:, i]
+        vip = vinp
+
+        ax = axs[i, k+1]
+        ax.fill_between(np.arange(Tcontrol), mip + 2 * np.sqrt(vip),
+                         mip - 2 * np.sqrt(vip), color=cs[i], alpha=0.4)
+        ax.plot(np.arange(Tcontrol), mip, '-', color=cs[i])
+        ax.set_ylabel(labels[i])
+        ax.set_xticks([])
+        ax.set_ylim(lims[i])
+        ax.set_yticks([])
+
+    ax = axs[4, k+1]
+    ax.plot(np.arange(Tcontrol), x_control, '-', color='m')
+    ax.set_ylabel('I')
+    ax.set_yticks([])
+    ax.set_xlabel('t')
+    ax.set_ylim(lims[-1])
+    plt.savefig(fig_fname)
+
+def plot_prediction_gp_MC_fixed_function_fixed_control(params_fname, fig_fname, cval, Tcontrol, M=20):
+    # load dataset
+    data = np.loadtxt('hh_data.txt')
+    # use the voltage and potasisum current
+    data = data / np.std(data, axis=0)
+    y = data[:, :4]
+    xc = data[:, [-1]]
+    # init hypers
+    Dlatent = 2
+    Dobs = y.shape[1]
+    T = y.shape[0]
+    x_control = cval * np.ones([Tcontrol, 1])
+    no_panes = 5
+    model_aep = aep.SGPSSM(
+        y, Dlatent, M, lik='Gaussian', prior_mean=0, prior_var=1000, 
+        x_control=xc, gp_emi=True, control_to_emi=True)
+    model_aep.load_model(params_fname)
+    cs = ['k', 'r', 'b', 'g']
+    labels = ['V', 'm', 'n', 'h']
+    K_samples = 5
+    fig, axs = plt.subplots(5, K_samples+1, figsize=(12, 8))
+    lims = [[-6, 3], [-1, 6], [1, 7], [-1, 5], [-5, 35]]
+    for k in range(K_samples):
+        np.random.seed(k)
+        
+        _, my_MC, vy_MC = model_aep.predict_forward_fixed_function(
+            Tcontrol, x_control, prop_mode=PROP_MC, no_samples=50)
+        for i in range(4):
+            mip = my_MC[:, :, i]
+            vip = vy_MC[:, :, i]
+
+            ax = axs[i, k]
+            for m in range(20):
+                ax.plot(np.arange(Tcontrol), mip[:, m], color=cs[i], alpha=0.1)
+            ax.set_ylabel(labels[i])
+            ax.set_xticks([])
+            ax.set_ylim(lims[i])
+            ax.set_yticks([])
+
+        ax = axs[4, k]
+        ax.plot(np.arange(Tcontrol), x_control, '-', color='m')
+        ax.set_ylabel('I')
+        ax.set_yticks([])
+        ax.set_xlabel('t')
+        ax.set_ylim(lims[-1])
+
+    _, my_MC, vy_MC = model_aep.predict_forward(
+        Tcontrol, x_control, prop_mode=PROP_MC, no_samples=50)
+    for i in range(4):
+        mip = my_MC[:, :, i]
+        vip = vy_MC[:, :, i]
+
+        ax = axs[i, k+1]
+        for m in range(20):
+            ax.plot(np.arange(Tcontrol), mip[:, m], color=cs[i], alpha=0.1)
+        ax.set_ylabel(labels[i])
+        ax.set_xticks([])
+        ax.set_ylim(lims[i])
+        ax.set_yticks([])
+
+    ax = axs[4, k+1]
+    ax.plot(np.arange(Tcontrol), x_control, '-', color='m')
+    ax.set_ylabel('I')
+    ax.set_yticks([])
+    ax.set_xlabel('t')
+    ax.set_ylim(lims[-1])
+    plt.savefig(fig_fname)
+
+
+
 if __name__ == '__main__':
-    M = 40
+    M = 30
     alpha = 0.2
 
-    plot_posterior_gp(
-        '/tmp/hh_gpssm_M_%d_alpha_%.2f.pickle'%(M, alpha),
-        '/tmp/hh_gpssm_M_%d_alpha_%.2f_posterior.pdf'%(M, alpha),
-        M=M)
-    plot_prediction_gp_MM('/tmp/hh_gpssm_M_%d_alpha_%.2f.pickle'%(M, alpha),
-                       '/tmp/hh_gpssm_M_%d_alpha_%.2f_prediction_MM.pdf'%(M, alpha),
-                       M=M)
-    plot_prediction_gp_MC('/tmp/hh_gpssm_M_%d_alpha_%.2f.pickle'%(M, alpha),
-                       '/tmp/hh_gpssm_M_%d_alpha_%.2f_prediction_MM.pdf'%(M, alpha),
-                       M=M)
+    # plot_posterior_gp(
+    #     '/tmp/hh_gpssm_M_%d_alpha_%.2f.pickle'%(M, alpha),
+    #     '/tmp/hh_gpssm_M_%d_alpha_%.2f_posterior.pdf'%(M, alpha),
+    #     M=M)
+    # plot_prediction_gp_MM('/tmp/hh_gpssm_M_%d_alpha_%.2f.pickle'%(M, alpha),
+    #                    '/tmp/hh_gpssm_M_%d_alpha_%.2f_prediction_MM.pdf'%(M, alpha),
+    #                    M=M)
+    # plot_prediction_gp_MC('/tmp/hh_gpssm_M_%d_alpha_%.2f.pickle'%(M, alpha),
+    #                    '/tmp/hh_gpssm_M_%d_alpha_%.2f_prediction_MC.pdf'%(M, alpha),
+    #                    M=M)
+
+    # K = 10
+    # for k in range(K):
+    #     print k
+    #     np.random.seed(k)
+    #     plot_prediction_gp_MM_fixed_function('/tmp/hh_gpssm_M_%d_alpha_%.2f.pickle'%(M, alpha),
+    #                        '/tmp/hh_gpssm_M_%d_alpha_%.2f_prediction_MM_fixed_u_%d.pdf'%(M, alpha, k),
+    #                        M=M)
+    #     np.random.seed(k)
+    #     plot_prediction_gp_MC_fixed_function('/tmp/hh_gpssm_M_%d_alpha_%.2f.pickle'%(M, alpha),
+    #                        '/tmp/hh_gpssm_M_%d_alpha_%.2f_prediction_MC_fixed_u_%d.pdf'%(M, alpha, k),
+    #                        M=M)
+
+    c_vals = [0, 5, 10, 15, 20, 25, 30]
+    Tcontrol = 200
+    for c in c_vals:
+        print c
+        plot_prediction_gp_MM_fixed_function_fixed_control('/tmp/hh_gpssm_M_%d_alpha_%.2f.pickle'%(M, alpha),
+                           '/tmp/hh_gpssm_M_%d_alpha_%.2f_prediction_MM_fixed_u_c_%.2f.pdf'%(M, alpha, c),
+                           c, Tcontrol, M=M)
+
+        plot_prediction_gp_MC_fixed_function_fixed_control('/tmp/hh_gpssm_M_%d_alpha_%.2f.pickle'%(M, alpha),
+                           '/tmp/hh_gpssm_M_%d_alpha_%.2f_prediction_MC_fixed_u_c_%.2f.pdf'%(M, alpha, c),
+                           c, Tcontrol, M=M)
+        

@@ -39,7 +39,7 @@ def model_gp(params_fname, M=20, alpha=0.5):
 
 
 if __name__ == '__main__':
-    M = 30
+    M = 40
     alpha = 0.2
     model_gp('/tmp/hh_gpssm_M_%d_alpha_%.2f.pickle'%(M, alpha),
              M=M, alpha=alpha)

@@ -351,6 +351,134 @@ class Base_SGP_Layer(object):
         else:
             return mout, vout
 
+    def forward_prop_thru_post_fixed_u(self, mx, vx=None, u_sample=None, mode=PROP_MM, return_info=False):
+        """Propagate input distributions through the posterior non-linearity
+        
+        Args:
+            mx (float): means of the input distributions, size K x Din
+            vx (float, optional): variances (if uncertain inputs), size K x Din
+            mode (config param, optional): propagation mode (see config)
+            return_info (bool, optional): Description
+        
+        Returns:
+            specific results depend on the propagation mode provided
+        
+        Raises:
+            NotImplementedError: Unknown propagation mode
+        """
+        if vx is None:
+            return self._forward_prop_deterministic_thru_post_fixed_u(mx, u_sample, return_info)
+        else:
+            if mode == PROP_MM:
+                return self._forward_prop_random_thru_post_mm_fixed_u(mx, vx, u_sample, return_info)
+            elif mode == PROP_LIN:
+                return self._forward_prop_random_thru_post_lin_fixed_u(mx, vx, u_sample, return_info)
+            elif mode == PROP_MC:
+                return self._forward_prop_random_thru_post_mc_fixed_u(mx, vx, u_sample, return_info)
+            else:
+                raise NotImplementedError('unknown propagation mode')
+
+    def _forward_prop_deterministic_thru_post_fixed_u(self, x, u_sample, return_info=False):
+        """Propagate deterministic inputs thru posterior
+        
+        Args:
+            x (float): input values, size K x Din
+            return_info (bool, optional): Description
+        
+        Returns:
+            float, size K x Dout: output means
+            float, size K x Dout: output variances
+        """
+        A = np.einsum('ab,db->da', self.Kuuinv, u_sample)
+        psi0 = np.exp(2 * self.sf)
+        psi1 = compute_kernel(2 * self.ls, 2 * self.sf, x, self.zu)
+        mout = np.einsum('nm,dm->nd', psi1, A)
+        Bpsi2 = -np.einsum('ab,na,nb->n', self.Kuuinv, psi1, psi1)
+        vout = psi0 + Bpsi2.reshape((Bpsi2.shape[0], 1))
+        if return_info:
+            return mout, vout, psi1
+        else:
+            return mout, vout
+
+    def _forward_prop_random_thru_post_mm_fixed_u(self, mx, vx, u_sample, return_info=False):
+        """Propagate uncertain inputs thru posterior, using Moment Matching
+        
+        Args:
+            mx (float): input means, size K x Din
+            vx (TYPE): input variances, size K x Din
+            return_info (bool, optional): Description
+        
+        Returns:
+            float, size K x Dout: output means
+            float, size K x Dout: output variances
+        """
+        A = np.einsum('ab,db->da', self.Kuuinv, u_sample)
+        uuT = np.einsum('da,db->dab', u_sample, u_sample)
+        B_sto = - self.Kuuinv + np.einsum(
+            'ab,dbc->dac',
+            self.Kuuinv,
+            np.einsum('dab,bc->dac', uuT, self.Kuuinv))
+        
+        psi0 = np.exp(2.0 * self.sf)
+        psi1, psi2 = compute_psi_weave(
+            2 * self.ls, 2 * self.sf, mx, vx, self.zu)
+        mout = np.einsum('nm,dm->nd', psi1, A)
+        Bpsi2 = np.einsum('dab,nab->nd', B_sto, psi2)
+        vout = psi0 + Bpsi2 - mout**2
+        if return_info:
+            return mout, vout, psi1, psi2
+        else:
+            return mout, vout
+
+    # TODO
+    def _forward_prop_random_thru_post_lin_fixed_u(self, mx, vx, u_sample, return_info=False):
+        """Propagate uncertain inputs thru posterior, using Linearisation
+        
+        Args:
+            mx (float): input means, size K x Din
+            vx (TYPE): input variances, size K x Din
+            return_info (bool, optional): Description
+        
+        Returns:
+            float, size K x Dout: output means
+            float, size K x Dout: output variances
+        """
+        # TODO: return_info
+        mout, vout = self._forward_prop_deterministic_thru_post(mx, False)
+        gx = grad_x(2 * self.ls, 2 * self.sf, mx, self.zu)
+        Kuuinv = self.Kuuinv
+        dA = np.einsum('nad,ab,ob->ndo', gx, Kuuinv, self.mu)
+        gcontrib = np.einsum('ndo,nd->no', dA**2, vx)
+        vout += gcontrib
+        return mout, vout
+
+    # TODO
+    def _forward_prop_random_thru_post_mc_fixed_u(self, mx, vx, u_sample, return_info=False):
+        """Propagate uncertain inputs thru posterior, using simple Monte Carlo
+        
+        Args:
+            mx (float): input means, size K x Din
+            vx (TYPE): input variances, size K x Din
+        
+        Returns:
+            output means and variances, and intermediate info for backprop
+        """
+        batch_size = mx.shape[0]
+        eps = np.random.randn(MC_NO_SAMPLES, batch_size, self.Din)
+        x = eps * np.sqrt(vx) + mx
+        x_stk = np.reshape(x, [MC_NO_SAMPLES * batch_size, self.Din])
+        e_stk = np.reshape(eps, [MC_NO_SAMPLES * batch_size, self.Din])
+        m_stk, v_stk, kfu_stk = self._forward_prop_deterministic_thru_post_fixed_u(
+            x_stk, u_sample=u_sample, return_info=True)
+        mout = m_stk.reshape([MC_NO_SAMPLES, batch_size, self.Dout])
+        vout = v_stk.reshape([MC_NO_SAMPLES, batch_size, self.Dout])
+        kfu = kfu_stk.reshape([MC_NO_SAMPLES, batch_size, self.M])
+        if return_info:
+            return (mout, vout, kfu, x, eps), (m_stk, v_stk, kfu_stk, x_stk, e_stk)
+        else:
+            return mout, vout
+
+
     @profile
     def backprop_predictive_grads_lvm_mm(self, m, v, dm_dm, dm_dv, dv_dm, dv_dv,
         psi1, psi2, mx, vx):
@@ -470,6 +598,14 @@ class Base_SGP_Layer(object):
         epsilon = np.random.randn(x.shape[0], self.Dout)
         f_sample = mf + np.einsum('ab,bd->ad', Lf, epsilon)
         return f_sample
+
+    def sample_u(self):
+        Su = self.Su
+        mu = self.mu
+        Lu = np.linalg.cholesky(Su)
+        epsilon = np.random.randn(self.Dout, self.M)
+        u_sample = mu + np.einsum('dab,db->da', Lu, epsilon)
+        return u_sample
 
     def compute_kuu(self):
         """update kuu and kuuinv
@@ -1554,11 +1690,117 @@ class Base_SGPSSM(Base_Model):
             eps = np.random.randn(no_samples, self.Din)
             x_samples = eps * np.sqrt(vt) + mt
             if self.Dcon_emi > 0:
-                xc_samples = np.hstack((x_samples, np.tile(x_control[[t], :]), [no_samples, 1]))
+                xc_samples = np.hstack((x_samples, np.tile(x_control[[t], :], [no_samples, 1])))
             else:
                 xc_samples = x_samples
             if self.gp_emi:
-                mft, vft = self.emi_layer.forward_prop_thru_post(mt, vt)
+                mft, vft = self.emi_layer.forward_prop_thru_post(xc_samples)
+                myt, vyt_n = self.lik_layer.output_probabilistic(mft, vft)
+            else:
+                myt, _, vyt_n = self.emi_layer.output_probabilistic(mt, vt)
+                vyt_n = np.diagonal(vyt_n, axis1=1, axis2=2)
+            x[t, :, :] = x_samples
+            my[t, :, :], vy[t, :, :] = myt, vyt_n
+        return x, my, vy
+
+    def predict_forward_fixed_function(self, T, x_control=None, prop_mode=PROP_MM, no_samples=200, starting_from_prior=True):
+        if prop_mode == PROP_MM:
+            return self.predict_forward_fixed_function_mm_or_lin(T, x_control, PROP_MM, starting_from_prior=starting_from_prior)
+        elif prop_mode == PROP_LIN:
+            return self.predict_forward_fixed_function_mm_or_lin(T, x_control, PROP_LIN, starting_from_prior=starting_from_prior)
+        elif prop_mode == PROP_MC:
+            return self.predict_forward_fixed_function_mc(T, x_control, no_samples, starting_from_prior=starting_from_prior)
+        else:
+            raise NotImplementedError('unknown prop mode %s' % prop_mode)
+
+    def predict_forward_fixed_function_mm_or_lin(self, T, x_control, prop_mode, starting_from_prior=True):
+        """Summary
+        
+        Args:
+            T (TYPE): Description
+            x_control (None, optional): Description
+        
+        Returns:
+            TYPE: Description
+        """
+        mx = np.zeros((T, self.Din))
+        vx = np.zeros((T, self.Din))
+        my = np.zeros((T, self.Dout))
+        vy_noiseless = np.zeros((T, self.Dout))
+        vy = np.zeros((T, self.Dout))
+        post_m, post_v = self.get_posterior_x()
+        mtm1 = post_m[[-1], :]
+        vtm1 = post_v[[-1], :]
+        if starting_from_prior:
+            vtm1 = self.prior_var * np.ones_like(vtm1)
+            mtm1 = self.prior_mean * np.ones_like(mtm1)
+        dyn_u_sample = self.dyn_layer.sample_u()
+        if self.gp_emi:
+            emi_u_sample = self.emi_layer.sample_u()
+        for t in range(T):
+            if self.Dcon_dyn > 0:
+                mtm1 = np.hstack((mtm1, x_control[[t], :]))
+                vtm1 = np.hstack((vtm1, np.zeros((1, self.Dcon_dyn))))
+            mt, vt = self.dyn_layer.forward_prop_thru_post_fixed_u(mtm1, vtm1, 
+                mode=prop_mode, u_sample=dyn_u_sample)
+            sn2 = np.exp(2 * self.sn)
+            vt = vt + sn2
+            if self.Dcon_emi > 0:
+                mtc = np.hstack((mt, x_control[[t], :]))
+                vtc = np.hstack((vt, np.zeros((1, self.Dcon_emi))))
+            else:
+                mtc, vtc = mt, vt
+            if self.gp_emi:
+                mft, vft = self.emi_layer.forward_prop_thru_post_fixed_u(mtc, vtc,
+                    mode=prop_mode, u_sample=emi_u_sample)
+                myt, vyt_n = self.lik_layer.output_probabilistic(mft, vft)
+            else:
+                myt, vyt, vyt_n = self.emi_layer.output_probabilistic(mt, vt)
+                vft = np.diagonal(vyt, axis1=1, axis2=2)
+                vyt_n = np.diagonal(vyt_n, axis1=1, axis2=2)
+            mx[t, :], vx[t, :] = mt, vt
+            my[t, :], vy_noiseless[t, :], vy[t, :] = myt, vft, vyt_n
+            mtm1 = mt
+            vtm1 = vt
+        return mx, vx, my, vy_noiseless, vy
+
+    def predict_forward_fixed_function_mc(self, T, x_control, no_samples, starting_from_prior=True):
+        """Summary
+        
+        Args:
+            T (TYPE): Description
+            x_control (None, optional): Description
+        
+        Returns:
+            TYPE: Description
+        """
+        x = np.zeros((T, no_samples, self.Din))
+        my = np.zeros((T, no_samples, self.Dout))
+        vy = np.zeros((T, no_samples, self.Dout))
+        post_m, post_v = self.get_posterior_x()
+        mtm1 = post_m[[-1], :]
+        vtm1 = post_v[[-1], :]
+        if starting_from_prior:
+            vtm1 = self.prior_var * np.ones_like(vtm1)
+            mtm1 = self.prior_mean * np.ones_like(mtm1)
+        eps = np.random.randn(no_samples, self.Din)
+        x_samples = eps * np.sqrt(vtm1) + mtm1
+        for t in range(T):
+            if self.Dcon_dyn > 0:
+                xc_samples = np.hstack((x_samples, np.tile(x_control[[t], :], [no_samples, 1])))
+            else:
+                xc_samples = x_samples
+            mt, vt = self.dyn_layer.forward_prop_thru_post(xc_samples)
+            sn2 = np.exp(2 * self.sn)
+            vt = vt + sn2
+            eps = np.random.randn(no_samples, self.Din)
+            x_samples = eps * np.sqrt(vt) + mt
+            if self.Dcon_emi > 0:
+                xc_samples = np.hstack((x_samples, np.tile(x_control[[t], :], [no_samples, 1])))
+            else:
+                xc_samples = x_samples
+            if self.gp_emi:
+                mft, vft = self.emi_layer.forward_prop_thru_post(xc_samples)
                 myt, vyt_n = self.lik_layer.output_probabilistic(mft, vft)
             else:
                 myt, _, vyt_n = self.emi_layer.output_probabilistic(mt, vt)
