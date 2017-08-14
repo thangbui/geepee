@@ -565,8 +565,8 @@ def predictive_entropy(params_fname, cval, Tcontrol, M=20, prior=False):
         x_control=xc, gp_emi=True, control_to_emi=True)
     model_aep.load_model(params_fname)
     no_func_samples = 200
-    no_y_samples = 200
-    Hy_fixed_func = 0
+    no_y_samples = 300
+    Hy_fixed_func = np.zeros(no_func_samples)
     for k in range(no_func_samples):
         if k % 50 == 0:
             print k, no_func_samples
@@ -575,21 +575,25 @@ def predictive_entropy(params_fname, cval, Tcontrol, M=20, prior=False):
             Tcontrol, x_control, prop_mode=PROP_MC, no_samples=no_y_samples,
             starting_from_prior=prior)
         # draw y sample
-        y_samples = np.random.randn(Tcontrol, no_y_samples, 4) * np.sqrt(vy_MC) + my_MC
+        # y_samples = np.random.randn(Tcontrol, no_y_samples, 4) * np.sqrt(vy_MC) + my_MC
+        y_samples = my_MC
+        Hy_fixed_func_k = 0
         for t in range(Tcontrol):
             # if t % 20 == 0:
             #     print t, Tcontrol
-            Hy_fixed_func += entropy(y_samples[t, :, :], k=5) / no_func_samples
-        
+            for d in range(4):
+                Hy_fixed_func_k += entropy(y_samples[t, :, d], k=50)
+        Hy_fixed_func[k] = Hy_fixed_func_k
 
     _, my_MC, vy_MC = model_aep.predict_forward(
         Tcontrol, x_control, prop_mode=PROP_MC, no_samples=no_y_samples)
     # draw y sample
-    y_samples = np.random.randn(Tcontrol, no_y_samples, 4) * np.sqrt(vy_MC) + my_MC
+    # y_samples = np.random.randn(Tcontrol, no_y_samples, 4) * np.sqrt(vy_MC) + my_MC
+    y_samples = my_MC
     Hy = 0
     for t in range(Tcontrol):
         Hy += entropy(y_samples[t, :, :], k=5)
-    return Hy, Hy_fixed_func
+    return Hy, np.mean(Hy_fixed_func), np.std(Hy_fixed_func)
 
 
 if __name__ == '__main__':
@@ -638,7 +642,7 @@ if __name__ == '__main__':
 
     Nc = 100
     inputs = range(Nc)
-    Tcontrol = 200
+    Tcontrol = 100
     def compute_entropy(i):
         print i
         c_vals = np.linspace(-5, 40, Nc)
@@ -648,6 +652,8 @@ if __name__ == '__main__':
     num_cores = 10
     results = Parallel(n_jobs=num_cores)(delayed(compute_entropy)(i) for i in inputs)
     Hy = np.array(results)
+
+    np.savetxt('/tmp/hh_gpssm_entropy.txt', Hy, delimiter=',', fmt='%.4f')
 
     c_vals = np.linspace(-5, 40, Nc)
     plt.figure()
