@@ -564,12 +564,12 @@ def predictive_entropy(params_fname, cval, Tcontrol, M=20, prior=False):
         y, Dlatent, M, lik='Gaussian', prior_mean=0, prior_var=1000, 
         x_control=xc, gp_emi=True, control_to_emi=True)
     model_aep.load_model(params_fname)
-    no_func_samples = 50
-    no_y_samples = 50
+    no_func_samples = 200
+    no_y_samples = 200
     Hy_fixed_func = 0
     for k in range(no_func_samples):
-        if k % 5 == 0:
-            print k, no_func_samples
+        # if k % 50 == 0:
+        #     print k, no_func_samples
         np.random.seed(k)
         _, my_MC, vy_MC = model_aep.predict_forward_fixed_function(
             Tcontrol, x_control, prop_mode=PROP_MC, no_samples=no_y_samples,
@@ -636,7 +636,7 @@ if __name__ == '__main__':
     from joblib import Parallel, delayed
     # import multiprocessing
 
-    Nc = 50
+    Nc = 100
     inputs = range(Nc)
     Tcontrol = 200
     def compute_entropy(i):
@@ -644,18 +644,19 @@ if __name__ == '__main__':
         return predictive_entropy(model_fname, c_vals[i], Tcontrol, M=M)
 
     # num_cores = multiprocessing.cpu_count()
-    num_cores = 10
+    num_cores = 20
     results = Parallel(n_jobs=num_cores)(delayed(compute_entropy)(i) for i in inputs)
+    Hy = np.array(results)
 
-    pdb.set_trace()
+    c_vals = np.linspace(-5, 40, Nc)
     plt.figure()
-    plt.plot(c, Hy, '+', color='b')
+    plt.plot(c_vals, Hy[:, 0], '+', color='b')
     plt.savefig('/tmp/hh_gpssm_Hy.pdf')
 
     plt.figure()
-    plt.plot(c, Hy_fixed_func, '*', color='r')
+    plt.plot(c_vals, Hy[:, 1], '*', color='r')
     plt.savefig('/tmp/hh_gpssm_Hyfixed.pdf')
 
     plt.figure()
-    plt.plot(c, Hy - Hy_fixed_func, 'o', color='m')
+    plt.plot(c_vals, Hy[:, 0] - Hy[:, 1], 'o', color='m')
     plt.savefig('/tmp/hh_gpssm_Hydiff.pdf')    
