@@ -34,7 +34,7 @@ class HodgkinHuxley():
     E_L  = -54.387
     """Leak Nernst reversal potentials, in mV"""
 
-    t = sp.arange(0.0, 200.0, 0.1)
+    t = sp.arange(0.0, 200.0, 0.5)
     """ The time to integrate over """
 
     def alpha_m(self, V):
