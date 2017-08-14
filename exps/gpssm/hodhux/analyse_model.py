@@ -568,8 +568,8 @@ def predictive_entropy(params_fname, cval, Tcontrol, M=20, prior=False):
     no_y_samples = 200
     Hy_fixed_func = 0
     for k in range(no_func_samples):
-        # if k % 50 == 0:
-        #     print k, no_func_samples
+        if k % 50 == 0:
+            print k, no_func_samples
         np.random.seed(k)
         _, my_MC, vy_MC = model_aep.predict_forward_fixed_function(
             Tcontrol, x_control, prop_mode=PROP_MC, no_samples=no_y_samples,
@@ -645,7 +645,7 @@ if __name__ == '__main__':
         return predictive_entropy(model_fname, c_vals[i], Tcontrol, M=M)
 
     # num_cores = multiprocessing.cpu_count()
-    num_cores = 20
+    num_cores = 10
     results = Parallel(n_jobs=num_cores)(delayed(compute_entropy)(i) for i in inputs)
     Hy = np.array(results)
 
