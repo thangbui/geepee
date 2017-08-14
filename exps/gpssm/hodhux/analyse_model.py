@@ -640,6 +640,7 @@ if __name__ == '__main__':
     inputs = range(Nc)
     Tcontrol = 200
     def compute_entropy(i):
+        print i
         c_vals = np.linspace(-5, 40, Nc)
         return predictive_entropy(model_fname, c_vals[i], Tcontrol, M=M)
 
