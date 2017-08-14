@@ -582,7 +582,7 @@ def predictive_entropy(params_fname, cval, Tcontrol, M=20, prior=False):
             # if t % 20 == 0:
             #     print t, Tcontrol
             for d in range(4):
-                Hy_fixed_func_k += entropy(y_samples[t, :, d], k=50)
+                Hy_fixed_func_k += entropy(y_samples[t, :, d].reshape([no_y_samples, 1]), k=50)
         Hy_fixed_func[k] = Hy_fixed_func_k
 
     _, my_MC, vy_MC = model_aep.predict_forward(
@@ -592,7 +592,7 @@ def predictive_entropy(params_fname, cval, Tcontrol, M=20, prior=False):
     y_samples = my_MC
     Hy = 0
     for t in range(Tcontrol):
-        Hy += entropy(y_samples[t, :, :], k=5)
+        Hy += entropy(y_samples[t, :, :].reshape([no_y_samples, 1]), k=50)
     return Hy, np.mean(Hy_fixed_func), np.std(Hy_fixed_func)
 
 
