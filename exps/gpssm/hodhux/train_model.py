@@ -34,7 +34,7 @@ def model_gp(params_fname, M=20, alpha=0.5):
     # model_aep.set_fixed_params(
     #     ['sf_emission', 'sf_dynamic', 'sn', 'sn_emission'])
     opt_hypers = model_aep.optimise(
-        method='adam', alpha=alpha, maxiter=50000, reinit_hypers=False)
+        method='adam', alpha=alpha, maxiter=50000, reinit_hypers=False, adam_lr=0.0001)
     model_aep.save_model(params_fname)
 
 
