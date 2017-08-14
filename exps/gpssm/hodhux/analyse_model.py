@@ -564,8 +564,8 @@ def predictive_entropy(params_fname, cval, Tcontrol, M=20, prior=False):
         y, Dlatent, M, lik='Gaussian', prior_mean=0, prior_var=1000, 
         x_control=xc, gp_emi=True, control_to_emi=True)
     model_aep.load_model(params_fname)
-    no_func_samples = 300
-    no_y_samples = 300
+    no_func_samples = 200
+    no_y_samples = 200
     Hy_fixed_func = np.zeros(no_func_samples)
     for k in range(no_func_samples):
         if k % 50 == 0:
@@ -592,7 +592,8 @@ def predictive_entropy(params_fname, cval, Tcontrol, M=20, prior=False):
     y_samples = my_MC
     Hy = 0
     for t in range(Tcontrol):
-        Hy += entropy(y_samples[t, :, :].reshape([no_y_samples, 1]), k=50)
+        for d in range(4):
+            Hy += entropy(y_samples[t, :, d].reshape([no_y_samples, 1]), k=50)
     return Hy, np.mean(Hy_fixed_func), np.std(Hy_fixed_func)
 
 
@@ -655,6 +656,9 @@ if __name__ == '__main__':
 
     np.savetxt('/tmp/hh_gpssm_entropy.txt', Hy, delimiter=',', fmt='%.4f')
 
+    Hy = np.loadtxt('/tmp/hh_gpssm_entropy.txt', delimiter=',')
+    no_func_samples = 200
+
     c_vals = np.linspace(-5, 40, Nc)
     plt.figure()
     plt.plot(c_vals, Hy[:, 0], '+', color='b')
@@ -662,8 +666,19 @@ if __name__ == '__main__':
 
     plt.figure()
     plt.plot(c_vals, Hy[:, 1], '*', color='r')
+    plt.fill_between(c_vals, Hy[:, 1] + 2*Hy[:, 2]/np.sqrt(no_func_samples), Hy[:, 1] - 2*Hy[:, 2]/np.sqrt(no_func_samples), 
+        facecolor='r', edgecolor='r', alpha=0.4)
     plt.savefig('/tmp/hh_gpssm_Hyfixed.pdf')
 
     plt.figure()
-    plt.plot(c_vals, Hy[:, 0] - Hy[:, 1], 'o', color='m')
-    plt.savefig('/tmp/hh_gpssm_Hydiff.pdf')    
+    res = Hy[:, 0] - Hy[:, 1]
+    plt.plot(c_vals, res, 'o', color='m')
+    plt.fill_between(c_vals, res + 2*Hy[:, 2]/np.sqrt(no_func_samples), res - 2*Hy[:, 2]/np.sqrt(no_func_samples), 
+        facecolor='m', edgecolor='m', alpha=0.4)
+    plt.savefig('/tmp/hh_gpssm_Hydiff.pdf')
+
+    data = np.loadtxt('hh_data.txt')
+    xc = data[:, [-1]]
+    plt.figure()
+    plt.hist(xc, bins=30, range=[-5, 40])
+    plt.savefig('/tmp/hh_gpssm_Hy_xc_hist.pdf')
