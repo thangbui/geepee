@@ -564,7 +564,7 @@ def predictive_entropy(params_fname, cval, Tcontrol, M=20, prior=False):
         y, Dlatent, M, lik='Gaussian', prior_mean=0, prior_var=1000, 
         x_control=xc, gp_emi=True, control_to_emi=True)
     model_aep.load_model(params_fname)
-    no_func_samples = 200
+    no_func_samples = 300
     no_y_samples = 300
     Hy_fixed_func = np.zeros(no_func_samples)
     for k in range(no_func_samples):
@@ -640,12 +640,12 @@ if __name__ == '__main__':
     from joblib import Parallel, delayed
     # import multiprocessing
 
-    Nc = 100
+    Nc = 200
     inputs = range(Nc)
     Tcontrol = 100
     def compute_entropy(i):
-        print i
-        c_vals = np.linspace(-5, 40, Nc)
+        print i, Nc
+        c_vals = np.linspace(-5, 45, Nc)
         return predictive_entropy(model_fname, c_vals[i], Tcontrol, M=M)
 
     # num_cores = multiprocessing.cpu_count()
