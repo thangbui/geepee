@@ -98,20 +98,7 @@ class HodgkinHuxley():
         """
         return self.g_L * (V - self.E_L)
 
-    # slope and step signals
-    def I_inj(self, t):
-        """
-        External Current
-
-        |  :param t: time
-        |  :return: step up to 10 uA/cm^2 at t>100
-        |           step down to 0 uA/cm^2 at t>200
-        |           step up to 35 uA/cm^2 at t>300
-        |           step down to 0 uA/cm^2 at t>400
-        """
-        return (t-10)/2*(t>10) - (t-10)/2*(t>70) + (t-110.0)/4*(t>110) - (t-110.0)/4*(t>190) + 15*(t>220) - 15*(t>260) + 30*(t>290) - 30*(t>350) + 5*(t>380) - 5*(t>420) + 2*(t>450) - 2*(t>480)
-
-    # # step signals
+    # # slope and step signals
     # def I_inj(self, t):
     #     """
     #     External Current
@@ -122,7 +109,20 @@ class HodgkinHuxley():
     #     |           step up to 35 uA/cm^2 at t>300
     #     |           step down to 0 uA/cm^2 at t>400
     #     """
-    #     return 2*(t>30) - 2*(t>60) + 3*(t>80) - 3*(t>110) + 5*(t>140) - 5*(t>170) + 10*(t>200) - 10*(t>240) + 15*(t>270) - 15*(t>310) + 30*(t>350) - 30*(t>400) + (t-430)/3*(t>430) - (t-430.0)/3*(t>480)
+    #     return (t-10)/2*(t>10) - (t-10)/2*(t>70) + (t-110.0)/4*(t>110) - (t-110.0)/4*(t>190) + 15*(t>220) - 15*(t>260) + 30*(t>290) - 30*(t>350) + 5*(t>380) - 5*(t>420) + 2*(t>450) - 2*(t>480)
+
+    # step signals
+    def I_inj(self, t):
+        """
+        External Current
+
+        |  :param t: time
+        |  :return: step up to 10 uA/cm^2 at t>100
+        |           step down to 0 uA/cm^2 at t>200
+        |           step up to 35 uA/cm^2 at t>300
+        |           step down to 0 uA/cm^2 at t>400
+        """
+        return 2*(t>10) - 2*(t>30) + 3*(t>50) - 3*(t>80) + 5*(t>110) - 5*(t>150) + 10*(t>180) - 10*(t>220) + 15*(t>260) - 15*(t>300) + 30*(t>340) - 30*(t>380) + (t-420)/2*(t>420) - (t-420.0)/2*(t>480)
 
 
     @staticmethod
