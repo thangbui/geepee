@@ -589,7 +589,6 @@ def predictive_entropy(params_fname, cval, Tcontrol, M=20, prior=False):
     Hy = 0
     for t in range(Tcontrol):
         Hy += entropy(y_samples[t, :, :], k=5)
-    pdb.set_trace()
     return Hy, Hy_fixed_func
 
 
@@ -634,16 +633,21 @@ if __name__ == '__main__':
     #                        '/tmp/hh_gpssm_M_%d_alpha_%.2f_prediction_MC_fixed_u_c_%.2f.pdf'%(M, alpha, c),
     #                        c, Tcontrol, M=M)
 
+    from joblib import Parallel, delayed
+    # import multiprocessing
+
     Nc = 50
-    c_vals = np.linspace(-5, 40, Nc)
+    inputs = range(Nc)
     Tcontrol = 200
-    Hy = np.zeros(Nc)
-    Hy_fixed_func = np.zeros(Nc)
-    for i, c in enumerate(c_vals):
-        if i % 10 == 0:
-            print i, Nc
-        Hy[i], Hy_fixed_func[i] = predictive_entropy(model_fname, c, Tcontrol, M=M)
-    
+    def compute_entropy(i):
+        c_vals = np.linspace(-5, 40, Nc)
+        return predictive_entropy(model_fname, c_vals[i], Tcontrol, M=M)
+
+    # num_cores = multiprocessing.cpu_count()
+    num_cores = 10
+    results = Parallel(n_jobs=num_cores)(delayed(compute_entropy)(i) for i in inputs)
+
+    pdb.set_trace()
     plt.figure()
     plt.plot(c, Hy, '+', color='b')
     plt.savefig('/tmp/hh_gpssm_Hy.pdf')
