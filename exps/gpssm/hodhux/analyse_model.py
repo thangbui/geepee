@@ -544,6 +544,54 @@ def plot_prediction_gp_MC_fixed_function_fixed_control(params_fname, fig_fname, 
     plt.savefig(fig_fname)
 
 
+def predictive_entropy(params_fname, cval, Tcontrol, M=20, prior=False):
+    from mutual_info import entropy
+    # load dataset
+    data = np.loadtxt('hh_data.txt')
+    # use the voltage and potasisum current
+    std_data = np.std(data, axis=0)
+    data = data / std_data
+    y = data[:, :4]
+    xc = data[:, [-1]]
+    cval = cval / std_data[-1]
+    # init hypers
+    Dlatent = 2
+    Dobs = y.shape[1]
+    T = y.shape[0]
+    x_control = cval * np.ones([Tcontrol, 1])
+    no_panes = 5
+    model_aep = aep.SGPSSM(
+        y, Dlatent, M, lik='Gaussian', prior_mean=0, prior_var=1000, 
+        x_control=xc, gp_emi=True, control_to_emi=True)
+    model_aep.load_model(params_fname)
+    no_func_samples = 50
+    no_y_samples = 50
+    Hy_fixed_func = 0
+    for k in range(no_func_samples):
+        if k % 5 == 0:
+            print k, no_func_samples
+        np.random.seed(k)
+        _, my_MC, vy_MC = model_aep.predict_forward_fixed_function(
+            Tcontrol, x_control, prop_mode=PROP_MC, no_samples=no_y_samples,
+            starting_from_prior=prior)
+        # draw y sample
+        y_samples = np.random.randn(Tcontrol, no_y_samples, 4) * np.sqrt(vy_MC) + my_MC
+        for t in range(Tcontrol):
+            # if t % 20 == 0:
+            #     print t, Tcontrol
+            Hy_fixed_func += entropy(y_samples[t, :, :], k=5) / no_func_samples
+        
+
+    _, my_MC, vy_MC = model_aep.predict_forward(
+        Tcontrol, x_control, prop_mode=PROP_MC, no_samples=no_y_samples)
+    # draw y sample
+    y_samples = np.random.randn(Tcontrol, no_y_samples, 4) * np.sqrt(vy_MC) + my_MC
+    Hy = 0
+    for t in range(Tcontrol):
+        Hy += entropy(y_samples[t, :, :], k=5)
+    pdb.set_trace()
+    return Hy, Hy_fixed_func
+
 
 if __name__ == '__main__':
     M = 30
@@ -574,15 +622,36 @@ if __name__ == '__main__':
     #                        '/tmp/hh_gpssm_M_%d_alpha_%.2f_prediction_MC_fixed_u_%d.pdf'%(M, alpha, k),
     #                        M=M)
     
-    c_vals = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30]
-    Tcontrol = 200
-    for c in c_vals:
-        print c
-        plot_prediction_gp_MM_fixed_function_fixed_control(model_fname,
-                           '/tmp/hh_gpssm_M_%d_alpha_%.2f_prediction_MM_fixed_u_c_%.2f.pdf'%(M, alpha, c),
-                           c, Tcontrol, M=M)
+    # c_vals = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30]
+    # Tcontrol = 200
+    # for c in c_vals:
+    #     print c
+    #     plot_prediction_gp_MM_fixed_function_fixed_control(model_fname,
+    #                        '/tmp/hh_gpssm_M_%d_alpha_%.2f_prediction_MM_fixed_u_c_%.2f.pdf'%(M, alpha, c),
+    #                        c, Tcontrol, M=M)
 
-        plot_prediction_gp_MC_fixed_function_fixed_control(model_fname,
-                           '/tmp/hh_gpssm_M_%d_alpha_%.2f_prediction_MC_fixed_u_c_%.2f.pdf'%(M, alpha, c),
-                           c, Tcontrol, M=M)
-        
+    #     plot_prediction_gp_MC_fixed_function_fixed_control(model_fname,
+    #                        '/tmp/hh_gpssm_M_%d_alpha_%.2f_prediction_MC_fixed_u_c_%.2f.pdf'%(M, alpha, c),
+    #                        c, Tcontrol, M=M)
+
+    Nc = 50
+    c_vals = np.linspace(-5, 40, Nc)
+    Tcontrol = 200
+    Hy = np.zeros(Nc)
+    Hy_fixed_func = np.zeros(Nc)
+    for i, c in enumerate(c_vals):
+        if i % 10 == 0:
+            print i, Nc
+        Hy[i], Hy_fixed_func[i] = predictive_entropy(model_fname, c, Tcontrol, M=M)
+    
+    plt.figure()
+    plt.plot(c, Hy, '+', color='b')
+    plt.savefig('/tmp/hh_gpssm_Hy.pdf')
+
+    plt.figure()
+    plt.plot(c, Hy_fixed_func, '*', color='r')
+    plt.savefig('/tmp/hh_gpssm_Hyfixed.pdf')
+
+    plt.figure()
+    plt.plot(c, Hy - Hy_fixed_func, 'o', color='m')
+    plt.savefig('/tmp/hh_gpssm_Hydiff.pdf')    
