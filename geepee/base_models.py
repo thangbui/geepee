@@ -1932,7 +1932,7 @@ class Base_SGPSSM(Base_Model):
             y = self.y_train
             # TODO: deal with different likelihood here
             reg = SGPR(x, y, self.M, 'Gaussian', self.nat_param)
-            # reg.set_fixed_params(['sn', 'sf', 'ls', 'zu'])
+            reg.set_fixed_params(['sn', 'sf', 'ls', 'zu'])
             # opt_params = reg.optimise(method='L-BFGS-B', alpha=0.5, maxiter=5000, disp=False)
             opt_params = reg.optimise(method='adam', alpha=0.5, maxiter=500, disp=False)
             reg.update_hypers(opt_params)
