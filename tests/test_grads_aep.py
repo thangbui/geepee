@@ -405,6 +405,8 @@ def test_gpssm_gp_aep_gaussian_kink(nat_param=True, stoc=False, prop_mode=PROP_M
 
     # init hypers, inducing points and q(u) params
     params = lvm.init_hypers(y_train)
+    # TODO
+    # params = lvm.optimise(maxiter=1000, disp=False)
     
     print 'gplvm gp emis aep kink nat_param %r stoc %r prop_mode %s' % (nat_param, stoc, prop_mode)
     check_grad(params, lvm, stochastic=stoc, alpha=alpha, prop_mode=prop_mode)
@@ -478,9 +480,9 @@ def plot_gpssm_linear_aep_gaussian_stochastic():
 if __name__ == '__main__':
     # TODO: PROP_LIN
 
-    test_gplvm_aep_gaussian(nat_param=True, stoc=False, prop_mode=PROP_MM)
+    # test_gplvm_aep_gaussian(nat_param=True, stoc=False, prop_mode=PROP_MM)
     # test_gplvm_aep_gaussian(nat_param=True, stoc=True, prop_mode=PROP_MM)
-    test_gplvm_aep_gaussian(nat_param=False, stoc=False, prop_mode=PROP_MM)
+    # test_gplvm_aep_gaussian(nat_param=False, stoc=False, prop_mode=PROP_MM)
     # test_gplvm_aep_gaussian(nat_param=False, stoc=True, prop_mode=PROP_MM)
 
     # test_gplvm_aep_gaussian(nat_param=True, stoc=False, prop_mode=PROP_MC)
@@ -511,15 +513,15 @@ if __name__ == '__main__':
     # plot_gplvm_aep_probit_stochastic()
     # plot_gplvm_aep_gaussian_stochastic()
 
-    test_gpr_aep_gaussian(nat_param=True, stoc=False)
-    test_gpr_aep_gaussian(nat_param=True, stoc=True)
-    test_gpr_aep_gaussian(nat_param=False, stoc=False)
-    test_gpr_aep_gaussian(nat_param=False, stoc=True)
+    # test_gpr_aep_gaussian(nat_param=True, stoc=False)
+    # test_gpr_aep_gaussian(nat_param=True, stoc=True)
+    # test_gpr_aep_gaussian(nat_param=False, stoc=False)
+    # test_gpr_aep_gaussian(nat_param=False, stoc=True)
 
-    test_gpr_aep_probit(nat_param=True, stoc=False)
-    test_gpr_aep_probit(nat_param=True, stoc=True)
-    test_gpr_aep_probit(nat_param=False, stoc=False)
-    test_gpr_aep_probit(nat_param=False, stoc=True)
+    # test_gpr_aep_probit(nat_param=True, stoc=False)
+    # test_gpr_aep_probit(nat_param=True, stoc=True)
+    # test_gpr_aep_probit(nat_param=False, stoc=False)
+    # test_gpr_aep_probit(nat_param=False, stoc=True)
 
     # plot_gpr_aep_probit_stochastic()
     # plot_gpr_aep_gaussian_stochastic()
@@ -560,13 +562,13 @@ if __name__ == '__main__':
     # # test_gpssm_linear_aep_gaussian_kink(nat_param=False, stoc=False, prop_mode=PROP_MC)
     # # test_gpssm_linear_aep_gaussian_kink(nat_param=False, stoc=True, prop_mode=PROP_MC)
 
-    # test_gpssm_gp_aep_gaussian_kink(nat_param=True, stoc=False, prop_mode=PROP_MM)
-    # test_gpssm_gp_aep_gaussian_kink(nat_param=True, stoc=True, prop_mode=PROP_MM)
+    test_gpssm_gp_aep_gaussian_kink(nat_param=True, stoc=False, prop_mode=PROP_MM)
+    test_gpssm_gp_aep_gaussian_kink(nat_param=True, stoc=True, prop_mode=PROP_MM)
     # # test_gpssm_gp_aep_gaussian_kink(nat_param=False, stoc=False, prop_mode=PROP_MM)
     # # test_gpssm_gp_aep_gaussian_kink(nat_param=False, stoc=True, prop_mode=PROP_MM)
 
-    # test_gpssm_gp_aep_gaussian_kink(nat_param=True, stoc=False, prop_mode=PROP_MC)
-    # test_gpssm_gp_aep_gaussian_kink(nat_param=True, stoc=True, prop_mode=PROP_MC)
+    test_gpssm_gp_aep_gaussian_kink(nat_param=True, stoc=False, prop_mode=PROP_MC)
+    test_gpssm_gp_aep_gaussian_kink(nat_param=True, stoc=True, prop_mode=PROP_MC)
     # # test_gpssm_gp_aep_gaussian_kink(nat_param=False, stoc=False, prop_mode=PROP_MC)
     # # test_gpssm_gp_aep_gaussian_kink(nat_param=False, stoc=True, prop_mode=PROP_MC)
 

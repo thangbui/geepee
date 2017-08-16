@@ -11,7 +11,13 @@ fontP.set_size('small')
 
 
 class HodgkinHuxley():
+
     """Full Hodgkin-Huxley Model implemented in Python"""
+
+
+    def __init__(self, t, I_inj_func):
+        self.t = t
+        self.I_inj = I_inj_func
 
     C_m  =   1.0
     """membrane capacitance, in uF/cm^2"""
@@ -34,7 +40,9 @@ class HodgkinHuxley():
     E_L  = -54.387
     """Leak Nernst reversal potentials, in mV"""
 
-    t = sp.arange(0.0, 200.0, 0.5)
+    # t = sp.arange(0.0, 200.0, 0.5)
+    # t = sp.arange(0.0, 250.0, 0.5)
+    # t = sp.arange(0.0, 300.0, 0.5)
     """ The time to integrate over """
 
     def alpha_m(self, V):
@@ -95,18 +103,44 @@ class HodgkinHuxley():
         """
         return self.g_L * (V - self.E_L)
 
-    # slope inject signals
-    def I_inj(self, t):
-        """
-        External Current
+    # # slope inject signals
+    # def I_inj(self, t):
+    #     """
+    #     External Current
 
-        |  :param t: time
-        |  :return: step up to 10 uA/cm^2 at t>100
-        |           step down to 0 uA/cm^2 at t>200
-        |           step up to 35 uA/cm^2 at t>300
-        |           step down to 0 uA/cm^2 at t>400
-        """
-        return (t-10)/2*(t>10) - (t-10)/2*(t>70) + (t-110.0)/4*(t>110) - (t-110.0)/4*(t>180)
+    #     |  :param t: time
+    #     |  :return: step up to 10 uA/cm^2 at t>100
+    #     |           step down to 0 uA/cm^2 at t>200
+    #     |           step up to 35 uA/cm^2 at t>300
+    #     |           step down to 0 uA/cm^2 at t>400
+    #     """
+    #     return (t-10)/2*(t>10) - (t-10)/2*(t>70) + (t-110.0)/4*(t>110) - (t-110.0)/4*(t>180)
+
+    # # step inject signals - 0
+    # def I_inj(self, t):
+    #     """
+    #     External Current
+
+    #     |  :param t: time
+    #     |  :return: step up to 10 uA/cm^2 at t>100
+    #     |           step down to 0 uA/cm^2 at t>200
+    #     |           step up to 35 uA/cm^2 at t>300
+    #     |           step down to 0 uA/cm^2 at t>400
+    #     """
+    #     return 2*(t>10) - 2*(t>50) + 5*(t>80) - 5*(t>120) + 15*(t>150) - 15*(t>180)
+
+    # # step inject signals - 1
+    # def I_inj(self, t):
+    #     """
+    #     External Current
+
+    #     |  :param t: time
+    #     |  :return: step up to 10 uA/cm^2 at t>100
+    #     |           step down to 0 uA/cm^2 at t>200
+    #     |           step up to 35 uA/cm^2 at t>300
+    #     |           step down to 0 uA/cm^2 at t>400
+    #     """
+    #     return 2*(t>10) - 2*(t>50) + 5*(t>80) - 5*(t>120) + 15*(t>150) - 15*(t>180) + 18*(t>205) - 18*(t>240)
 
 
     @staticmethod
@@ -126,7 +160,7 @@ class HodgkinHuxley():
         dndt = self.alpha_n(V)*(1.0-n) - self.beta_n(V)*n
         return dVdt, dmdt, dhdt, dndt
 
-    def Main(self):
+    def Main(self, data_fname):
         """
         Main demo for the Hodgkin Huxley neuron model
         """
@@ -176,7 +210,7 @@ class HodgkinHuxley():
         plt.xlabel('V')
         plt.ylabel('n')
 
-        np.savetxt('hh_data.txt', 
+        np.savetxt(data_fname, 
             np.vstack((V, m, n, h, np.array(i_inj_values))).T,
             fmt='%.5f')
 
@@ -184,5 +218,15 @@ class HodgkinHuxley():
         plt.savefig('/tmp/hh_data_V_n.pdf')
 
 if __name__ == '__main__':
-    runner = HodgkinHuxley()
-    runner.Main()
+    # step inject signals 
+    
+    def I_func(t, vals):
+        I = 0
+        for i, val in enumerate(vals):
+            I += val * (t > (60*i + 10)) - val * (t > (60*i + 50))
+        return I
+    vals = [2, 5, 10]
+    t = sp.arange(0.0, 60*len(vals), 0.5)
+    I_inj = lambda x: I_func(x, vals)
+    runner = HodgkinHuxley(t, I_inj)
+    runner.Main('hh_data_test.txt')

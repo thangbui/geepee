@@ -101,9 +101,9 @@ def plot_model_with_control(model, plot_title='', name_suffix=''):
                     name_suffix + '_c_%.2f.pdf' % c_val)
 
 
-def plot_posterior_gp(params_fname, fig_fname, M=20):
+def plot_posterior_gp(data_fname, params_fname, fig_fname, M=20):
     # load dataset
-    data = np.loadtxt('hh_data.txt')
+    data = np.loadtxt(data_fname)
     # use the voltage and potasisum current
     data = data / np.std(data, axis=0)
     y = data[:, :4]
@@ -148,9 +148,9 @@ def plot_posterior_gp(params_fname, fig_fname, M=20):
     # plot_model_with_control(model_aep, '', '_gp_with_control')
 
 
-def plot_prediction_gp_MM(params_fname, fig_fname, M=20):
+def plot_prediction_gp_MM(data_fname, params_fname, fig_fname, M=20):
     # load dataset
-    data = np.loadtxt('hh_data.txt')
+    data = np.loadtxt(data_fname)
     # use the voltage and potasisum current
     data = data / np.std(data, axis=0)
     y = data[:, :4]
@@ -160,8 +160,8 @@ def plot_prediction_gp_MM(params_fname, fig_fname, M=20):
     Dobs = y.shape[1]
     T = y.shape[0]
     x_control = xc
-    # x_control_test = np.flipud(x_control)
-    x_control_test = x_control * 1.5
+    x_control_test = np.flipud(x_control)
+    # x_control_test = x_control * 1.5
     no_panes = 5
     model_aep = aep.SGPSSM(
         y, Dlatent, M, lik='Gaussian', prior_mean=0, prior_var=1000, 
@@ -209,10 +209,10 @@ def plot_prediction_gp_MM(params_fname, fig_fname, M=20):
     plt.savefig(fig_fname)
 
 
-def plot_prediction_gp_MC(params_fname, fig_fname, M=20, no_samples=100):
+def plot_prediction_gp_MC(data_fname, params_fname, fig_fname, M=20, no_samples=100):
     # TODO
     # load dataset
-    data = np.loadtxt('hh_data.txt')
+    data = np.loadtxt(data_fname)
     # use the voltage and potasisum current
     data = data / np.std(data, axis=0)
     y = data[:, :4]
@@ -222,8 +222,8 @@ def plot_prediction_gp_MC(params_fname, fig_fname, M=20, no_samples=100):
     Dobs = y.shape[1]
     T = y.shape[0]
     x_control = xc
-    # x_control_test = np.flipud(x_control)
-    x_control_test = x_control * 1.5
+    x_control_test = np.flipud(x_control)
+    # x_control_test = x_control * 1.5
     no_panes = 5
     model_aep = aep.SGPSSM(
         y, Dlatent, M, lik='Gaussian', prior_mean=0, prior_var=1000, 
@@ -472,6 +472,7 @@ def plot_prediction_gp_MM_fixed_function_fixed_control(params_fname, fig_fname, 
     ax.set_ylim(lims[-1])
     plt.savefig(fig_fname)
 
+
 def plot_prediction_gp_MC_fixed_function_fixed_control(params_fname, fig_fname, cval, Tcontrol, M=20, prior=False):
     # load dataset
     data = np.loadtxt('hh_data.txt')
@@ -544,6 +545,62 @@ def plot_prediction_gp_MC_fixed_function_fixed_control(params_fname, fig_fname, 
     plt.savefig(fig_fname)
 
 
+def test_entropy_convergence(params_fname, cval, Tcontrol, M=20, prior=False):
+    from mutual_info import entropy
+    # load dataset
+    data = np.loadtxt('hh_data.txt')
+    # use the voltage and potasisum current
+    std_data = np.std(data, axis=0)
+    data = data / std_data
+    y = data[:, :4]
+    xc = data[:, [-1]]
+    cval = cval / std_data[-1]
+    # init hypers
+    Dlatent = 2
+    Dobs = y.shape[1]
+    T = y.shape[0]
+    x_control = cval * np.ones([Tcontrol, 1])
+    no_panes = 5
+    model_aep = aep.SGPSSM(
+        y, Dlatent, M, lik='Gaussian', prior_mean=0, prior_var=1000, 
+        x_control=xc, gp_emi=True, control_to_emi=True)
+    model_aep.load_model(params_fname)
+    no_func_samples = 200
+    no_trials = 10
+    N_samples = [10, 20, 30, 50, 100, 200, 300, 400, 500]
+    for trial in range(no_trials):
+        np.random.seed(trial)
+        for no_y_samples in N_samples:
+            Hy_fixed_func = np.zeros(no_func_samples)
+            for k in range(no_func_samples):
+                # if k % 50 == 0:
+                #     print k, no_func_samples
+                _, my_MC, vy_MC = model_aep.predict_forward_fixed_function(
+                    Tcontrol, x_control, prop_mode=PROP_MC, no_samples=no_y_samples,
+                    starting_from_prior=prior)
+                # draw y sample
+                # y_samples = np.random.randn(Tcontrol, no_y_samples, 4) * np.sqrt(vy_MC) + my_MC
+                y_samples = my_MC
+                Hy_fixed_func_k = 0
+                for t in range(Tcontrol):
+                    # if t % 20 == 0:
+                    #     print t, Tcontrol
+                    for d in range(4):
+                        Hy_fixed_func_k += entropy(y_samples[t, :, d].reshape([no_y_samples, 1]), k=int(np.sqrt(no_y_samples)))
+                Hy_fixed_func[k] = Hy_fixed_func_k
+
+            _, my_MC, vy_MC = model_aep.predict_forward(
+                Tcontrol, x_control, prop_mode=PROP_MC, no_samples=no_y_samples)
+            # draw y sample
+            # y_samples = np.random.randn(Tcontrol, no_y_samples, 4) * np.sqrt(vy_MC) + my_MC
+            y_samples = my_MC
+            Hy = 0
+            for t in range(Tcontrol):
+                for d in range(4):
+                    Hy += entropy(y_samples[t, :, d].reshape([no_y_samples, 1]), k=int(np.sqrt(no_y_samples)))
+            print 'trial', trial, 'no_samples', no_y_samples, Hy, np.mean(Hy_fixed_func), np.std(Hy_fixed_func) / np.sqrt(no_func_samples)
+
+
 def predictive_entropy(params_fname, cval, Tcontrol, M=20, prior=False):
     from mutual_info import entropy
     # load dataset
@@ -565,7 +622,7 @@ def predictive_entropy(params_fname, cval, Tcontrol, M=20, prior=False):
         x_control=xc, gp_emi=True, control_to_emi=True)
     model_aep.load_model(params_fname)
     no_func_samples = 200
-    no_y_samples = 200
+    no_y_samples = 300
     Hy_fixed_func = np.zeros(no_func_samples)
     for k in range(no_func_samples):
         if k % 50 == 0:
@@ -594,25 +651,51 @@ def predictive_entropy(params_fname, cval, Tcontrol, M=20, prior=False):
     for t in range(Tcontrol):
         for d in range(4):
             Hy += entropy(y_samples[t, :, d].reshape([no_y_samples, 1]), k=50)
-    return Hy, np.mean(Hy_fixed_func), np.std(Hy_fixed_func)
+    return Hy, np.mean(Hy_fixed_func), np.std(Hy_fixed_func) / np.sqrt(no_func_samples)
 
 
 if __name__ == '__main__':
     M = 30
     alpha = 0.2
+    for step in range(5):
+        model_fname = 'res/hh_gpssm_MM_M_%d_alpha_%.2f_step_%d.pickle'%(M, alpha, step)
+        data_fname = 'res/hh_data_MM_step_%d.txt'%step
+        plot_posterior_gp(
+            data_fname,
+            model_fname,
+            'res/hh_gpssm_MM_M_%d_alpha_%.2f_posterior_%d.pdf'%(M, alpha, step),
+            M=M)
+        plot_prediction_gp_MM(data_fname, model_fname,
+                           'res/hh_gpssm_MM_M_%d_alpha_%.2f_prediction_MM_%d.pdf'%(M, alpha, step),
+                           M=M)
+        plot_prediction_gp_MC(data_fname, model_fname,
+                           'res/hh_gpssm_MM_M_%d_alpha_%.2f_prediction_MC_%d.pdf'%(M, alpha, step),
+                           M=M)
 
-    model_fname= 'hh_gpssm_M_%d_alpha_%.2f.pickle'%(M, alpha)
-    
-    # plot_posterior_gp(
-    #     model_fname,
-    #     '/tmp/hh_gpssm_M_%d_alpha_%.2f_posterior.pdf'%(M, alpha),
-    #     M=M)
-    # plot_prediction_gp_MM(model_fname,
-    #                    '/tmp/hh_gpssm_M_%d_alpha_%.2f_prediction_MM.pdf'%(M, alpha),
-    #                    M=M)
-    # plot_prediction_gp_MC(model_fname,
-    #                    '/tmp/hh_gpssm_M_%d_alpha_%.2f_prediction_MC.pdf'%(M, alpha),
-    #                    M=M)
+        # Hy = np.loadtxt('/tmp/hh_gpssm_entropy.txt', delimiter=',')
+        # plt.figure()
+        # plt.plot(c_vals, Hy[:, 0], '+', color='b')
+        # plt.savefig('/tmp/hh_gpssm_Hy.pdf')
+
+        # plt.figure()
+        # plt.plot(c_vals, Hy[:, 1], '*', color='r')
+        # plt.fill_between(c_vals, Hy[:, 1] + 2*Hy[:, 2], Hy[:, 1] - 2*Hy[:, 2], 
+        #     facecolor='r', edgecolor='r', alpha=0.4)
+        # plt.savefig('/tmp/hh_gpssm_Hyfixed.pdf')
+
+        # plt.figure()
+        # res = Hy[:, 0] - Hy[:, 1]
+        # plt.plot(c_vals, res, 'o', color='m')
+        # plt.fill_between(c_vals, res + 2*Hy[:, 2], res - 2*Hy[:, 2], 
+        #     facecolor='m', edgecolor='m', alpha=0.4)
+        # plt.savefig('/tmp/hh_gpssm_Hydiff.pdf')
+
+        # data = np.loadtxt('hh_data.txt')
+        # xc = data[:, [-1]]
+        # plt.figure()
+        # plt.hist(xc, bins=30, range=[-5, 25])
+        # plt.savefig('/tmp/hh_gpssm_Hy_xc_hist.pdf')
+        #############################
 
     # K = 10
     # for k in range(K):
@@ -638,47 +721,20 @@ if __name__ == '__main__':
     #                        '/tmp/hh_gpssm_M_%d_alpha_%.2f_prediction_MC_fixed_u_c_%.2f.pdf'%(M, alpha, c),
     #                        c, Tcontrol, M=M)
 
-    from joblib import Parallel, delayed
-    # import multiprocessing
 
-    Nc = 200
-    inputs = range(Nc)
-    Tcontrol = 100
-    def compute_entropy(i):
-        print i, Nc
-        c_vals = np.linspace(-5, 45, Nc)
-        return predictive_entropy(model_fname, c_vals[i], Tcontrol, M=M)
+    # #######################
+    # from joblib import Parallel, delayed
 
-    # num_cores = multiprocessing.cpu_count()
-    num_cores = 10
-    results = Parallel(n_jobs=num_cores)(delayed(compute_entropy)(i) for i in inputs)
-    Hy = np.array(results)
+    # Nc = 100
+    # inputs = range(Nc)
+    # c_vals = np.linspace(-5, 25, Nc)
+    # Tcontrol = 100
+    # def compute_entropy(i):
+    #     print i, Nc
+    #     return predictive_entropy(model_fname, c_vals[i], Tcontrol, M=M)
 
-    np.savetxt('/tmp/hh_gpssm_entropy.txt', Hy, delimiter=',', fmt='%.4f')
-
-    Hy = np.loadtxt('/tmp/hh_gpssm_entropy.txt', delimiter=',')
-    no_func_samples = 200
-
-    c_vals = np.linspace(-5, 40, Nc)
-    plt.figure()
-    plt.plot(c_vals, Hy[:, 0], '+', color='b')
-    plt.savefig('/tmp/hh_gpssm_Hy.pdf')
-
-    plt.figure()
-    plt.plot(c_vals, Hy[:, 1], '*', color='r')
-    plt.fill_between(c_vals, Hy[:, 1] + 2*Hy[:, 2]/np.sqrt(no_func_samples), Hy[:, 1] - 2*Hy[:, 2]/np.sqrt(no_func_samples), 
-        facecolor='r', edgecolor='r', alpha=0.4)
-    plt.savefig('/tmp/hh_gpssm_Hyfixed.pdf')
-
-    plt.figure()
-    res = Hy[:, 0] - Hy[:, 1]
-    plt.plot(c_vals, res, 'o', color='m')
-    plt.fill_between(c_vals, res + 2*Hy[:, 2]/np.sqrt(no_func_samples), res - 2*Hy[:, 2]/np.sqrt(no_func_samples), 
-        facecolor='m', edgecolor='m', alpha=0.4)
-    plt.savefig('/tmp/hh_gpssm_Hydiff.pdf')
-
-    data = np.loadtxt('hh_data.txt')
-    xc = data[:, [-1]]
-    plt.figure()
-    plt.hist(xc, bins=30, range=[-5, 40])
-    plt.savefig('/tmp/hh_gpssm_Hy_xc_hist.pdf')
+    # # num_cores = multiprocessing.cpu_count()
+    # num_cores = 10
+    # results = Parallel(n_jobs=num_cores)(delayed(compute_entropy)(i) for i in inputs)
+    # Hy = np.array(results)
+    # np.savetxt('/tmp/hh_gpssm_entropy.txt', Hy, delimiter=',', fmt='%.4f')
