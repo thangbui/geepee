@@ -104,9 +104,14 @@ class SGP_Layer(Base_SGP_Layer):
             float: weighted sum of the log-partitions in the PEP energy
         """
         N = self.N
-        scale_post = N * 1.0 / alpha - 1.0
-        scale_cav = - N * 1.0 / alpha
-        scale_prior = 1
+        # scale_post = N * 1.0 / alpha - 1.0
+        # scale_cav = - N * 1.0 / alpha
+        # scale_prior = 1
+
+        scale_post = 0
+        scale_cav = 0
+        scale_prior = 0
+        
         phi_prior = self.compute_phi_prior()
         phi_post = self.compute_phi_posterior()
         phi_cav = self.compute_phi_cavity()
@@ -231,9 +236,13 @@ class SGP_Layer(Base_SGP_Layer):
         Kuuinv = self.Kuuinv
 
         beta = (N - alpha) * 1.0 / N
-        scale_poste = N * 1.0 / alpha - 1.0
-        scale_cav = - N * 1.0 / alpha
-        scale_prior = 1
+        # scale_poste = N * 1.0 / alpha - 1.0
+        # scale_cav = - N * 1.0 / alpha
+        # scale_prior = 1
+
+        scale_poste = 0
+        scale_cav = 0
+        scale_prior = 0
         # compute grads wrt Ahat and Bhat
         dm_all = dm - 2 * dv * m
         dAhat = np.einsum('nd,nm->dm', dm_all, psi1)
@@ -290,7 +299,7 @@ class SGP_Layer(Base_SGP_Layer):
                        np.dot(Kuuinv, np.dot(Minner, Kuuinv)))
         dhyp = d_trace_MKzz_dhypers(
             2 * self.ls, 2 * self.sf, self.zu, M_all,
-            self.Kuu - np.diag(JITTER * np.ones(self.M)))
+            self.Kuu - np.diag(JITTER * np.ones((self.M, 1))))
 
         dzu += dhyp[2]
         dls += 2 * dhyp[1]
@@ -1057,8 +1066,10 @@ class SGPSSM(Base_SGPSSM):
             yb = self.y_train[emi_idxs, :]
         batch_size_dyn = dyn_idxs.shape[0]
         scale_logZ_dyn = - (N - 1) * 1.0 / batch_size_dyn / alpha
+        scale_logZ_dyn = 0
         batch_size_emi = emi_idxs.shape[0]
         scale_logZ_emi = - N * 1.0 / batch_size_emi / alpha
+        # scale_logZ_emi = 0
 
         # update model with new hypers
         self.update_hypers(params)
@@ -1111,6 +1122,22 @@ class SGPSSM(Base_SGPSSM):
                     cav_up_mc, cav_up_vc, alpha)
                 lik_grad_hyper = lik_layer.backprop_grads(
                     mout, vout, dm, dv, alpha, scale_logZ_emi)
+                # print 'logZ'
+                # print logZ_emi
+                # print 'mcav'
+                # print cav_up_mc
+                # print 'vcav'
+                # print cav_up_vc
+                # print 'mout'
+                # print mout
+                # print 'vout'
+                # print vout
+                # print 'data'
+                # print yb 
+                # print 'alpha'
+                # print alpha
+                # print emi_layer.get_hypers()
+                # print lik_layer.get_hypers()
         elif prop_mode == PROP_MC:
             # deal with the transition/dynamic factors here
             res, res_s = dyn_layer.forward_prop_thru_cav(
@@ -1194,7 +1221,7 @@ class SGPSSM(Base_SGPSSM):
         phi_cavity_x = self.compute_phi_cavity_x(alpha)
         x_contrib = phi_prior_x + phi_poste_x + phi_cavity_x
         energy = logZ_dyn + logZ_emi + x_contrib + dyn_contrib + emi_contrib
-        # print logZ_dyn, logZ_emi, x_contrib, dyn_contrib, emi_contrib
+        print logZ_dyn, logZ_emi, x_contrib, dyn_contrib, emi_contrib
         # print phi_prior_x, phi_poste_x, phi_cavity_x
         for p in self.fixed_params:
             grad_all[p] = np.zeros_like(grad_all[p])

@@ -44,7 +44,7 @@ def print_message(message_str, computed, numerical):
     if np.abs(diff) < 1e-4 or ((np.isinf(diff) or np.isnan(diff) or (np.abs(diff) <= 1.1 and np.abs(diff) > 1e-4)) and np.abs(numerical) < 1e-4):
         pass
     else:
-        print(bcolors.FAIL + '%s, computed=%.5f, numerical=%.5f, rel. diff=%.5f' % (message_str, computed, numerical, diff) + bcolors.ENDC)
+        print(bcolors.FAIL + '%s, computed=%.6f, numerical=%.6f, rel. diff=%.6f' % (message_str, computed, numerical, diff) + bcolors.ENDC)
 
 def check_grad(params, model, stochastic=False, alpha=0.5, stoc_seed=42, prop_mode=PROP_MM):
     if stochastic:
@@ -54,8 +54,8 @@ def check_grad(params, model, stochastic=False, alpha=0.5, stoc_seed=42, prop_mo
             N = int(np.ceil(model.N/3.0))
     else:
         N = model.N
-    eps = 1e-5
-    fixed_seed = stochastic or prop_mode == PROP_MC
+    eps = 1e-4
+    fixed_seed = stochastic or (prop_mode == PROP_MC)
     if fixed_seed:
         np.random.seed(stoc_seed)
     logZ, grad_all = model.objective_function(params, N, alpha=alpha, prop_mode=prop_mode)
@@ -75,7 +75,6 @@ def check_grad(params, model, stochastic=False, alpha=0.5, stoc_seed=42, prop_mo
                         if fixed_seed:
                             np.random.seed(stoc_seed)
                         val_minus, _ = model.objective_function(params_minus, N, alpha=alpha, prop_mode=prop_mode)
-
                         dij = (val_plus - val_minus) / eps / 2
                         print_message('%s i=%d/%d, j=%d/%d' % (name, i, pshape[0], j, pshape[1]), grad_all[name][i, j], dij)
             elif len(pshape) == 1:

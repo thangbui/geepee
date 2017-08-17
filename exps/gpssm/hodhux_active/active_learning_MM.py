@@ -65,7 +65,6 @@ def compute_predictive_entropy_given_control(data_fname, params_fname, cval, Tco
     Dobs = y.shape[1]
     T = y.shape[0]
     x_control = cval * np.ones([Tcontrol, 1])
-    no_panes = 5
     model_aep = aep.SGPSSM(
         y, Dlatent, M, lik='Gaussian', prior_mean=0, prior_var=1000, 
         x_control=xc, gp_emi=True, control_to_emi=True)

@@ -8,7 +8,7 @@ Attributes:
     PROP_MC (str): Description
     PROP_MM (str): Description
 """
-JITTER = 1e-5
+JITTER = 1e-6
 GH_DEGREE = 10
 PROP_MM = 'MM'
 PROP_LIN = 'LIN'

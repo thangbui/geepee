@@ -26,6 +26,7 @@ def test_gplvm_aep_gaussian(nat_param=True, stoc=False, prop_mode=PROP_MM):
     params = lvm.init_hypers(y_train)
     # lvm.optimise(method='adam', alpha=alpha, maxiter=1000, adam_lr=0.08)
     # params = lvm.get_hypers()
+    # params = lvm.optimise(method='L-BFGS-B', alpha=alpha, maxiter=1000)
     print 'gplvm aep gaussian nat_param %r stoc %r prop_mode %s' % (nat_param, stoc, prop_mode)
     check_grad(params, lvm, stochastic=stoc, alpha=alpha, prop_mode=prop_mode)
 
@@ -380,6 +381,7 @@ def test_gpssm_linear_aep_gaussian_kink(nat_param=True, stoc=False, prop_mode=PR
     y_train = np.reshape(y, [y.shape[0], 1])
     # TODO nat_param=nat_param
     lvm = aep.SGPSSM(y_train, Q, M, lik='Gaussian', gp_emi=False)
+
     lvm.optimise(method='adam', alpha=alpha, maxiter=500, adam_lr=0.08)
     params = lvm.get_hypers()
 
@@ -391,22 +393,29 @@ def test_gpssm_linear_aep_gaussian_kink(nat_param=True, stoc=False, prop_mode=PR
 
 
 def test_gpssm_gp_aep_gaussian_kink(nat_param=True, stoc=False, prop_mode=PROP_MM):
-
-    N_train = 10
+    np.random.seed(42)
+    N_train = 20
     process_noise = 0.2
     obs_noise = 0.1
     alpha = 0.5
-    M = 4
+    M = 10
     Q = 1
     D = 1
     (xtrue, x, y) = kink(N_train, process_noise, obs_noise)
     y_train = np.reshape(y, [y.shape[0], 1])
     lvm = aep.SGPSSM(y_train, Q, M, lik='Gaussian', gp_emi=True)
 
-    # init hypers, inducing points and q(u) params
-    params = lvm.init_hypers(y_train)
-    # TODO
-    # params = lvm.optimise(maxiter=1000, disp=False)
+    # # init hypers, inducing points and q(u) params
+    # params = lvm.init_hypers(y_train)
+    # # TODO
+    # params = lvm.optimise(maxiter=500, disp=False)
+    # import cPickle as pickle
+    # pickle.dump(params, open('/tmp/test_gpssm_params.pickle', 'wb'))
+
+    import cPickle as pickle
+    params = pickle.load(open('/tmp/test_gpssm_params.pickle', 'rb'))
+
+    print params
     
     print 'gplvm gp emis aep kink nat_param %r stoc %r prop_mode %s' % (nat_param, stoc, prop_mode)
     check_grad(params, lvm, stochastic=stoc, alpha=alpha, prop_mode=prop_mode)
@@ -477,7 +486,39 @@ def plot_gpssm_linear_aep_gaussian_stochastic():
     plt.savefig('/tmp/gaussian_stochastic_aep_gpssm_linear_MC.pdf')
 
 
+# def test_gpssm_gp_aep_gaussian_hodhux():
+#     data_fname = '/tmp/hh_data_MM_step_0.txt'
+#     alpha = 0.2
+#     M = 30
+#     data = np.loadtxt(data_fname)
+#     data = data / np.std(data, axis=0)
+#     y = data[:, :4]
+#     xc = data[:, [-1]]
+#     # init hypers
+#     Dlatent = 2
+#     Dobs = y.shape[1]
+#     T = y.shape[0]
+#     R = np.log([0.02]) / 2
+#     lsn = np.log([0.02]) / 2
+#     params = {'sn': lsn, 'sn_emission': R}
+
+#     # create AEP model
+#     x_control = xc
+#     model_aep = aep.SGPSSM(
+#         y, Dlatent, M, lik='Gaussian', prior_mean=0, prior_var=1000, 
+#         x_control=x_control, gp_emi=True, control_to_emi=True)
+#     hypers = model_aep.init_hypers(y)
+#     for key in params.keys():
+#         hypers[key] = params[key]
+#     model_aep.update_hypers(hypers)
+#     opt_hypers = model_aep.optimise(
+#         method='L-BFGS-B', alpha=alpha, maxiter=10000, reinit_hypers=False)
+
+#     check_grad(opt_hypers, model_aep, stochastic=False, alpha=alpha, prop_mode=PROP_MM)
+
 if __name__ == '__main__':
+    # test_gpssm_gp_aep_gaussian_hodhux()
+
     # TODO: PROP_LIN
 
     # test_gplvm_aep_gaussian(nat_param=True, stoc=False, prop_mode=PROP_MM)
@@ -563,12 +604,12 @@ if __name__ == '__main__':
     # # test_gpssm_linear_aep_gaussian_kink(nat_param=False, stoc=True, prop_mode=PROP_MC)
 
     test_gpssm_gp_aep_gaussian_kink(nat_param=True, stoc=False, prop_mode=PROP_MM)
-    test_gpssm_gp_aep_gaussian_kink(nat_param=True, stoc=True, prop_mode=PROP_MM)
+    # test_gpssm_gp_aep_gaussian_kink(nat_param=True, stoc=True, prop_mode=PROP_MM)
     # # test_gpssm_gp_aep_gaussian_kink(nat_param=False, stoc=False, prop_mode=PROP_MM)
     # # test_gpssm_gp_aep_gaussian_kink(nat_param=False, stoc=True, prop_mode=PROP_MM)
 
-    test_gpssm_gp_aep_gaussian_kink(nat_param=True, stoc=False, prop_mode=PROP_MC)
-    test_gpssm_gp_aep_gaussian_kink(nat_param=True, stoc=True, prop_mode=PROP_MC)
+    # test_gpssm_gp_aep_gaussian_kink(nat_param=True, stoc=False, prop_mode=PROP_MC)
+    # test_gpssm_gp_aep_gaussian_kink(nat_param=True, stoc=True, prop_mode=PROP_MC)
     # # test_gpssm_gp_aep_gaussian_kink(nat_param=False, stoc=False, prop_mode=PROP_MC)
     # # test_gpssm_gp_aep_gaussian_kink(nat_param=False, stoc=True, prop_mode=PROP_MC)
 

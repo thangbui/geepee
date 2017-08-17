@@ -617,7 +617,8 @@ class Base_SGP_Layer(object):
         zu = self.zu
         self.Kuu = compute_kernel(2 * ls, 2 * sf, zu, zu)
         self.Kuu += np.diag(JITTER * np.ones((M, )))
-        self.Kuuinv = np.linalg.inv(self.Kuu)
+        # self.Kuuinv = np.linalg.inv(self.Kuu)
+        self.Kuuinv = matrixInverse(self.Kuu)
 
     def update_posterior(self):
         """update the posterior approximation
