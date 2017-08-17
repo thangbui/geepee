@@ -405,17 +405,15 @@ def test_gpssm_gp_aep_gaussian_kink(nat_param=True, stoc=False, prop_mode=PROP_M
     y_train = np.reshape(y, [y.shape[0], 1])
     lvm = aep.SGPSSM(y_train, Q, M, lik='Gaussian', gp_emi=True)
 
-    # # init hypers, inducing points and q(u) params
-    # params = lvm.init_hypers(y_train)
-    # # TODO
-    # params = lvm.optimise(maxiter=500, disp=False)
+    # init hypers, inducing points and q(u) params
+    params = lvm.init_hypers(y_train)
+    # TODO
+    # params = lvm.optimise(maxiter=50, disp=False)
+    # # import cPickle as pickle
+    # # pickle.dump(params, open('/tmp/test_gpssm_params.pickle', 'wb'))
+
     # import cPickle as pickle
-    # pickle.dump(params, open('/tmp/test_gpssm_params.pickle', 'wb'))
-
-    import cPickle as pickle
-    params = pickle.load(open('/tmp/test_gpssm_params.pickle', 'rb'))
-
-    print params
+    # params = pickle.load(open('/tmp/test_gpssm_params.pickle', 'rb'))
     
     print 'gplvm gp emis aep kink nat_param %r stoc %r prop_mode %s' % (nat_param, stoc, prop_mode)
     check_grad(params, lvm, stochastic=stoc, alpha=alpha, prop_mode=prop_mode)

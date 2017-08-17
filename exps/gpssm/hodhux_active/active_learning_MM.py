@@ -41,12 +41,12 @@ def train_gpssm(data_fname, M, alpha, params_fname):
     for key in params.keys():
         hypers[key] = params[key]
     model_aep.update_hypers(hypers)
-    opt_hypers = model_aep.optimise(
-        method='L-BFGS-B', alpha=alpha, maxiter=50, reinit_hypers=False)
+    # opt_hypers = model_aep.optimise(
+    #     method='L-BFGS-B', alpha=alpha, maxiter=50, reinit_hypers=False)
     # opt_hypers = model_aep.optimise(
     #     method='adam', alpha=alpha, maxiter=25000, reinit_hypers=False, adam_lr=0.001)
     opt_hypers = model_aep.optimise(
-        method='adam', alpha=alpha, maxiter=40000, reinit_hypers=False)
+        method='adam', alpha=alpha, maxiter=30000, reinit_hypers=False)
     model_aep.save_model(params_fname)
 
 
@@ -87,7 +87,7 @@ if __name__ == '__main__':
     no_steps = 5
     M = 30
     alpha = 0.1
-    data_vals = [2, 10, 20]
+    data_vals = [2, 10]
     for step_id in range(no_steps):
         print 'step', step_id, '/ total', no_steps 
         np.savetxt('res/control_signals_MM_%d.txt'%step_id, np.array(data_vals), delimiter=',')

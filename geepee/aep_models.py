@@ -104,14 +104,10 @@ class SGP_Layer(Base_SGP_Layer):
             float: weighted sum of the log-partitions in the PEP energy
         """
         N = self.N
-        # scale_post = N * 1.0 / alpha - 1.0
-        # scale_cav = - N * 1.0 / alpha
-        # scale_prior = 1
+        scale_post = N * 1.0 / alpha - 1.0
+        scale_cav = - N * 1.0 / alpha
+        scale_prior = 1
 
-        scale_post = 0
-        scale_cav = 0
-        scale_prior = 0
-        
         phi_prior = self.compute_phi_prior()
         phi_post = self.compute_phi_posterior()
         phi_cav = self.compute_phi_cavity()
@@ -204,7 +200,7 @@ class SGP_Layer(Base_SGP_Layer):
         return mout, vout, psi1, psi2
 
     @profile
-    def backprop_grads_lvm_mm(self, m, v, dm, dv, psi1, psi2, mx, vx, alpha=1.0):
+    def backprop_grads_lvm_mm_OLD(self, m, v, dm, dv, psi1, psi2, mx, vx, alpha=1.0):
         """Summary
         
         Args:
@@ -236,13 +232,10 @@ class SGP_Layer(Base_SGP_Layer):
         Kuuinv = self.Kuuinv
 
         beta = (N - alpha) * 1.0 / N
-        # scale_poste = N * 1.0 / alpha - 1.0
-        # scale_cav = - N * 1.0 / alpha
-        # scale_prior = 1
+        scale_poste = N * 1.0 / alpha - 1.0
+        scale_cav = - N * 1.0 / alpha
+        scale_prior = 1
 
-        scale_poste = 0
-        scale_cav = 0
-        scale_prior = 0
         # compute grads wrt Ahat and Bhat
         dm_all = dm - 2 * dv * m
         dAhat = np.einsum('nd,nm->dm', dm_all, psi1)
@@ -311,6 +304,114 @@ class SGP_Layer(Base_SGP_Layer):
         grad_input = {'mx': dmx, 'vx': dvx}
 
         return grad_hyper, grad_input
+
+    @profile
+    def backprop_grads_lvm_mm(self, m, v, dm, dv, psi1, psi2, mx, vx, alpha=1.0):
+        """Summary
+        
+        Args:
+            m (TYPE): Description
+            v (TYPE): Description
+            dm (TYPE): Description
+            dv (TYPE): Description
+            psi1 (TYPE): Description
+            psi2 (TYPE): Description
+            mx (TYPE): Description
+            vx (TYPE): Description
+            alpha (float, optional): Description
+        
+        Returns:
+            TYPE: Description
+        """
+        N = self.N
+        M = self.M
+        ls = np.exp(self.ls)
+        sf2 = np.exp(2 * self.sf)
+        triu_ind = np.triu_indices(M)
+        diag_ind = np.diag_indices(M)
+        mu = self.mu
+        Su = self.Su
+        Suinv = self.Suinv
+        Spmm = self.Splusmm
+        muhat = self.muhat
+        Suhat = self.Suhat
+        Suhatinv = self.Suhatinv
+        Spmmhat = self.Splusmmhat
+        Kuuinv = self.Kuuinv
+        Kuu = self.Kuu
+
+        beta = (N - alpha) * 1.0 / N
+        scale_post = N * 1.0 / alpha - 1.0
+        scale_cav = - N * 1.0 / alpha
+        scale_prior = 1
+
+        # compute grads wrt psi1 and psi2
+        dm_all = dm - 2 * dv * m
+        dpsi1 = np.einsum('nd,dm->nm', dm_all, self.Ahat)
+        dpsi2 = np.einsum('nd,dab->nab', dv, self.Bhat_sto)
+        dsf2, dls, dzu, dmx, dvx = compute_psi_derivatives(
+            dpsi1, psi1, dpsi2, psi2, ls, sf2, mx, vx, self.zu)
+
+        dv_sum = np.sum(dv)
+        dls *= ls
+        dsf2 += dv_sum
+        dsf = 2 * sf2 * dsf2
+
+        # compute grads wrt cavity mean and covariance
+        psi1Kuuinv = np.einsum('na,ab->nb', psi1, Kuuinv)
+        psi2Kuuinv = np.einsum('nab,bc->nac', psi2, Kuuinv)
+        dmucav = np.einsum('nd,nm->dm', dm_all, psi1Kuuinv)
+        dSucav = np.einsum('ab,nd,nbc->dac', Kuuinv, dv, psi2Kuuinv)
+        dmucav += 2 * np.einsum('dab,db->da', dSucav, muhat)
+        # add in contribution from the normalising factor
+        Suinvmuhat = np.einsum('dab,db->da', Suhatinv, muhat)
+        dmucav += scale_cav * Suinvmuhat
+        dSucav += scale_cav * (
+            0.5 * Suhatinv 
+            - 0.5 * np.einsum('da,db->dab', Suinvmuhat, Suinvmuhat))
+        deta1_R_cav, deta2_cav, dKuuinv_via_cav = \
+            self.compute_cav_grad_u(dmucav, dSucav, alpha)
+
+        # compute grads wrt posterior mean and covariance
+        Suinvmu = np.einsum('dab,db->da', Suinv, mu)
+        dmu = scale_post * Suinvmu
+        dSu = scale_post * (
+            0.5 * Suinv - 0.5 * np.einsum('da,db->dab', Suinvmu, Suinvmu))
+        deta1_R_post, deta2_post, dKuuinv_via_post = \
+            self.compute_posterior_grad_u(dmu, dSu)
+
+        # contrib from phi prior term
+        dKuuinv_via_prior = - 0.5 * self.Dout * Kuu * scale_prior
+
+        deta1_R = deta1_R_cav + deta1_R_post
+        deta2 = deta2_cav + deta2_post
+        dKuuinv_via_phi = dKuuinv_via_cav + dKuuinv_via_post + dKuuinv_via_prior
+
+        # get contribution of Ahat and Bhat to Kuu and add to Minner
+        dAhat = np.einsum('nd,nm->dm', dm_all, psi1)
+        dKuuinv_m = np.einsum('da,db->ab', dAhat, muhat)
+        KuuinvSmmd = np.einsum('ab,dbc->dac', Kuuinv, Spmmhat)
+        dBhat = np.einsum('nd,nab->dab', dv, psi2)
+        dKuuinv_v = 2 * np.einsum('dab,dac->bc', KuuinvSmmd, dBhat) \
+            - np.sum(dBhat, axis=0)
+        dKuuinv = dKuuinv_m + dKuuinv_v + dKuuinv_via_phi
+        M_inner = - np.dot(Kuuinv, np.dot(dKuuinv, Kuuinv))
+        dhyp = d_trace_MKzz_dhypers(
+            2 * self.ls, 2 * self.sf, self.zu, M_inner,
+            self.Kuu - np.diag(JITTER * np.ones(self.M)))
+
+        dzu += dhyp[2]
+        dls += 2 * dhyp[1]
+        dsf += 2 * dhyp[0]
+
+        grad_hyper = {
+            'sf': dsf, 'ls': dls, 'zu': dzu,
+            'eta1_R': deta1_R, 'eta2': deta2
+        }
+        grad_input = {'mx': dmx, 'vx': dvx}
+
+        return grad_hyper, grad_input
+
 
     @profile
     def backprop_grads_lvm_mc(self, m, v, dm, dv, kfu, x, alpha=1.0):
@@ -1066,10 +1167,8 @@ class SGPSSM(Base_SGPSSM):
             yb = self.y_train[emi_idxs, :]
         batch_size_dyn = dyn_idxs.shape[0]
         scale_logZ_dyn = - (N - 1) * 1.0 / batch_size_dyn / alpha
-        scale_logZ_dyn = 0
         batch_size_emi = emi_idxs.shape[0]
         scale_logZ_emi = - N * 1.0 / batch_size_emi / alpha
-        # scale_logZ_emi = 0
 
         # update model with new hypers
         self.update_hypers(params)
@@ -1112,8 +1211,12 @@ class SGPSSM(Base_SGPSSM):
                 # deal with the emission factors here
                 mout, vout, psi1, psi2 = emi_layer.forward_prop_thru_cav(
                     cav_up_mc, cav_up_vc)
+                # mout = 0 * mout
+                # vout = 0 * vout + 1
                 logZ_emi, dm, dv = lik_layer.compute_log_Z(
                     mout, vout, yb, alpha)
+                # dm = 0 * dm
+                # dv = 0 * dv
                 logZ_emi = scale_logZ_emi * logZ_emi
                 dm_scale = scale_logZ_emi * dm
                 dv_scale = scale_logZ_emi * dv
@@ -1122,22 +1225,6 @@ class SGPSSM(Base_SGPSSM):
                     cav_up_mc, cav_up_vc, alpha)
                 lik_grad_hyper = lik_layer.backprop_grads(
                     mout, vout, dm, dv, alpha, scale_logZ_emi)
-                # print 'logZ'
-                # print logZ_emi
-                # print 'mcav'
-                # print cav_up_mc
-                # print 'vcav'
-                # print cav_up_vc
-                # print 'mout'
-                # print mout
-                # print 'vout'
-                # print vout
-                # print 'data'
-                # print yb 
-                # print 'alpha'
-                # print alpha
-                # print emi_layer.get_hypers()
-                # print lik_layer.get_hypers()
         elif prop_mode == PROP_MC:
             # deal with the transition/dynamic factors here
             res, res_s = dyn_layer.forward_prop_thru_cav(
@@ -1221,7 +1308,7 @@ class SGPSSM(Base_SGPSSM):
         phi_cavity_x = self.compute_phi_cavity_x(alpha)
         x_contrib = phi_prior_x + phi_poste_x + phi_cavity_x
         energy = logZ_dyn + logZ_emi + x_contrib + dyn_contrib + emi_contrib
-        print logZ_dyn, logZ_emi, x_contrib, dyn_contrib, emi_contrib
+        # print logZ_dyn, logZ_emi, x_contrib, dyn_contrib, emi_contrib
         # print phi_prior_x, phi_poste_x, phi_cavity_x
         for p in self.fixed_params:
             grad_all[p] = np.zeros_like(grad_all[p])

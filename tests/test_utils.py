@@ -54,7 +54,7 @@ def check_grad(params, model, stochastic=False, alpha=0.5, stoc_seed=42, prop_mo
             N = int(np.ceil(model.N/3.0))
     else:
         N = model.N
-    eps = 1e-4
+    eps = 1e-5
     fixed_seed = stochastic or (prop_mode == PROP_MC)
     if fixed_seed:
         np.random.seed(stoc_seed)
