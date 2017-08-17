@@ -28,8 +28,8 @@ def train_gpssm(data_fname, M, alpha, params_fname):
     Dlatent = 2
     Dobs = y.shape[1]
     T = y.shape[0]
-    R = np.log([0.02]) / 2
-    lsn = np.log([0.02]) / 2
+    R = np.log([0.00001]) / 2
+    lsn = np.log([0.00001]) / 2
     params = {'sn': lsn, 'sn_emission': R}
 
     # create AEP model
@@ -42,11 +42,11 @@ def train_gpssm(data_fname, M, alpha, params_fname):
         hypers[key] = params[key]
     model_aep.update_hypers(hypers)
     # opt_hypers = model_aep.optimise(
-    #     method='L-BFGS-B', alpha=alpha, maxiter=50, reinit_hypers=False)
+    #     method='L-BFGS-B', alpha=alpha, maxiter=1000, reinit_hypers=False)
     # opt_hypers = model_aep.optimise(
     #     method='adam', alpha=alpha, maxiter=25000, reinit_hypers=False, adam_lr=0.001)
     opt_hypers = model_aep.optimise(
-        method='adam', alpha=alpha, maxiter=30000, reinit_hypers=False)
+        method='adam', alpha=alpha, maxiter=10000, reinit_hypers=False, adam_lr=0.01)
     model_aep.save_model(params_fname)
 
 
@@ -69,7 +69,7 @@ def compute_predictive_entropy_given_control(data_fname, params_fname, cval, Tco
         y, Dlatent, M, lik='Gaussian', prior_mean=0, prior_var=1000, 
         x_control=xc, gp_emi=True, control_to_emi=True)
     model_aep.load_model(params_fname)
-    no_func_samples = 300
+    no_func_samples = 500
     Hy_fixed_func = np.zeros(no_func_samples)
     for k in range(no_func_samples):
         np.random.seed(k)
@@ -85,8 +85,8 @@ def compute_predictive_entropy_given_control(data_fname, params_fname, cval, Tco
 
 if __name__ == '__main__':
     no_steps = 5
-    M = 30
-    alpha = 0.1
+    M = 20
+    alpha = 0.2
     data_vals = [2, 10]
     for step_id in range(no_steps):
         print 'step', step_id, '/ total', no_steps 
@@ -104,7 +104,7 @@ if __name__ == '__main__':
         train_gpssm(data_fname, M, alpha, params_fname)
 
         # compute predictive entropy
-        Tcontrol = 50
+        Tcontrol = 100
         Nc = 101
         control_values = np.linspace(0, 25, Nc)
         from joblib import Parallel, delayed
@@ -113,7 +113,7 @@ if __name__ == '__main__':
             print c_ind, Nc
             return compute_predictive_entropy_given_control(data_fname, params_fname, control_values[c_ind], Tcontrol, M=M)
 
-        num_cores = 10
+        num_cores = 12
         results = Parallel(n_jobs=num_cores)(delayed(compute_entropy)(c_ind) for c_ind in inputs)
         Hy = np.array(results)
         np.savetxt('res/hh_gpssm_MM_entropy_%d.txt'%step_id, Hy, delimiter=',', fmt='%.4f')

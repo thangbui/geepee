@@ -655,7 +655,7 @@ def predictive_entropy(params_fname, cval, Tcontrol, M=20, prior=False):
 
 
 if __name__ == '__main__':
-    M = 30
+    M = 20
     alpha = 0.2
     for step in range(5):
         model_fname = 'res/hh_gpssm_MM_M_%d_alpha_%.2f_step_%d.pickle'%(M, alpha, step)

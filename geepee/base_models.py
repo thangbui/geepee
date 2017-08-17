@@ -110,7 +110,7 @@ class Base_Model(object):
                     final_params = results
             else:
                 options = {'maxfun': maxfun, 'maxiter': maxiter,
-                           'disp': disp, 'gtol': 1e-6, 'ftol': 1e-6}
+                           'disp': disp, 'gtol': 1e-10, 'ftol': 1e-10}
                 results = minimize(
                     fun=objective_wrapper,
                     x0=init_params_vec,
